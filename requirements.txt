@@ -1,0 +1,5 @@
+glog
+pandas
+streamlit
+python-dotenv
+graphviz
