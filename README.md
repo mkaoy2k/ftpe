@@ -1,14 +1,10 @@
-# FamilyTrees Personal Edition (PE) App
+# FamilyTrees Personal Edition (ftpe)
 
 ## Introduction
 
----
-
-The 'FamilyTrees' PE App is a stand-alone Python application that allows you to record you family tree.
+The 'FamilyTrees' Personal Edition (ftpe) is a stand-alone Python application that allows you to record you family tree.
 
 ## How It Works
-
----
 
 The 'Family Trees' service facilitates you to build your whole family tree as you grow your family, you will be able to add, update or share family info among your family as you like.
 
@@ -26,9 +22,7 @@ The 'Family Trees' service not only helps you to build your whole family tree, b
 
 ## Dependencies and Installation
 
----
-
-To install the 'Family Trees' PE App, please follow these steps:
+To install the ftpe App in Python, follow these steps:
 
 1. Clone the repository to your local machine.
 
@@ -36,38 +30,52 @@ To install the 'Family Trees' PE App, please follow these steps:
 
    ```
    conda env create -f environemnt.yaml
+   ```
    
 3. Or under Python environment, run:
    
+   ```
    python -m pip install -r requirements.txt
    ```
 
-3. Configuration defined in the `.env` file.
+## Configuration Defined in the `.env` file
 
-```commandline
+### Rename template.env to .env in your environment and configure accordingly
 
-# Gmail service
+### Gmail service
+   ```
 EMAIL_PW=your_gmail_pw
 EMAIL_SENDER=your_gmail
+   ```
 
-# Server Logging: 
-# LOGGING="DEBUG"
-
-# Turn off logging:
+### Server Logging: 
+   ```
+LOGGING="DEBUG"
 LOGGING="INFO"
+   ```
 
-# Languages currently supported
+### Languages currently supported
+   ```
 L10N = "繁中"
-# L10N = "US"
-```
+L10N = "US"
+   ```
 
 ## How to Use
 
----
+### To run ftpe as an image in a Docker container:
 
-To use the 'Family Trees' PE App, follow these steps:
+1. After pull from the Docker Hub, execute the following:
+   ```
+   docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:1.2
+   ```
+2. Lauch your default web browser, displaying the main page by entering:
+   '''
+   localhost:8501
+   '''
 
-1. Ensure that you have installed the required dependencies and added the OpenAI API key to the `.env` file.
+### To run ftpe in Python, do:
+
+1. Ensure that you have installed the required dependencies in the `.env` file.
 
 2. Run the `family_pe.py` file using the Streamlit CLI. Execute the following command:
 
@@ -77,7 +85,7 @@ To use the 'Family Trees' PE App, follow these steps:
 
 3. The application will launch in your default web browser, displaying the main page.
 
-### FAQ
+## FAQ
 
 1. _Where is the my FamilyTree stored?_
 
