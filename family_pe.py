@@ -1,10 +1,13 @@
 """
-FamilyTrees Personal Edition 1.2 2024/4/8
+FamilyTrees Personal Edition 1.4 2024/6/27
 
 	Feature Enhancement
+        None.
         
 	Bug Fix
-        1. Fixed function 1 bugs
+        1. Fixed function 10 bug to set L10N at run time
+        2. Updated function docstrings
+        
 """
 
 # Modules required
@@ -38,10 +41,17 @@ g_logging = os.getenv("LOGGING")
 log.setLevel(g_logging)    
 
 # --- Internal Functions --- from here
-# build family tree graph, starting from mem pointing to spouse(s), 
-# and then in turn female spouse pointing to kid(s) if any
 def build_spouse_graph(dbuff):
+    """ 
+    build family tree graph, starting from mem pointing to spouse(s), 
+    and then in turn female spouse pointing to kid(s) if any.
 
+    Args:
+        dbuff (dictionary): member's record
+
+    Returns:
+        None: Null
+    """
     global g_loc
     global g_single, all_members
     
@@ -1101,10 +1111,7 @@ def main_page(lname_idx, dbuff):
         with c1:
             if st.button(g_loc['BX_USR_SETTINGS']):
                 g_loc = g_L10N[g_loc_key]
-                
-                # update user_db
-                upd = {}
-                upd['l10n'] = g_loc_key
+                os.environ['L10N'] = g_loc_key
                 try:
                     st.info(f"{g_loc_key}: {g_loc['LANGUAGE_MODE_AFTER_RELOAD']}")
                     
@@ -1157,7 +1164,7 @@ def main_page(lname_idx, dbuff):
     return g_nav
           
 # ---- READ Family Tree from CSV ----
-# Clear all chches every 5 min = 300 seconds
+# Clear all caches every 5 min = 300 seconds
 @st.cache_data(ttl=300)
 def get_data_from_csv(f, base=None):
     # Load the family tree from a CSV file, into a dataframe, 'g_df'.
@@ -1250,6 +1257,17 @@ def load_male_members(members, base=None):
         m_members.Order, m_members.Name, m_members.Born)] 
     return m_members, g_lname
      
+# --- Load up User L10N --- from here
+@st.cache_data(ttl=300)
+def load_user_l10n(base=None):
+        # --- Initialize System L10N Settings ---- from here
+    # set system L10N setting as default locator key , 'g_loc_key'
+    # and associated language dictionary, 'g_loc'
+    
+    g_loc_key = os.getenv("L10N")    
+    g_loc = g_L10N[g_loc_key]
+    return g_loc_key, g_loc
+
 # --- Main Program --- from here
 if __name__ == '__main__':
     st.empty()
@@ -1267,11 +1285,8 @@ if __name__ == '__main__':
     g_L10N = load_L10N(base=g_dirtyUser)
     g_L10N_options = list(g_L10N.keys())
     
-    # --- Initialize System L10N Settings ---- from here
-    # set system L10N setting as default locator key , 'g_loc_key'
-    # and associated language dictionary, 'g_loc'
-    g_loc_key = os.getenv("L10N")    
-    g_loc = g_L10N[g_loc_key]
+    # --- Load User L10N --- from here
+    g_loc_key, g_loc = load_user_l10n(base=g_dirtyUser)
     
     # logging check-points --- here
     log.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
@@ -1284,7 +1299,6 @@ if __name__ == '__main__':
     g_fullname = "Personal Edition"
     
     # Set user-specific L10N dict obj
-    g_loc_key = "繁中"
     g_loc = g_L10N[g_loc_key]
     log.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
 
