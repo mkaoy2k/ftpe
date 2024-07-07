@@ -40,7 +40,7 @@ To install the ftpe App in Python, follow these steps:
 
 ## Configuration Defined in the `.env` file
 
-### Rename template.env to .env in your environment and configure accordingly
+### Rename template.env.txt to .env in your environment and configure accordingly
 
 ### Gmail service
    ```

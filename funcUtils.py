@@ -3,9 +3,9 @@ import os
 from dotenv import load_dotenv  # pip install python-dotenv
 import json
 import streamlit as st  # pip install streamlit
+import glog as log  # pip install glog
 
 # Import email packages
-import email
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
@@ -167,14 +167,15 @@ def verify_email(email, subject, action, msg, template=None):
     fc.close()        
     return
 
-def get_1st_mbr_dict(df, mem, born):
+@st.cache_data(ttl=300)
+def get_1st_mbr_dict(df, mem, born, base=None):
     """
     Return an index and associated dict obj, containing the FIRST record 
     found in 'df' dataframe, matching given member-name and birth-year.
     
     Raise 'FileNotFoundError' if not found, otherwise.
     """
-    # log.debug(f"Filter = 'Name == {mem} and Born = {born}'")
+    log.debug(f"Filter = 'Name == {mem} and Born = {born}'")
     filter = f"Name == @mem and Born == @born"
     try:
         rec = df.query(filter)
@@ -185,9 +186,10 @@ def get_1st_mbr_dict(df, mem, born):
     
     # drop duplicates for the same person with multiple records
     rec = rec[0:1]
+    
     # convert the single-record dataframe to a tuple (index, dict),
     # in which only dict obj is returned.
-    idx , member = rec.to_dict('index').popitem()
+    idx, member = rec.to_dict('index').popitem()
     return idx, member
 
 # Functional testing

@@ -1,18 +1,23 @@
 """
-FamilyTrees Personal Edition 1.4 2024/6/27
+FamilyTrees Personal Edition 1.5 2024/7/5
 
 	Feature Enhancement
-        None.
+        DocStrings update.
         
 	Bug Fix
-        1. Fixed function 10 bug to set L10N at run time
-        2. Updated function docstrings
+        1. Fixed functions 1,2,7 & 9 sliding max and default settings
+        2. Allow sharing of the selected member across all the functions via 
+            environment.
+        3. Adjusted column widths of row 1&3 displayed on
+            function 3 and 4.
+        4. Changed '過繼' (step) 譯成 '後繼'.
+        5. Fixed display_dad() and display_mom() for adopt/step cases.
         
 """
 
 # Modules required
 import pandas as pd     # pip install pandas
-import os, time
+import os, time, datetime
 from dotenv import load_dotenv  # pip install python-dotenv
 
 # Import Web App modules
@@ -57,17 +62,18 @@ def build_spouse_graph(dbuff):
     
     mem = dbuff['Name']
     born = dbuff['Born']
+    order = dbuff['Order']
     
-    filter = f"Name == @mem and Born == @born"
+    filter = f"Name == @mem and Born == @born and Order == @order"
     rec = all_members.query(filter)
-    log.debug(f"rec={rec}")
     if rec.empty:
         # This male-member not on file
         raise(FileNotFoundError)
     
+    log.debug(f"Found Member: {rec}")
     # Create a graph object with graphviz
     dot = gv.Digraph(name=mem,
-                    comment=f"{mem}'s Graph",
+                    comment=f"{mem} G{order} Graph",
                     engine = 'twopi')
     
     # set graph attributes
@@ -100,7 +106,9 @@ def build_spouse_graph(dbuff):
             spouse_label = f"{w}\n{g_loc['MEMBER_NOT_REG']}\n{g_loc['MARRIED_IN']}{married}"
             href = ""
         else:
-            # spouse info exists            
+            # spouse info exists
+            log.debug(f"Found Spouses: {rec_sp}")
+            
             born = rec_sp.Born.iloc[0]
             died = rec_sp.Died.iloc[0]
             spouse_label = f"{w}\n{born}-{died}\n{g_loc['MARRIED_IN']}{married}"
@@ -123,10 +131,13 @@ def build_spouse_graph(dbuff):
         if kids.empty:
             # no kids associated with this Mom
             continue # to the next spouse
+        
         # found kids
         # drop duplicated rows with the same name, and birth-year
         kids =kids.drop_duplicates(subset=['Name','Born'], 
                 keep='first')
+        
+        log.debug(f"Found Kids: {kids}")
         # add nodes for kids, associated with this Mom
         with dot.subgraph() as s:
             s.attr(rank='same')
@@ -262,21 +273,48 @@ def display_dad(dmem):
     
     # setup filter for extra Dads?
     filter = f"Name == @mem"
+    filter_dad = f"Dad == @mem"
     
-    # adopted-Dad?
+    # any adopted-Dads?
     if adopt_members.empty != True:
         dads = adopt_members.query(filter)
         if dads.empty != True:
-            # display adopted-Dad
-            st.markdown(f"#### => {g_loc['DAD']}({g_loc['REL_ADOPT']}): {dads.Dad.iloc[0]}")
+            # display adopted-Dads
+            # need to iterate dataframe
+            for idx in dads.index:
+                name = dads['Dad'] [idx]
+                st.markdown(f"#### => {g_loc['DAD']}({g_loc['REL_ADOPT']}): {name}")
+
+    # any adopted-Kids?
+    if adopt_members.empty != True:
+        kids = adopt_members.query(filter_dad)
+        if kids.empty != True:
+            # display adopted-kids            
+            # need to iterate dataframe
+            for idx in kids.index:
+                name = kids['Name'][idx]
+                st.markdown(f"#### => {g_loc['KID']}({g_loc['REL_ADOPT']}): {name}")
     
-    # step-Dad?   
+    # any step-Dads?   
     if step_members.empty != True:
         dads = step_members.query(filter)
         if dads.empty != True:
-            # display step-Dad
-            st.markdown(f"#### => {g_loc['DAD']}({g_loc['REL_STEP']}): {dads.Dad.iloc[0]}")       
+            # display step-Dads
+            # need to iterate dataframe
+            for idx in dads.index:
+                name = dads['Dad'][idx]
+                st.markdown(f"#### => {g_loc['DAD']}({g_loc['REL_STEP']}): {name}")       
     
+    # any step-Kids?
+    if step_members.empty != True:
+        kids = step_members.query(filter_dad)
+        if kids.empty != True:
+            # display step-kids            
+            # need to iterate dataframe
+            for idx in kids.index:
+                name = kids['Name'][idx]
+                st.markdown(f"#### => {g_loc['KID']}({g_loc['REL_STEP']}): {name}")
+      
     return
 
 # Display the basic info about member's Mom(s) via Streamlit
@@ -333,26 +371,60 @@ def display_mom(dmem):
     
     # setup filter for extra Moms    
     filter = f"Name == @mem"
+    filter_mom = f"Mom == @mem"
 
-    # adopted-Mom?
+    # any adopted-Moms?
     if adopt_members.empty != True:
         moms = adopt_members.query(filter)
         if moms.empty != True:
-            mom_name = moms.Mom.iloc[0]
-            # check if adopted-Mom is bio-Mom or not
-            if mom_name != bio_mom_name:
-                # display adopted-Mom
-                st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_ADOPT']}): {mom_name}")
+            # display adopted-Moms
+            # need to iterate dataframe
+            for idx in moms.index:
+                name = moms['Mom'] [idx]
+                st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_ADOPT']}): {name}")
+
+            # mom_name = moms.Mom.iloc[0]
+            # # check if adopted-Mom is bio-Mom or not
+            # if mom_name != bio_mom_name:
+            #     # display adopted-Mom
+            #     st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_ADOPT']}): {mom_name}")
     
-    # step-Mom?   
+    # any adopted-Kids?
+    if adopt_members.empty != True:
+        kids = adopt_members.query(filter_mom)
+        if kids.empty != True:
+            # display adopted-kids            
+            # need to iterate dataframe
+            for idx in kids.index:
+                name = kids['Name'][idx]
+                st.markdown(f"#### => {g_loc['KID']}({g_loc['REL_ADOPT']}): {name}")
+
+    # any step-Moms?   
     if step_members.empty != True:
         moms = step_members.query(filter)
         if moms.empty != True:
-            mom_name = moms.Mom.iloc[0]
-            # check if adopted-Mom is bio-Mom or not
-            if mom_name != bio_mom_name:
-                # display step-Mom
-                st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_STEP']}): {mom_name}")       
+            # display step-Moms
+            # need to iterate dataframe
+            for idx in moms.index:
+                name = moms['Mom'][idx]
+                st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_STEP']}): {name}")       
+            
+            # mom_name = moms.Mom.iloc[0]
+            # # check if adopted-Mom is bio-Mom or not
+            # if mom_name != bio_mom_name:
+            #     # display step-Mom
+            #     st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_STEP']}): {mom_name}")       
+    
+    # any step-Kids?
+    if step_members.empty != True:
+        kids = step_members.query(filter_mom)
+        if kids.empty != True:
+            # display step-kids            
+            # need to iterate dataframe
+            for idx in kids.index:
+                name = kids['Name'][idx]
+                st.markdown(f"#### => {g_loc['KID']}({g_loc['REL_STEP']}): {name}")
+    
     return
 
 # Display the basic info about member's Spouse via Streamlit
@@ -453,7 +525,7 @@ def display_3gen(dmem):
     Display a list of members who are related across three generations 
         via Streamlit, given by member dict object.
     Each member displays basic info about member, Dad, Mom, and
-        Spouse, which is formated as a string, consisting of:
+        Spouse, which are formated as a string, consisting of:
         1. name, 
         2. 'birth-deadth'-years
         3. associated URL 
@@ -487,89 +559,90 @@ def display_3gen(dmem):
     return
 
 # Display the detail info about member via Streamlit.
-def display_update_member(dbuff):
-    # Args:
-    #     dbuff: a dict object about the member
+def display_update_member():
+    # Args: None
     # On the web page, 
     #     1. display fields, arranged in row-column layout.
     #     2. Solicitate user for an update
     
     # Return:
-    #     return the modified 'dbuff' dict obj
-    global g_loc
-    
+    #     A 'dbuff' dict obj
+    global g_loc, gbuff
+        
     # row 1
-    c11, c12, c13 = st.columns([3,3,1])
-    dbuff["Name"] = c11.text_input(f":blue[{g_loc['L311_FULL_NAME']}]", 
-        dbuff["Name"], 
+    c11, c12, c13 = st.columns([3,2,2])
+    gbuff["Name"] = c11.text_input(f":blue[{g_loc['L311_FULL_NAME']}]", 
+        gbuff["Name"], 
         max_chars=20, 
         help=g_loc['L311_HELP'])
-    dbuff["Aka"] = c12.text_input(f":blue[{g_loc['L312_ALIAS']}]", 
-        dbuff["Aka"],
+    gbuff["Aka"] = c12.text_input(f":blue[{g_loc['L312_ALIAS']}]", 
+        gbuff["Aka"],
         max_chars=60,                             
         help=g_loc['L312_HELP'])
 
     rec_sex = c13.selectbox(f":blue[{g_loc['L313_SEX']}]", 
         options=g_lsex, 
-        index=int(dbuff["Sex"]),
+        index=int(gbuff["Sex"]),
         help=g_loc['L313_HELP'])
-    dbuff["Sex"] = g_lsex.index(rec_sex)
+    gbuff["Sex"] = g_lsex.index(rec_sex)
     
     # row 2
     c21, c22, c23 = st.columns([3,2,2])
-    dbuff["Order"] = c21.text_input(f":blue[{g_loc['L321_GEN_ID']}]", 
-        dbuff["Order"],
+    gbuff["Order"] = c21.text_input(f":blue[{g_loc['L321_GEN_ID']}]", 
+        gbuff["Order"],
         max_chars=10,
         help=g_loc['L321_HELP'])
-    dbuff["Born"] = c22.text_input(f":blue[{g_loc['L322_BIRTH_YEAR']}]", 
-        dbuff["Born"],
+    gbuff["Born"] = c22.text_input(f":blue[{g_loc['L322_BIRTH_YEAR']}]", 
+        gbuff["Born"],
         max_chars=10,
         help=g_loc['L322_HELP'])
-    dbuff["Died"] = c23.text_input(f":blue[{g_loc['L323_DEATH_YEAR']}]", 
-        dbuff["Died"],
+    gbuff["Died"] = c23.text_input(f":blue[{g_loc['L323_DEATH_YEAR']}]", 
+        gbuff["Died"],
         max_chars=10,
         help=g_loc['L323_HELP'])
     
     # row 3
-    c31, c32, c33 = st.columns([3,3,1])
-    dbuff["Dad"] = c31.text_input(f":blue[{g_loc['L331_DAD_NAME']}]", 
-        dbuff["Dad"], 
+    c31, c32, c33 = st.columns([3,2,2])
+    gbuff["Dad"] = c31.text_input(f":blue[{g_loc['L331_DAD_NAME']}]", 
+        gbuff["Dad"], 
         max_chars=20,
         help=g_loc['L331_HELP'])
-    dbuff["Mom"] = c32.text_input(f":blue[{g_loc['L332_MOM_NAME']}]", 
-        dbuff["Mom"], 
+    gbuff["Mom"] = c32.text_input(f":blue[{g_loc['L332_MOM_NAME']}]", 
+        gbuff["Mom"], 
         max_chars=20,
         help=g_loc['L332_HELP'])
     rec_rel = c33.selectbox(f":blue[{g_loc['L333_RELATION']}]", 
         options=g_lrelation,
-        index=int(dbuff["Relation"]),
+        index=int(gbuff["Relation"]),
         help=g_loc['L333_HELP'])
-    dbuff["Relation"] = g_lrelation.index(rec_rel)
+    gbuff["Relation"] = g_lrelation.index(rec_rel)
     
     # row 4
     c41, c42, c43 = st.columns([2,3,2])
     rec_status = c41.selectbox(f":blue[{g_loc['L341_STATUS']}]", 
         options=g_lstatus,
-        index=int(dbuff["Status"]),
+        index=int(gbuff["Status"]),
         help=g_loc['L341_HELP'])
-    dbuff["Status"] = g_lstatus.index(rec_status)
+    gbuff["Status"] = g_lstatus.index(rec_status)
     
-    dbuff["Spouse"] = c42.text_input(f":blue[{g_loc['L342_SPOUSE']}]",
-        dbuff["Spouse"],
+    gbuff["Spouse"] = c42.text_input(f":blue[{g_loc['L342_SPOUSE']}]",
+        gbuff["Spouse"],
         max_chars=20,
         help=g_loc['L342_HELP'])
     
-    dbuff["Married"] = c43.text_input(f":blue[{g_loc['L343_MARRIAGE_YEAR']}]",
-        dbuff["Married"],
+    gbuff["Married"] = c43.text_input(f":blue[{g_loc['L343_MARRIAGE_YEAR']}]",
+        gbuff["Married"],
         max_chars=20,
         help=g_loc['L343_HELP'])
     
     # row 5
     c51, _ = st.columns([6,1])
-    dbuff["Href"] = c51.text_input(f":blue[{g_loc['L351_URL']}]", 
-        dbuff["Href"], 
+    gbuff["Href"] = c51.text_input(f":blue[{g_loc['L351_URL']}]", 
+        gbuff["Href"], 
         max_chars=120,
         help=g_loc['L351_HELP'])   
+
+    return
 
 # Return a Pandas dataframe obj
 def get_gen(gen_begin, num):
@@ -596,6 +669,7 @@ def get_gen(gen_begin, num):
 # A generator function, yielding an unique member at a time, 
 # given a member-name. 
 def get_umember(name, spouse='?', dad='?', mom='?', born='0', order='0'):
+    """
     # The selection criteria might include 
     # the following five optional attributes:
     #     1. Spouse-name (optional)
@@ -616,7 +690,7 @@ def get_umember(name, spouse='?', dad='?', mom='?', born='0', order='0'):
     # Return:
     #   A member (row index and its associated dict obj) at a time,
     #   or 'FileNotFoundError' if not found
-
+    """
     global all_members, g_loc
     
     # build filter
@@ -638,6 +712,8 @@ def get_umember(name, spouse='?', dad='?', mom='?', born='0', order='0'):
     rec = all_members.query(filter)
     if rec.empty:
         raise(FileNotFoundError)
+    
+    log.debug(f"Found Member: {rec}")
 
     didx = rec.to_dict('index')
     for i in didx:
@@ -646,20 +722,22 @@ def get_umember(name, spouse='?', dad='?', mom='?', born='0', order='0'):
     
 # --- Main Web Widget --- from here
 @func_timer_decorator
-def main_page(lname_idx, dbuff):
-    global g_username, g_nav, g_lname
+def main_page(nav, lname_idx):
+    """
+    Upon selecting a side-bar function one the right portion of the
+    main widget via Streamlit, launching corresponding funtion and 
+    displaying output on the left portion of the main widget 
+    """
+    global g_username, g_lname
+    global gbuff, gbuff_idx
     global g_loc, g_loc_key, g_L10N_options, g_L10N
     global g_df
     global g_fTree, g_path_dir
     global g_dirtyUser, g_dirtyTree
-    
-    # Upon selecting a side-bar function, 
-    # take an action accordingly by 
-    # displaying output on the main widget 
-    
+
     # --- Function 1 --- from here
-    # display a family graph by male-member
-    if g_nav == g_loc['MENU_DISP_GRAPH_BY_MALE']:
+    # display a family graph by selected male-member
+    if nav == g_loc['MENU_DISP_GRAPH_BY_MALE']:
         # display a family graph starting from a male-member 
         # selected with associated spousees who have related kids
 
@@ -668,12 +746,11 @@ def main_page(lname_idx, dbuff):
         if lname_idx <= 1:
             # at least 2 generations
             st.error(f"{g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
-            return g_nav
+            return
         
-        # select a generation
-        max_gen = dbuff['Order'] 
-        
-        default_gen = load_male_gen(g_lname, base=g_dirtyTree)
+        # select a generation        
+        max_gen = load_male_gen(g_lname, base=g_dirtyTree)
+        default_gen = gbuff['Order'] 
 
         fgen = st.slider(g_loc['S1_GEN_ORDER'], 
                         1, 
@@ -681,62 +758,72 @@ def main_page(lname_idx, dbuff):
                         help=g_loc['S1_HELP'])
         
         c11, c12 = st.columns([5,5])
+        today =  datetime.date.today()
+        max_year = today.year
+        default_year = today.year - 100
         fborn1 = c11.slider(g_loc['S1_BORN_FROM'], 
                         0, 
-                        2050, 1950,
+                        max_year, default_year,
                         step=10,
                         help=g_loc['S1_HELP'])
         
+        default_year = today.year
         fborn2 = c12.slider(g_loc['S1_BORN_TO'], 
                         0, 
-                        2050, 2000,
+                        max_year, default_year,
                         step=10,
                         help=g_loc['S1_HELP'])
         
         try:
-            # build a male list, given selected generation
+            # build a male list of tuples, given selected generation
             lname = slice_male_list(fgen, fborn1, fborn2, base=g_dirtyTree)
             lname_idx = len(lname) - 1
             tmem = st.selectbox(g_loc['L1_SELECTBOX'],
                                         options=lname, 
                                         index=lname_idx,
                                         help=g_loc['L1_HELP'])
-            log.debug(f"tmem={tmem}")
+            log.debug(f"Selected Tuple= {tmem}")
             order, mem, born = tmem
             lname_idx = lname.index(tmem)
+            st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(lname)}")
+            
             try:
-                # _, dbuff = get_1st_mbr_dict(g_df, mem, born)
                 memgen = get_umember(mem, 
                                     order=order,
                                     born=born)
-                for idx, dbuff in memgen:
-                    mem = dbuff['Name']
-                    born = dbuff['Born']
-                    order = dbuff['Order']
-                    sex = g_lsex[dbuff['Sex']]
+                for idx, gbuff in memgen:
+                    mem = gbuff['Name']
+                    born = gbuff['Born']
+                    order = gbuff['Order']
+                    sex = g_lsex[gbuff['Sex']]
                     st.markdown(f"#### {g_loc['GEN_ORDER']}: {order} {g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {mem}({born},{sex})")
+                    gbuff_idx = idx
                     break
+                
                 # build the graph using the first member got
-                log.debug(f"dbuff={dbuff}")
-                dot = build_spouse_graph(dbuff)                        
+                log.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+                load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)        
+
+                dot = build_spouse_graph(gbuff)                        
             except:
                 st.error(g_loc['MEMBER_NOT_FOUND'])
-                return g_nav
+                return
                         
             # Show graph on Streamlit Page
             log.debug(dot.source)
             st.graphviz_chart(dot,
                     use_container_width = True)
+
         except:
             st.warning(g_loc['MEMBER_NOT_FOUND'])
             # continue to adjust sliders
-                
+        
         st.success(f"{g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['DONE']}")
-        return g_nav      
+        return      
         
     # --- Function 2 --- from here
     # list a family info by male-member    
-    if g_nav == g_loc['MENU_QUERY_3G_BY_MALE']:
+    if nav == g_loc['MENU_QUERY_3G_BY_MALE']:
         # list immediate family basic info with respect to a 
         # given a tuple (male-member -name, birth-year)
         st.subheader(g_loc['T2_QUERY_3G_BY_MALE'])
@@ -744,28 +831,33 @@ def main_page(lname_idx, dbuff):
         if lname_idx <= 1:
             # at least 2 generations
             st.error(f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
-            return g_nav
+            return
         
         # select a generation
-        max_gen = dbuff['Order'] 
         
-        default_gen = load_male_gen(g_lname, base=g_dirtyTree)
-
+        max_gen = load_male_gen(g_lname, base=g_dirtyTree)
+        default_gen = gbuff['Order'] 
+        
         fgen = st.slider(g_loc['S1_GEN_ORDER'], 
                         1, 
                         max_gen, default_gen,
                         help=g_loc['S1_HELP'])
 
         c11, c12 = st.columns([5,5])
+        today =  datetime.date.today()
+        max_year = today.year
+        default_year = today.year - 100
+        
         fborn1 = c11.slider(g_loc['S1_BORN_FROM'], 
                         0, 
-                        2050, 1950,
+                        max_year, default_year,
                         step=10,
                         help=g_loc['S1_HELP'])
         
+        default_year = today.year
         fborn2 = c12.slider(g_loc['S1_BORN_TO'], 
                         0, 
-                        2050, 2000,
+                        max_year, default_year,
                         step=10,
                         help=g_loc['S1_HELP'])
         
@@ -779,45 +871,50 @@ def main_page(lname_idx, dbuff):
                                         help=g_loc['L1_HELP'])
             order, mem, born = tmem
             lname_idx = lname.index(tmem)
+            st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(lname)}")
             
             try:
-                # _, dbuff = get_1st_mbr_dict(g_df, mem, born)
                 memgen = get_umember(mem, 
                                     order=order,
                                     born=born)
-                for idx, dbuff in memgen:
-                    mem = dbuff['Name']
-                    born = dbuff['Born']
-                    order = dbuff['Order']
-                    sex = g_lsex[dbuff['Sex']]
+                for idx, gbuff in memgen:
+                    mem = gbuff['Name']
+                    born = gbuff['Born']
+                    order = gbuff['Order']
+                    sex = g_lsex[gbuff['Sex']]
                     st.markdown(f"#### {g_loc['GEN_ORDER']}: {order} {g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {mem}({born},{sex})")
                     break
             except:
                 st.error(f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['FAILED']}")
-                return g_nav
+                return
             
             # display current generation, plus one level up and down
-            display_3gen(dbuff)
+            display_3gen(gbuff)
+            load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)                
             st.success(f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['DONE']}")
-            return g_nav      
         except:
             st.warning(g_loc['MEMBER_NOT_FOUND'])
             # continue to adjust sliders
+            
+        return      
     
     # --- Function 3 --- from here
     # add a new Family Member
-    if g_nav == g_loc['MENU_MEMBER_ADD']:
+    if nav == g_loc['MENU_MEMBER_ADD']:
         st.subheader(g_loc['T3_MEMBER_ADD'])
+
+        # initialize a dict obj, 'dbuff'
+        # dbuff = gbuff.copy()
         
-        display_update_member(dbuff)
+        display_update_member()
         
         if st.button(g_loc['B3_MEMBER_ADD']):
             with st.spinner(g_loc['IN_PROGRESS']):
             
-                st.write(f"{g_loc['MENU_MEMBER_ADD']}: {dbuff['Name']}")
+                st.write(f"{g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']}")
 
-                # create a dict object with list values from buffer 'dbuff' 
-                to_add = {key: [value] for key, value in dbuff.items()}
+                # create a dict object with list values from buffer 'gbuff' 
+                to_add = {key: [value] for key, value in gbuff.items()}
                 
                 # convert dictionary to dataframe
                 to_add = pd.DataFrame.from_dict(to_add)
@@ -827,48 +924,51 @@ def main_page(lname_idx, dbuff):
                                 mode='a',
                                 header = False,
                                 index= False)
-                    st.success(f"{g_loc['MENU_MEMBER_ADD']}: {dbuff['Name']} {g_loc['ADD']} {g_loc['DONE']}")
+                    st.success(f"{g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']} {g_loc['ADD']} {g_loc['DONE']}")
                     # force to create a new tree cache upon return
                     os.environ['DIRTY_TREE'] = str(time.time())
+                    load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)        
+
                 except:
-                    st.error(f"{g_loc['MENU_MEMBER_ADD']}: {dbuff['Name']} {g_loc['ADD']} {g_loc['FAILED']}")        
-        return g_nav      
+                    st.error(f"{g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']} {g_loc['ADD']} {g_loc['FAILED']}")        
+        return      
   
     # --- Function 4 --- from here
     # update an existed Family Member
-    if g_nav == g_loc['MENU_MEMBER_UPDATE']:
+    if nav == g_loc['MENU_MEMBER_UPDATE']:
         # update an existed Family Member
         # given by the member index of dataframe
         st.subheader(g_loc['T4_MEMBER_UPDATE'])
         
-        default_gen = dbuff['Order']
+        # default_gen = gbuff['Order']
     
         idx = st.text_input(f":blue[{g_loc['L41_MEMBER_INDEX']}]",
-            default_gen,
+            gbuff_idx,
             max_chars=10,
             help=g_loc['L41_HELP'])
         
         # Target Series obj, identified by 'idx'
         idx = int(idx)
         try:
-            # safe guard person not found
+            # safe guard in case that person not found
             rcd = g_df.iloc[idx]
         except:
             st.error(f"{g_loc['MEMBER_NOT_FOUND']}") 
-            return g_nav      
+            return      
         
         # convert to dict buffer
-        dbuff = {key: value for key, value in rcd.items()}
+        gbuff = {key: value for key, value in rcd.items()}
                
-        display_update_member(dbuff)
+        display_update_member()
         
-        st.info(f"{g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {dbuff['Name']} {g_loc['L42_CONFIRM_UPDATE']}")
+        st.info(f"{g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['L42_CONFIRM_UPDATE']}")
         btn1, btn2 = st.columns(2)
         with btn1:
             if st.button(g_loc['B4_MEMBER_UPDATE']):
                 with st.spinner(g_loc['IN_PROGRESS']):
-                    # To update a row, by index with a dict obj 'dbuff'
-                    g_df.loc[idx] = dbuff
+                    # To update a row, by index with a dict obj 'gbuff'
+                    g_df.loc[idx] = gbuff
+                    
                     try:
                         # backup the current family tree
                         os.rename(g_fTree, g_fTree_Backup)
@@ -880,8 +980,8 @@ def main_page(lname_idx, dbuff):
                                     index= False)
                         # force to create a new tree cache upon return
                         os.environ['DIRTY_TREE'] = str(time.time())
-                        
-                        st.success(f"{g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {dbuff['Name']} {g_loc['UPDATE']} {g_loc['DONE']}")
+                        load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
+                        st.success(f"{g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['UPDATE']} {g_loc['DONE']}")
                     except:
                         st.error(f"{g_loc['MEMBER']}{g_loc['UPDATE']} {g_loc['FAILED']}")        
         with btn2: 
@@ -902,25 +1002,25 @@ def main_page(lname_idx, dbuff):
                         # force to create a new tree cache upon return
                         os.environ['DIRTY_TREE'] = str(time.time())
                         
-                        st.success(f"{g_loc['MEMBER']} {g_loc['INDEX']}: {idx} {dbuff['Name']} {g_loc['DELETE']} {g_loc['DONE']}")
+                        st.success(f"{g_loc['MEMBER']} {g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['DELETE']} {g_loc['DONE']}")
                     except:
                         st.error(f"{g_loc['MEMBER']}{g_loc['DELETE']} {g_loc['FAILED']}")        
-                
-        return g_nav      
+        gbuff_idx = idx        
+        return      
 
     # --- Function 5 --- from here
     # inquire the basic info across 3 generations by mamber-name
-    if g_nav == g_loc['MENU_QUERY_TBL_BY_NAME']:
+    if nav == g_loc['MENU_QUERY_TBL_BY_NAME']:
         # ALl member detail info of three generations, 
         #     given by any member name of the middle generation.
 
         st.subheader(g_loc['T5_QUERY_TBL_BY_NAME'])
         
         rec_name = st.text_input(g_loc['L51_FULL_NAME'], 
-                dbuff['Name'], 
+                gbuff['Name'], 
                 max_chars=20, 
                 help=g_loc['L51_HELP'])
-                
+        
         if st.button(g_loc['B5_MEMBER_INQUERY']):
             with st.spinner(g_loc['IN_PROGRESS']): 
                 filter = f"Name == @rec_name"
@@ -928,17 +1028,24 @@ def main_page(lname_idx, dbuff):
                 if df2.empty:
                     st.error(f"{rec_name} {g_loc['MENU_QUERY_TBL_BY_NAME']} {g_loc['FAILED']}")
                 else:  
+                    st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
                     st.table(df2)
+                    
+                    # keep the first record found, given the newly entered name
+                    gbuff['Name'] = rec_name
+                    gbuff['Born'] = df2.Born.iloc[0]
+                    load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
+                    gbuff_idx = df2.index[0]
                     st.success(f"{rec_name} {g_loc['MENU_QUERY_TBL_BY_NAME']} {g_loc['DONE']}")                  
-        return g_nav      
+        return      
 
     # --- Function 6: --- from here   
     # inquire the detail info of members by alias(es)
-    if g_nav == g_loc['MENU_QUERY_TBL_BY_ALIAS']:
+    if nav == g_loc['MENU_QUERY_TBL_BY_ALIAS']:
         st.subheader(g_loc['T6_QUERY_TBL_BY_ALIAS'])
         
         rec_aka = st.text_input(g_loc['L61_ALIAS'], 
-                    dbuff['Name'], 
+                    gbuff['Name'], 
                     max_chars=120, 
                     help=g_loc['L61_HELP'])
                     
@@ -957,26 +1064,31 @@ def main_page(lname_idx, dbuff):
                 if df2.empty:
                     st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
                 else:   
+                    st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
                     st.table(df2)
+                    gbuff['Name'] = df2['Name'].iloc[0]
+                    gbuff['Born'] = df2['Born'].iloc[0]
+                    load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
                     st.success(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['DONE']}")              
-        return g_nav      
+        return      
 
     # --- Function 7 --- from here
     # inquire the detail info of members by generation-id
-    if g_nav == g_loc['MENU_QUERY_TBL_BY_1GEN']:
+    if nav == g_loc['MENU_QUERY_TBL_BY_1GEN']:
         st.subheader(g_loc['T7_QUERY_TBL_BY_1GEN'])
         
         st.markdown(f"{g_loc['HEAD_COUNT_TOTAL']}{len(bio_members.index)}")
         st.markdown(f"{g_loc['HEAD_COUNT_MALE']}{len(m_members.index)}")
                 
         # set an upper bound above the max gen order
-        max_gen = dbuff['Order'] + 1
+        max_gen = load_male_gen(g_lname, base=g_dirtyTree)
+
         if max_gen <= 0:
             # at least 1 generation
             st.error(f"{g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
-            return g_nav
+            return
             
-        default_gen = load_male_gen(g_lname, base=g_dirtyTree)
+        default_gen = gbuff['Order']
 
         gen = st.slider(g_loc['S1_GEN_ORDER'], 
                         1, 
@@ -989,29 +1101,28 @@ def main_page(lname_idx, dbuff):
             g1_members = get_gen(gen, 0)
             st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(g1_members.index)}")
             st.table(g1_members)
+            load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
             st.success(f"{g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['DONE']}")        
         except:
             st.error(g_loc['INFO_NOT_FOUND'])        
-        return g_nav      
+        return      
     
     # --- Function 8 --- from here
     # inquire the basic info of members by member-name etc.
-    if g_nav == g_loc['MENU_QUERY_3G_BY_NAME']:
+    if nav == g_loc['MENU_QUERY_3G_BY_NAME']:
         # inquire the basic info of members by member-name (mandatory)
         # and two optional attributes:
         # 1. bith-year,
         # 2. spouse
 
         st.subheader(g_loc['T8_QUERY_3G_BY_NAME'])
-
-        
+       
         rec_name = st.text_input(g_loc['L81_ENTER_NAME'], 
-                    dbuff['Name'], 
+                    gbuff['Name'], 
                     max_chars=20, 
                     help=g_loc['L81_HELP'])
         
-        c11, c12 = st.columns([4,6])
-        
+        c11, c12 = st.columns([4,6])        
         rec_born = c11.text_input(g_loc['L82_ENTER_BORN'],
                     "0", 
                     max_chars=20, 
@@ -1023,26 +1134,32 @@ def main_page(lname_idx, dbuff):
                 
         if st.button(g_loc['B8_QUERY_3G']):
             try:
+                # keep the new entered name
+                gbuff['Name'] = rec_name
+                load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
+        
                 memgen = get_umember(rec_name, 
                                 spouse=rec_spouse,
                                 born=rec_born)
                 for idx, dmem in memgen:
                     mem = dmem['Name']
                     born = dmem['Born']
+                    gbuff['Born'] = born
+                    gbuff_idx = idx  
                     order = dmem['Order']
                     sex = g_lsex[dmem['Sex']]
                     st.markdown(f"#### {g_loc['GEN_ORDER']}:{order} {g_loc['MEMBER']}{g_loc['INDEX']}:{idx} {mem}({born}, {sex})")
                     display_3gen(dmem)
-                    st.markdown("---")    
-
+                    st.markdown("---") 
+                    gbuff = dmem.copy()                 
                 st.success(f"{rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['DONE']}")
             except:
                 st.error(f"{rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['FAILED']}")
-        return g_nav      
+        return      
 
     # --- Function 9 --- from here
     # list the detail info of 3-generation view
-    if g_nav == g_loc['MENU_QUERY_TBL_BY_3GEN']:
+    if nav == g_loc['MENU_QUERY_TBL_BY_3GEN']:
         # list the detail info of 3-generation view, given by 
         # member-name                  
         st.subheader(g_loc['T9_QUERY_TBL_BY_3GEN'])
@@ -1051,13 +1168,13 @@ def main_page(lname_idx, dbuff):
         st.markdown(f"{g_loc['HEAD_COUNT_MALE']}{len(m_members.index)}")
                 
         # select a begining generation and list 2 generations below
-        max_gen = dbuff['Order'] 
+        max_gen = load_male_gen(g_lname, base=g_dirtyTree)
         if max_gen <= 1:
             # at least 2 generations
             st.error(f"{g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
-            return g_nav
+            return
         
-        default_gen = load_male_gen(g_lname, base=g_dirtyTree)
+        default_gen = gbuff['Order'] 
 
         gen = st.slider(g_loc['S1_GEN_ORDER'], 
                         1, 
@@ -1073,13 +1190,13 @@ def main_page(lname_idx, dbuff):
             st.success(f"{g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['DONE']}")
         except:
             st.error(g_loc['INFO_NOT_FOUND'])       
-        return g_nav   
+        return   
 
     # --- Function 10 --- from here
     # Configure User Settings                  
-    if g_nav == g_loc['MENU_SETTINGS']:
+    if nav == g_loc['MENU_SETTINGS']:
         # Three settings are supported:
-        # 1. Update User setting: L10N
+        # 1. Update Server setting: L10N
         # 2. Import CVS to merge into family tree
         # 3. Export current family tree to local 'Download' folder
 
@@ -1134,7 +1251,7 @@ def main_page(lname_idx, dbuff):
                     mbrs = df.drop(index=0)
                 
                 if mbrs.empty:
-                    return g_nav # no merge needed
+                    return # no merge needed
                     
                 g_df = pd.concat([g_df, mbrs])
                 
@@ -1161,7 +1278,7 @@ def main_page(lname_idx, dbuff):
                     
                 except:
                     st.error(f"{g_loc['BX_IMPORT']} {g_loc['FAILED']}")        
-    return g_nav
+    return
           
 # ---- READ Family Tree from CSV ----
 # Clear all caches every 5 min = 300 seconds
@@ -1214,7 +1331,7 @@ def load_male_gen(lname, base=None):
     order, _, _ = lname[-1]
     return order
 
-# --- Load up Male Members --- from here
+# --- Load Male Members into list of tuples --- from here
 @st.cache_data(ttl=300)
 def slice_male_list(order, born1, born2, base=None):
     # return male members in a list, given by generation order, 'order'
@@ -1232,13 +1349,14 @@ def slice_male_list(order, born1, born2, base=None):
     return lname
 
 # --- Load up Male Members --- from here
-@st.cache_data(ttl=300)
+@st.cache_data()
 def load_male_members(members, base=None):
     # return male members in a dataframe, 'm_members', 
     # containing male-members, 
     # droping duplcated rows with the same 
     # generation order, name, and birth-year
     global g_loc, g_lsex
+    global g_df, g_dirtyTree
 
     m_members = members.drop_duplicates(subset=['Order','Name',
                                                 'Dad', 'Born'], 
@@ -1251,12 +1369,38 @@ def load_male_members(members, base=None):
     m_members = m_members.query(
         "Sex == @male1 or Sex == @male2"
         ).sort_values(by=['Order', 'Born', 'Name'])
-
-    # create the global name list of all male-members.
-    g_lname = [(o, m, b) for o, m, b in zip(
-        m_members.Order, m_members.Name, m_members.Born)] 
-    return m_members, g_lname
+    
+    if m_members.empty:
+        g_lname = []
+        lname_idx = -1
+        
+        # initialize with the last person in dataframe
+        mem = g_df.tail(1).Name.iloc[0]
+        born = g_df.tail(1).Born.iloc[0]
+    else:
+        # create the global name list of all male-members.
+        g_lname = [(o, m, b) for o, m, b in zip(
+            m_members.Order, m_members.Name, m_members.Born)] 
+        
+        # initialize index to the latest joined male member, i.e.
+        # the end of g_lname list
+        lname_idx = len(g_lname) - 1
+        log.debug(f"lname_idx={lname_idx}")
+        
+        mem = m_members.tail(1).Name.iloc[0]
+        born = m_members.tail(1).Born.iloc[0]
+    
+    load_buff(mem, born, base=g_dirtyTree)
+    return m_members, g_lname, lname_idx
      
+# --- Load up Buffer (name and born-year) into environment --- from here
+@st.cache_data()
+def load_buff(mem, born, base=None):
+    # save to environemnt
+    os.environ['FT_NAME'] = mem
+    os.environ['FT_BORN'] = str(born)
+    return    
+
 # --- Load up User L10N --- from here
 @st.cache_data(ttl=300)
 def load_user_l10n(base=None):
@@ -1308,7 +1452,7 @@ if __name__ == '__main__':
     st.sidebar.title(g_SBAR_TITLE)
     
     # Show side-bar 9 functions
-    g_nav = st.sidebar.radio(g_loc['MENU_TITLE'],
+    nav = st.sidebar.radio(g_loc['MENU_TITLE'],
             [g_loc['MENU_DISP_GRAPH_BY_MALE'],
             g_loc['MENU_QUERY_3G_BY_MALE'],
             g_loc['MENU_MEMBER_ADD'],
@@ -1364,53 +1508,47 @@ if __name__ == '__main__':
                     ]
     
     # Define global variables
-    # The value of 'Status' attribute of member info
+    # Define a global 'Single Status' vaiable, 'g_single'
     g_single = g_lstatus.index(g_loc['REL_SINGLE'])
     
-    # Define global dataframe 'adopt_members' for adopted members
+    # Define a global dataframe 'adopt_members' for adopted members
     rel = g_lrelation.index(g_loc['REL_ADOPT'])
     adopt_members = load_dataframe(all_members, 
                                     rel, 
                                     base=g_dirtyTree)
     
-    # Define global dataframe 'step_members' for step-members
+    # Define a global dataframe 'step_members' for step-members
     rel = g_lrelation.index(g_loc['REL_STEP'])
     step_members = load_dataframe(all_members, 
                                     rel, 
                                     base=g_dirtyTree)
 
-    # Define global dataframe, 'bio_members' for bio-members
+    # Define a global dataframe, 'bio_members' for bio-members
     rel = g_lrelation.index(g_loc['REL_BIO'])
     bio_members = load_dataframe(all_members, 
                                     rel,
                                     base=g_dirtyTree)
 
-    m_members, g_lname = load_male_members(bio_members,
+    # Define a global list of male members, 'g_lname'
+    # and its index, 'lname_idx'
+    m_members, g_lname, lname_idx = load_male_members(all_members,
                                             base=g_dirtyTree)
-    if m_members.empty:
-        g_lname = []
-        lname_idx = -1
-        mem = g_df.tail(1).Name.iloc[0]
-        born = g_df.tail(1).Born.iloc[0]
-    else:
-        # initialize index to the latest joined member, i.e.
-        # the end of g_lname list
-        lname_idx = len(g_lname) - 1
-        log.debug(f"lname_idx={lname_idx}")
-        
-        mem = m_members.tail(1).Name.iloc[0]
-        born = m_members.tail(1).Born.iloc[0]
+    
+    # retrieve from environment
+    mem = os.getenv('FT_NAME')
+    born = int(os.getenv('FT_BORN'))
             
     try:
-        # initialize a dict obj, 'dbuff' as a starting template.
-        _, dbuff = get_1st_mbr_dict(g_df, mem, born)
-        log.debug(f"dbuff={dbuff}")
+        # initialize a global member index, 'gbuff_idx' as template.
+        # initialize a global dict obj, 'gbuff' as template.
+        gbuff_idx, gbuff = get_1st_mbr_dict(g_df, mem, born, base=g_dirtyTree)
     except:
-        st.error(f"{g_loc['MAIN_TITLE']} launched {g_loc['FAILED']}")
-        exit
-        
+        # force to create a new tree cache upon loop-back
+        os.environ['DIRTY_TREE'] = str(time.time())
+        st.warning(f"{g_loc['MEMBER_NOT_REG']}")
     
-    # Invoke main page
-    g_nav = main_page(lname_idx, dbuff)   
-    log.debug (f"{g_nav} <=== FINISHED.")
+    # Invoke main page via Streamlit
+    main_page(nav, lname_idx)   
+    log.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+    log.debug (f"{nav} <=== FINISHED.")
                 
