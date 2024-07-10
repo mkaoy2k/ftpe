@@ -1,18 +1,11 @@
 """
-FamilyTrees Personal Edition 1.5 2024/7/5
+FamilyTrees Personal Edition 1.6 2024/7/8
 
 	Feature Enhancement
-        DocStrings update.
+        1. Added version on the page title
         
 	Bug Fix
-        1. Fixed functions 1,2,7 & 9 sliding max and default settings
-        2. Allow sharing of the selected member across all the functions via 
-            environment.
-        3. Adjusted column widths of row 1&3 displayed on
-            function 3 and 4.
-        4. Changed '過繼' (step) 譯成 '後繼'.
-        5. Fixed display_dad() and display_mom() for adopt/step cases.
-        
+        None.        
 """
 
 # Modules required
@@ -23,7 +16,7 @@ from dotenv import load_dotenv  # pip install python-dotenv
 # Import Web App modules
 import streamlit as st  # pip install streamlit
 st.set_page_config(
-    page_title="FamilyTrees PE",
+    page_title="FamilyTrees PE 1.6",
     page_icon=':books:',
     )
 

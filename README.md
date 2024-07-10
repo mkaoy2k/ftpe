@@ -1,12 +1,12 @@
-# FamilyTrees Personal Edition (ftpe)
+# FamilyTrees Personal Edition (`ftpe`)
 
 ## Introduction
 
-The 'FamilyTrees' Personal Edition (ftpe) is a stand-alone Python application that allows you to record you family tree.
+The 'FamilyTrees' Personal Edition (`ftpe` in short) is a stand-alone Python application that allows you to record you family tree at your own laptop/PC.
 
 ## How It Works
 
-The 'Family Trees' service facilitates you to build your whole family tree as you grow your family, you will be able to add, update or share family info among your family as you like.
+The 'Family Trees' service facilitates you to build your whole family tree as you grow your family or tracing back your family root. With this `ftpe` App, uou will be able to add, update or share family info among your family as your family heritage.
 
 The 'Family Trees' service also provides various query functions to trace your root, including to show you graphic representation of your immediate family members. And as you like, download graphs to share via email.
 
@@ -18,11 +18,11 @@ The 'Family Trees' service not only helps you to build your whole family tree, b
    
 2. _Multi-Language Support_: 
    
-   Currently, supported languages: TW, and US
+   Currently, there are two supported languages: TW, and US. You are welcome if you are interested in localizing any language of yours. Please let [me](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
-To install the ftpe App in Python, follow these steps:
+To install the `ftpe` App in Python environment, follow the following steps:
 
 1. Clone the repository to your local machine.
 
@@ -40,56 +40,56 @@ To install the ftpe App in Python, follow these steps:
 
 ## Configuration Defined in the `.env` file
 
-### Rename template.env.txt to .env in your environment and configure accordingly
+Rename 'template.env.txt' to '.env' in your environment and configure the followings:
 
-### Gmail service
-   ```
-EMAIL_PW=your_gmail_pw
-EMAIL_SENDER=your_gmail
-   ```
-
-### Server Logging: 
+### Server Logging: 2 options
    ```
 LOGGING="DEBUG"
 LOGGING="INFO"
    ```
+comment out what you don't want.
 
-### Languages currently supported
+### Languages: 2 supported
    ```
 L10N = "繁中"
 L10N = "US"
    ```
+comment out what you don't want.
 
 ## How to Use
+There are two running environments that are supported to run `ftpe` App.
 
-### To run ftpe as an image in a Docker container:
+1. To run `ftpe` App as a Docker Image in a Docker Container:
 
-1. After pull from the Docker Hub, execute the following:
+   1). After pull from the [Docker Hub](https://hub.docker.com), execute the following command to launch `ftpe` server:
    ```
    docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:1.2
    ```
-2. Lauch your default web browser, displaying the main page by entering:
-   '''
-   localhost:8501
-   '''
+   2). At your default web browser, displaying the main page by entering:
+   ```
+   http://localhost:8501
+   ```
 
-### To run ftpe in Python, do:
+2. To run `ftpe` App in Python environment, do:
 
-1. Ensure that you have installed the required dependencies in the `.env` file.
+   1). Ensure that you have installed the required dependencies in the `.env` file.
 
-2. Run the `family_pe.py` file using the Streamlit CLI. Execute the following command:
+   2). Run the `family_pe.py` file using the Streamlit CLI. Execute the following command to launch 'ftpe' server:
 
    ```
    streamlit run family_pe.py
    ```
 
-3. The application will launch in your default web browser, displaying the main page.
+   3). When the `ftpe` server is running, your default web browser, displaying the main page, will be launched automatically. Or at will, you may launch your default web browser, displaying the main page by entering:
+   ```
+   http://localhost:8501
+   ```
 
 ## FAQ
 
 1. _Where is the my FamilyTree stored?_
 
-   The data is stored in a CSV file format, called me.csv, located in the sub-directory, call 'data'.
+   The data is stored in a CSV file, called me.csv, located in the sub-directory, call 'data'.
    
 2. _Who created 'FamilyTrees PE'?_
     

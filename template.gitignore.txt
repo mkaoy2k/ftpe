@@ -8,13 +8,9 @@
 # USB extFat
 ._*
 
-# Conda environemtn
-environment.yaml
-
 # FamilyTrees Obsolete files
 config.yaml
 L10N*.py
-family_*.py
 
 # FamilyTrees support files
 db_*.py
