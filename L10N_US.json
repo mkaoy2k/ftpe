@@ -230,6 +230,7 @@
     "LOGOUT" : "Logout",
     "MEMBER_NOT_REG" : "Not-registered",
     "MEMBER_NOT_FOUND" : "Member Not Found",
+    "GEN_AT_LEAST_2" : "At least 2 Generations to Display",
     "INFO_NOT_FOUND" : "No Further Info",
     "INFO_BASIC" : "Basic Info",
     "INFO_DETAIL" : "Detail Info",

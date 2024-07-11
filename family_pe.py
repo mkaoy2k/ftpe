@@ -1,11 +1,20 @@
 """
-FamilyTrees Personal Edition 1.6 2024/7/8
+FamilyTrees Personal Release 1.7 2024/7/11
+    Note: remember to change the revision in
+        page_title="FamilyTrees PE 1.7",
 
 	Feature Enhancement
-        1. Added version on the page title
-        
+        None
+                
 	Bug Fix
-        None.        
+        1. Fixed Function 1: 
+            Set the min of Gen-slider to 0, instead of 1. 
+            Check lname_idx <= 0 ('0' meaning one generation)        
+        2. Fixed Function 2: 
+            Set the min of Gen-slider to 0, instead of 1.        
+            Check lname_idx <= 0 ('0' meaning one generation)        
+        3. Fixed Function 7: the min of Gen-slider to 0, instead of 1.        
+        4. Fixed Function 9: the min of Gen-slider to 0, instead of 1.        
 """
 
 # Modules required
@@ -16,7 +25,7 @@ from dotenv import load_dotenv  # pip install python-dotenv
 # Import Web App modules
 import streamlit as st  # pip install streamlit
 st.set_page_config(
-    page_title="FamilyTrees PE 1.6",
+    page_title="FamilyTrees PE 1.7",
     page_icon=':books:',
     )
 
@@ -736,9 +745,9 @@ def main_page(nav, lname_idx):
 
         st.subheader(g_loc['T1_DISP_GRAPH_BY_MALE'])
         
-        if lname_idx <= 1:
+        if lname_idx <= 0:
             # at least 2 generations
-            st.error(f"{g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
+            st.error(f"{g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}")
             return
         
         # select a generation        
@@ -746,7 +755,7 @@ def main_page(nav, lname_idx):
         default_gen = gbuff['Order'] 
 
         fgen = st.slider(g_loc['S1_GEN_ORDER'], 
-                        1, 
+                        0, 
                         max_gen, default_gen,
                         help=g_loc['S1_HELP'])
         
@@ -821,9 +830,9 @@ def main_page(nav, lname_idx):
         # given a tuple (male-member -name, birth-year)
         st.subheader(g_loc['T2_QUERY_3G_BY_MALE'])
         
-        if lname_idx <= 1:
+        if lname_idx <= 0:
             # at least 2 generations
-            st.error(f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
+            st.error(f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}")
             return
         
         # select a generation
@@ -832,7 +841,7 @@ def main_page(nav, lname_idx):
         default_gen = gbuff['Order'] 
         
         fgen = st.slider(g_loc['S1_GEN_ORDER'], 
-                        1, 
+                        0, 
                         max_gen, default_gen,
                         help=g_loc['S1_HELP'])
 
@@ -1084,7 +1093,7 @@ def main_page(nav, lname_idx):
         default_gen = gbuff['Order']
 
         gen = st.slider(g_loc['S1_GEN_ORDER'], 
-                        1, 
+                        0, 
                         max_gen, default_gen,
                         help=g_loc['S1_HELP'])
         
@@ -1170,7 +1179,7 @@ def main_page(nav, lname_idx):
         default_gen = gbuff['Order'] 
 
         gen = st.slider(g_loc['S1_GEN_ORDER'], 
-                        1, 
+                        0, 
                         max_gen, default_gen,
                         help=g_loc['S1_HELP'])
         
@@ -1526,6 +1535,7 @@ if __name__ == '__main__':
     # and its index, 'lname_idx'
     m_members, g_lname, lname_idx = load_male_members(all_members,
                                             base=g_dirtyTree)
+    log.debug(f"lname_idx={lname_idx}")
     
     # retrieve from environment
     mem = os.getenv('FT_NAME')
