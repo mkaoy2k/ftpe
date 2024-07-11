@@ -61,9 +61,9 @@ There are two running environments that are supported to run `ftpe` App.
 
 1. To run `ftpe` App as a Docker Image in a Docker Container:
 
-   1). After pull from the [Docker Hub](https://hub.docker.com), execute the following command to launch `ftpe` server:
+   1). After pulling mkaoy2k/ftpe image from the [Docker Hub](https://hub.docker.com), execute the following command to launch `ftpe` container, for example:
    ```
-   docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:1.2
+   docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:1.7
    ```
    2). At your default web browser, displaying the main page by entering:
    ```

@@ -198,6 +198,7 @@
     "LOGOUT" : "登出",
     "MEMBER_NOT_REG" : "（尚未登錄）",
     "MEMBER_NOT_FOUND" : "查無此人",
+    "GEN_AT_LEAST_2" : "至少两代以上成員",
     "INFO_NOT_FOUND" : "查無資料",
     "INFO_BASIC" : "基本資料",
     "INFO_DETAIL" : "詳細資料",
