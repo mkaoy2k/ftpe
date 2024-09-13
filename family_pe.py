@@ -19,7 +19,7 @@ from dotenv import load_dotenv  # pip install python-dotenv
 # Import Web App modules
 import streamlit as st  # pip install streamlit
 st.set_page_config(
-    page_title="FamilyTrees PE 1.8",
+    page_title=PAGE_TITLE,
     page_icon=':books:',
     )
 
