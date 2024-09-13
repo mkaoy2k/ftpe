@@ -1,21 +1,15 @@
 """
-FamilyTrees Personal Release 1.7 2024/7/11
-    Note: remember to change the revision in
-        page_title="FamilyTrees PE 1.7",
+FamilyTrees Personal Release 1.9 2024//13
+    Note: remember to change the revision in PAGE_TITLE below
 
-	Feature Enhancement
-        None
+	Feature Enhancement:
+        1. Clean up about() info in the L10N*.json files.
                 
-	Bug Fix
-        1. Fixed Function 1: 
-            Set the min of Gen-slider to 0, instead of 1. 
-            Check lname_idx <= 0 ('0' meaning one generation)        
-        2. Fixed Function 2: 
-            Set the min of Gen-slider to 0, instead of 1.        
-            Check lname_idx <= 0 ('0' meaning one generation)        
-        3. Fixed Function 7: the min of Gen-slider to 0, instead of 1.        
-        4. Fixed Function 9: the min of Gen-slider to 0, instead of 1.        
+	Bug Fix:
+        1. None.
 """
+
+PAGE_TITLE = "FamilyTrees PE 1.9"
 
 # Modules required
 import pandas as pd     # pip install pandas
@@ -25,7 +19,7 @@ from dotenv import load_dotenv  # pip install python-dotenv
 # Import Web App modules
 import streamlit as st  # pip install streamlit
 st.set_page_config(
-    page_title="FamilyTrees PE 1.7",
+    page_title="FamilyTrees PE 1.8",
     page_icon=':books:',
     )
 
@@ -587,20 +581,22 @@ def display_update_member():
         index=int(gbuff["Sex"]),
         help=g_loc['L313_HELP'])
     gbuff["Sex"] = g_lsex.index(rec_sex)
+
+    today =  datetime.date.today()
     
     # row 2
     c21, c22, c23 = st.columns([3,2,2])
-    gbuff["Order"] = c21.text_input(f":blue[{g_loc['L321_GEN_ID']}]", 
+    gbuff["Order"] = c21.number_input(f":blue[{g_loc['L321_GEN_ID']}]", 
         gbuff["Order"],
-        max_chars=10,
+        today.year,
         help=g_loc['L321_HELP'])
-    gbuff["Born"] = c22.text_input(f":blue[{g_loc['L322_BIRTH_YEAR']}]", 
+    gbuff["Born"] = c22.number_input(f":blue[{g_loc['L322_BIRTH_YEAR']}]", 
         gbuff["Born"],
-        max_chars=10,
+        today.year,
         help=g_loc['L322_HELP'])
-    gbuff["Died"] = c23.text_input(f":blue[{g_loc['L323_DEATH_YEAR']}]", 
+    gbuff["Died"] = c23.number_input(f":blue[{g_loc['L323_DEATH_YEAR']}]", 
         gbuff["Died"],
-        max_chars=10,
+        today.year,
         help=g_loc['L323_HELP'])
     
     # row 3
@@ -631,10 +627,10 @@ def display_update_member():
         gbuff["Spouse"],
         max_chars=20,
         help=g_loc['L342_HELP'])
-    
-    gbuff["Married"] = c43.text_input(f":blue[{g_loc['L343_MARRIAGE_YEAR']}]",
+        
+    gbuff["Married"] = c43.number_input(f":blue[{g_loc['L343_MARRIAGE_YEAR']}]",
         gbuff["Married"],
-        max_chars=20,
+        today.year,
         help=g_loc['L343_HELP'])
     
     # row 5
@@ -916,7 +912,12 @@ def main_page(nav, lname_idx):
                 st.write(f"{g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']}")
 
                 # create a dict object with list values from buffer 'gbuff' 
-                to_add = {key: [value] for key, value in gbuff.items()}
+                # to_add = {key: [value] for key, value in gbuff.items()}
+                for key, value in gbuff.items():
+                    if type(value) == str & value == '':
+                        value = "?"
+                        
+                    to_add[key] = [value]
                 
                 # convert dictionary to dataframe
                 to_add = pd.DataFrame.from_dict(to_add)
@@ -968,8 +969,24 @@ def main_page(nav, lname_idx):
         with btn1:
             if st.button(g_loc['B4_MEMBER_UPDATE']):
                 with st.spinner(g_loc['IN_PROGRESS']):
+                    
+                    for key, value in gbuff.items():
+                        
+                        # make sure default value is not empty
+                        if value == '':
+                            value = "?"
+                        gbuff[key] = value
+                        
+                        # type conversion
+                        if pd.api.types.is_integer_dtype(g_df[key]):
+                            gbuff[key] = int(value)
+                        if pd.api.types.is_float_dtype(g_df[key]):
+                            gbuff[key] = float(value)
+                        if pd.api.types.is_bool_dtype(g_df[key]):
+                            gbuff[key] = bool(value)
+                            
                     # To update a row, by index with a dict obj 'gbuff'
-                    g_df.loc[idx] = gbuff
+                    g_df.loc[idx, g_df.columns] = gbuff
                     
                     try:
                         # backup the current family tree
@@ -1053,25 +1070,35 @@ def main_page(nav, lname_idx):
                     
         if st.button(g_loc['B6_MEMBER_INQUERY']):
             with st.spinner(g_loc['IN_PROGRESS']):
+
                 l_grp = rec_aka.split(',')
-                filter = "Aka in ("
+                filter = "Aka.str.contains ("
                 for w in l_grp:
                     # strip off leading and trailing spaces
                     kw = w.strip()
                     filter = filter + f"'{kw}',"
                     
-                # finally, strip off the last ','
-                rec_grp = filter.strip(',') + ")"
-                df2 = g_df.query(rec_grp)
-                if df2.empty:
+                # finally, add case insensitive search 
+                rec_grp = filter + " case=False)"    
+                
+                log.debug(f"Query: {rec_grp}")
+                
+                # drops NA-value rows
+                df2 = g_df.dropna()
+                try:
+                    df2 = df2.query(rec_grp)
+                    if df2.empty:
+                        st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
+                    else:   
+                        st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
+                        st.table(df2)
+                        gbuff['Name'] = df2['Name'].iloc[0]
+                        gbuff['Born'] = df2['Born'].iloc[0]
+                        load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
+                        st.success(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['DONE']}")              
+                except Exception as err:
+                    log.error(err)
                     st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
-                else:   
-                    st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
-                    st.table(df2)
-                    gbuff['Name'] = df2['Name'].iloc[0]
-                    gbuff['Born'] = df2['Born'].iloc[0]
-                    load_buff(gbuff['Name'], gbuff['Born'], g_dirtyTree)
-                    st.success(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['DONE']}")              
         return      
 
     # --- Function 7 --- from here
@@ -1223,7 +1250,7 @@ def main_page(nav, lname_idx):
         with c2:
             with open(g_fTree) as f:
                 fn = f"{filename}.csv"
-                if c2.download_button(g_loc['BX_EXPORT'], f, f"{filename}.csv"):
+                if c2.download_button(g_loc['BX_EXPORT'], f, fn):
                     st.success(f"{g_loc['BX_EXPORT']} {fn} {g_loc['DONE']}")
         
         # set L10N upon click 
