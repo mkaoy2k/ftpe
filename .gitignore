@@ -20,10 +20,10 @@ wip.py
 prod_*
 
 # FamilyTrees Data files
-data/*.bak
-data/*.csv
-data/*.gv
-data/*.png
+/data/*.bak
+/data/*.csv
+/data/*.gv
+/data/*.png
 
 # Streamlit Examples
 main.py
