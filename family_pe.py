@@ -1,18 +1,18 @@
 """
-FamilyTrees Personal Release 2.1 2024/11/13
+FamilyTrees Personal Release 2.2 2025/3/22
     Note: remember to change the revision in PAGE_TITLE below
 
         Feature Enhancement:
-        1. Format and check this code via ruff library
-        2. Resolve the "data" sub-directory via pathlib library
+        1. Code optimization
 
         Bug Fix:
         1. None.
 """
 
-PAGE_TITLE = "FamilyTrees PE 2.1"
+PAGE_TITLE = "FamilyTrees PE 2.2"
 
 # Modules required
+from functools import lru_cache
 import pandas as pd  # pip install pandas
 import os
 from pathlib import Path
