@@ -2,23 +2,23 @@
 
 ## Introduction
 
-The 'FamilyTrees' Personal Edition (`ftpe` in short) is a stand-alone Python application that allows you to record you family tree at your own laptop/PC.
+The 'FamilyTrees' Personal Edition (`ftpe` in short) is a stand-alone web application, wrritten in Python that allows you to record your family tree at your own laptop/PC.
 
 ## How It Works
 
-The 'Family Trees' service facilitates you to build your whole family tree as you grow your family or tracing back your family root. With this `ftpe` App, uou will be able to add, update or share family info among your family as your family heritage.
+The `ftpe` facilitates you to build your whole family tree as you grow your family and tracing back your family root as long as you like. With this `ftpe` App, you will also be able to add, update, share and pass along your family tree among your family members as unique family heritage.
 
-The 'Family Trees' service also provides various query functions to trace your root, including to show you graphic representation of your immediate family members. And as you like, download graphs to share via email.
+The `ftpe` also provides various query functions to discover your root, by showing you graphic representation of your immediate family members.
 
-The 'Family Trees' service not only helps you to build your whole family tree, but also provides you with the following benefits:
+The `ftpe` not only helps you to build your family heritage, but also provides you with the following benefits:
 
 1. _Sharing_:
 
-   To share with your family tree, simply passing along your credential to them. They can help you to review and build the same family tree of yours. Or better yet, with divide-and-conquer approach, several registered users are allowed to build different parts of the family tree simultaneously. And merge them together later for sharing the whole family tree which might eventually become the legacy of your family heritage.
+   To export and import the data file in CSV format of your family tree, you can help  build the same family tree of yours. Or better yet, with divide-and-conquer approach, several family members can work together to build different parts of the family tree simultaneously. And merge them together later for the whole picture of your family tree which might eventually become the treasure of your family heritage.
 
 2. _Multi-Language Support_:
 
-   Currently, there are two supported languages: TW, and US. You are welcome if you are interested in localizing any language of yours. Please let [me](mailto:mkaoy2k@gmail.com) know.
+   Currently, there are currently five supported languages: TW, CN, JP, KR and US. You are welcome if you are interested in localizing any language of yours or any comments. Please let [me](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
@@ -101,7 +101,7 @@ There are two running environments that are supported to run `ftpe` App.
 
 1. _Where is the my FamilyTree stored?_
 
-   The data is stored in a CSV file, called me.csv, located in the sub-directory, call 'data'.
+   The data is stored in a CSV format, called me.csv, located in the sub-directory, call 'data'.
 
 2. _Who created 'FamilyTrees PE'?_
 
