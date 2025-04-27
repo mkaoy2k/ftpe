@@ -1,9 +1,12 @@
 """
-FamilyTrees Personal Release 2.2 2025/3/22
+FamilyTrees Personal Release 2.2 2025/4/27
     Note: remember to change the revision in PAGE_TITLE below
 
         Feature Enhancement:
-        1. Code optimization
+        1. Changed logging module from 'glog' to Python's built-in 'logging' module.
+        2. Added Simplified Chinese (CN) language support.
+        3. Added Korean (KR) language support.
+        4. Added Japanese (JP) language support.
 
         Bug Fix:
         1. None.
@@ -12,7 +15,6 @@ FamilyTrees Personal Release 2.2 2025/3/22
 PAGE_TITLE = "FamilyTrees PE 2.2"
 
 # Modules required
-from functools import lru_cache
 import pandas as pd  # pip install pandas
 import os
 from pathlib import Path
@@ -35,7 +37,7 @@ import graphviz as gv  # pip install graphviz
 from funcUtils import *
 
 # Import performance logging modules
-import glog as log  # pip install glog
+import logging
 from glogTime import func_timer_decorator
 
 # --- Initialize system environment --- from here
@@ -44,7 +46,7 @@ load_dotenv(".env")
 # --- Set Server logging levels ---
 g_log_options = ["INFO", "DEBUG"]
 g_logging = os.getenv("LOGGING")
-log.setLevel(g_logging)
+logging.basicConfig(level=logging._nameToLevel.get(g_logging, logging.INFO))
 
 
 # --- Internal Functions --- from here
@@ -72,7 +74,7 @@ def build_spouse_graph(dbuff):
         # This male-member not on file
         raise (FileNotFoundError)
 
-    log.debug(f"Found Member: {rec}")
+    logging.debug(f"Found Member: {rec}")
     # Create a graph object with graphviz
     dot = gv.Digraph(name=mem, comment=f"{mem} G{order} Graph", engine="twopi")
 
@@ -108,7 +110,7 @@ def build_spouse_graph(dbuff):
             href = ""
         else:
             # spouse info exists
-            log.debug(f"Found Spouses: {rec_sp}")
+            logging.debug(f"Found Spouses: {rec_sp}")
 
             born = rec_sp.Born.iloc[0]
             died = rec_sp.Died.iloc[0]
@@ -136,7 +138,7 @@ def build_spouse_graph(dbuff):
         # drop duplicated rows with the same name, and birth-year
         kids = kids.drop_duplicates(subset=["Name", "Born"], keep="first")
 
-        log.debug(f"Found Kids: {kids}")
+        logging.debug(f"Found Kids: {kids}")
         # add nodes for kids, associated with this Mom
         with dot.subgraph() as s:
             s.attr(rank="same")
@@ -774,7 +776,7 @@ def get_umember(name, spouse="?", dad="?", mom="?", born="0", order="0"):
     if rec.empty:
         raise (FileNotFoundError)
 
-    log.debug(f"Found Member: {rec}")
+    logging.debug(f"Found Member: {rec}")
 
     didx = rec.to_dict("index")
     for i in didx:
@@ -853,7 +855,7 @@ def main_page(nav, lname_idx):
                 index=lname_idx,
                 help=g_loc["L1_HELP"],
             )
-            log.debug(f"Selected Tuple= {tmem}")
+            logging.debug(f"Selected Tuple= {tmem}")
             order, mem, born = tmem
             lname_idx = lname.index(tmem)
             st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(lname)}")
@@ -872,7 +874,7 @@ def main_page(nav, lname_idx):
                     break
 
                 # build the graph using the first member got
-                log.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+                logging.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
                 load_buff(gbuff["Name"], gbuff["Born"], g_dirtyTree)
 
                 dot = build_spouse_graph(gbuff)
@@ -881,7 +883,7 @@ def main_page(nav, lname_idx):
                 return
 
             # Show graph on Streamlit Page
-            log.debug(dot.source)
+            logging.debug(dot.source)
             st.graphviz_chart(dot, use_container_width=True)
 
         except:
@@ -1173,7 +1175,7 @@ def main_page(nav, lname_idx):
                 # finally, add case insensitive search
                 rec_grp = filter + " case=False)"
 
-                log.debug(f"Query: {rec_grp}")
+                logging.debug(f"Query: {rec_grp}")
 
                 # drops NA-value rows
                 df2 = g_df.dropna()
@@ -1193,7 +1195,7 @@ def main_page(nav, lname_idx):
                             f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['DONE']}"
                         )
                 except Exception as err:
-                    log.error(err)
+                    logging.error(err)
                     st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
         return
 
@@ -1424,13 +1426,13 @@ def get_data_from_csv(f, base=None):
             temp_contents = temp.read()
         with open(f, "w") as ft:
             print(temp_contents, file=ft)
-        log.debug(f"{f} not existed, CREATED a NEW family tree.")
+        logging.debug(f"{f} not existed, CREATED a NEW family tree.")
 
     df = pd.read_csv(f)
     members = df.drop(index=0)
-    log.debug(f"{f} LOADED.")
-    log.debug(f"{df.tail(3)}")
-    log.debug(f"{members.head(3)}")
+    logging.debug(f"{f} LOADED.")
+    logging.debug(f"{df.tail(3)}")
+    logging.debug(f"{members.head(3)}")
 
     return df, members
 
@@ -1517,7 +1519,7 @@ def load_male_members(members, base=None):
         # initialize index to the latest joined male member, i.e.
         # the end of g_lname list
         lname_idx = len(g_lname) - 1
-        log.debug(f"lname_idx={lname_idx}")
+        logging.debug(f"lname_idx={lname_idx}")
 
         mem = m_members.tail(1).Name.iloc[0]
         born = m_members.tail(1).Born.iloc[0]
@@ -1556,7 +1558,7 @@ if __name__ == "__main__":
 
     # --- Set Server logging levels ---
     g_logging = os.getenv("LOGGING")
-    log.setLevel(g_logging)
+    logging.basicConfig(level=logging._nameToLevel.get(g_logging, logging.INFO))
 
     # --- global L10N dictionary --- from here
     # Load 'g_L10N', for all languages
@@ -1568,10 +1570,10 @@ if __name__ == "__main__":
     g_loc_key, g_loc = load_user_l10n(base=g_dirtyUser)
 
     # logging check-points --- here
-    log.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
-    log.debug(f"{g_loc['SVR_L10N']}: {g_loc_key}")
-    log.debug(f"DIRTY_TREE: {g_dirtyTree}")
-    log.debug(f"DIRTY_USER: {g_dirtyUser}")
+    logging.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
+    logging.debug(f"{g_loc['SVR_L10N']}: {g_loc_key}")
+    logging.debug(f"DIRTY_TREE: {g_dirtyTree}")
+    logging.debug(f"DIRTY_USER: {g_dirtyUser}")
 
     # Set default user's L10N settings
     g_username = "me"
@@ -1579,7 +1581,7 @@ if __name__ == "__main__":
 
     # Set user-specific L10N dict obj
     g_loc = g_L10N[g_loc_key]
-    log.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
+    logging.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
 
     # ---- SIDEBAR ---- from here
     # Define the title of sidebar widget
@@ -1659,7 +1661,7 @@ if __name__ == "__main__":
     # Define a global list of male members, 'g_lname'
     # and its index, 'lname_idx'
     m_members, g_lname, lname_idx = load_male_members(all_members, base=g_dirtyTree)
-    log.debug(f"lname_idx={lname_idx}")
+    logging.debug(f"lname_idx={lname_idx}")
 
     # retrieve from environment
     mem = os.getenv("FT_NAME")
@@ -1676,5 +1678,5 @@ if __name__ == "__main__":
 
     # Invoke main page via Streamlit
     main_page(nav, lname_idx)
-    log.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
-    log.debug(f"{nav} <=== FINISHED.")
+    logging.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+    logging.debug(f"{nav} <=== FINISHED.")

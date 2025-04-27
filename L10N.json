@@ -1,4 +1,7 @@
 {
     "繁中"  : "L10N_TW.json",
+    "简中"  : "L10N_CN.json",
+    "日本語" : "L10N_JP.json",
+    "한국어" : "L10N_KR.json",
     "US"   : "L10N_US.json"
 }

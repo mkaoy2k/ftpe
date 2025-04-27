@@ -18,6 +18,7 @@ db_*.py
 ops_*.py
 wip.py
 prod_*
+__init__*.py
 
 # FamilyTrees Data files
 /data/*.bak
