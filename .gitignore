@@ -20,10 +20,11 @@ prod_*
 __init__*.py
 
 # FamilyTrees Data files
-/data/*.bak
-/data/*.csv
-/data/*.gv
-/data/*.png
+data/*.bak
+data/*.csv
+data/*.gv
+data/*.png
+data/*.log
 
 # Streamlit Examples
 main.py
