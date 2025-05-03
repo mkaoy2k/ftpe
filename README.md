@@ -6,9 +6,9 @@ The 'FamilyTrees' Personal Edition (`ftpe` in short) is a stand-alone web applic
 
 ## How It Works
 
-The `ftpe` facilitates you to build your whole family tree as you grow your family and tracing back your family root as long as you like. With this `ftpe` App, you will also be able to add, update, share and pass along your family tree among your family members as unique family heritage.
+The `ftpe` facilitates you to build your whole family tree as you grow your family and to be able to trace back your family root as you like. With this simple `ftpe` App, you can add, update, share and pass along your family tree among your family members. Who knows, it might become one of your family heritage some day.
 
-The `ftpe` also provides various query functions to discover your root, by showing you graphic representation of your immediate family members.
+The `ftpe` also provides various query functions to discover your root, by entertaining you with graphic representation of your related family members.
 
 The `ftpe` not only helps you to build your family heritage, but also provides you with the following benefits:
 
@@ -18,7 +18,7 @@ The `ftpe` not only helps you to build your family heritage, but also provides y
 
 2. _Multi-Language Support_:
 
-   Currently, there are currently five supported languages: TW, CN, JP, KR and US. You are welcome if you are interested in localizing any language of yours or any comments. Please let [me](mailto:mkaoy2k@gmail.com) know.
+   Currently, there are currently five supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, and Korean. You are welcome if you are interested in localizing any language of yours or any comments. Please let [me](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
@@ -32,17 +32,17 @@ To install the `ftpe` App in Python environment, follow the following steps:
    conda env create -f environment.yaml
    ```
 
-3. Or under Python environment, run:
+3. Or under uv environment, run:
 
    ```bash
-   python -m pip install -r requirements.txt
+   uv run python -m pip install -r requirements.txt
    ```
 
 ## Configuration Defined in the `.env` file
 
 Rename 'template.env.txt' to '.env' in your environment and configure the followings:
 
-### Server Logging: 2 options
+### Server Logging: 2 options available
 
 ```bash
 LOGGING="DEBUG"
@@ -51,7 +51,7 @@ LOGGING="INFO"
 
 comment out what you don't want.
 
-### Languages: 5 supported
+### Languages: 5 options available
 
 ```bash
 L10N = "繁中"

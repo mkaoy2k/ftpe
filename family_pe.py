@@ -1,26 +1,27 @@
 """
-FamilyTrees Personal Release 2.2 2025/4/27
-    Note: remember to change the revision in PAGE_TITLE below
+FamilyTrees Personal Release 2.3 2025/5/2
+    Todo: 在正式發布前，請記得：
+        1. 將修訂版本同步到 PAGE_TITLE 中。
+        2. 更新 README.md 中的發布說明。
 
-        Feature Enhancement:
-        1. Changed logging module from 'glog' to Python's built-in 'logging' module.
-        2. Added Simplified Chinese (CN) language support.
-        3. Added Korean (KR) language support.
-        4. Added Japanese (JP) language support.
+    功能增強：
+        1. 增強了程式碼的中文文件。
+        2. 增強了日誌輸出及除錯功能。
 
-        Bug Fix:
-        1. None.
+    Bug 修復：
+        1. Pandas query() 中的 Filter 用法錯誤，修正直接使用字典變數的 bug。
 """
-
-PAGE_TITLE = "FamilyTrees PE 2.2"
+PAGE_TITLE = "FamilyTrees PE 2.3"
 
 # Modules required
 import pandas as pd  # pip install pandas
 import os
-from pathlib import Path
+import sys
+import logging
 import time
 import datetime
 from dotenv import load_dotenv  # pip install python-dotenv
+from pathlib import Path  # 添加這行導入
 
 # Import Web App modules
 import streamlit as st  # pip install streamlit
@@ -41,199 +42,270 @@ import logging
 from glogTime import func_timer_decorator
 
 # --- Initialize system environment --- from here
-load_dotenv(".env")
+load_dotenv()
 
 # --- Set Server logging levels ---
-g_log_options = ["INFO", "DEBUG"]
-g_logging = os.getenv("LOGGING")
-logging.basicConfig(level=logging._nameToLevel.get(g_logging, logging.INFO))
+g_logging = os.getenv("LOGGING", "INFO")  # 預設為 INFO
+    
+# 創建日誌器
+logger = logging.getLogger(__name__)
+if g_logging == "INFO":
+    logger.setLevel(logging.INFO)
+else:
+    logger.setLevel(logging.DEBUG)
 
+# 設置日誌格式
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+
+# 設置控制台處理器
+console_handler = logging.StreamHandler()
+if g_logging == "INFO":
+    console_handler.setLevel(logging.INFO)  
+else:
+    console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# 添加處理器到日誌器
+logger.addHandler(console_handler)
 
 # --- Internal Functions --- from here
 def build_spouse_graph(dbuff):
     """
-    build family tree graph, starting from mem pointing to spouse(s),
-    and then in turn female spouse pointing to kid(s) if any.
+    建立家庭樹圖形，從成員指向其配偶開始，
+    然後再由女性配偶指向其子女（如果有的話）。
 
     Args:
-        dbuff (dictionary): member's record
+        dbuff (dict): 包含成員記錄的字典，包含以下鍵值：
+            - Name: 成員姓名
+            - Born: 出生年
+            - Order: 代數順序
+            - Died: 死亡年
+            - Href: 相關連結
+            - Status: 婚姻狀態
+            - Spouse: 配偶資訊
 
     Returns:
-        None: Null
+        graphviz.Digraph: 包含家庭關係的圖形物件
+
+    Raises:
+        FileNotFoundError: 當成員記錄不存在時
     """
-    global g_loc
-    global g_single, all_members
+    logger.debug(f"Entering build_spouse_graph with dbuff: {dbuff}")
+    
+    try:
+        global g_loc
+        global g_single, all_members
 
-    mem = dbuff["Name"]
-    born = dbuff["Born"]
-    order = dbuff["Order"]
+        mem = dbuff["Name"]
+        born = dbuff["Born"]
+        order = dbuff["Order"]
 
-    filter = "Name == @mem and Born == @born and Order == @order"
-    rec = all_members.query(filter)
-    if rec.empty:
-        # This male-member not on file
-        raise (FileNotFoundError)
+        filter = "Name == @mem and Born == @born and Order == @order"
+        rec = all_members.query(filter)
+        if rec.empty:
+            logger.error(f"Member not found: {mem}, {born}, {order}")
+            raise FileNotFoundError(f"Member not found: {mem}, {born}, {order}")
 
-    logging.debug(f"Found Member: {rec}")
-    # Create a graph object with graphviz
-    dot = gv.Digraph(name=mem, comment=f"{mem} G{order} Graph", engine="twopi")
+        logger.debug(f"Found Member: {rec}")
+        # Create a graph object with graphviz
+        dot = gv.Digraph(name=mem, comment=f"{mem} G{order} Graph", engine="twopi")
 
-    # set graph attributes
-    dot.attr("graph", overlap="scalexy", layout="twopi")
-    dot.attr("node", shape="circle")
+        # set graph attributes
+        dot.attr("graph", overlap="scalexy", layout="twopi")
+        dot.attr("node", shape="circle")
 
-    # Add member node
-    mem_label = f"{mem}\n{born}-{dbuff['Died']}"
-    if dbuff["Href"].startswith("http"):
-        dot.node(
-            mem, mem_label, shape="doubleoctagon", style="filled", href=dbuff["Href"]
-        )
-    else:
-        dot.node(mem, mem_label, shape="doubleoctagon", style="filled")
-
-    # check if this male-member not married
-    if rec.Status.iloc[0] == g_single:
-        # single
-        return dot
-
-    # iterating this male-member list of spouses
-    cnt_sp = len(rec.Spouse.index)
-    for i, w in zip(range(cnt_sp), rec.Spouse):
-        married = rec.Married.iloc[i]
-        filter = "Name == @w and Spouse == @mem"
-        rec_sp = all_members.query(filter)
-        if rec_sp.empty:
-            # spouse info is not on file
-            spouse_label = (
-                f"{w}\n{g_loc['MEMBER_NOT_REG']}\n{g_loc['MARRIED_IN']}{married}"
-            )
-            href = ""
-        else:
-            # spouse info exists
-            logging.debug(f"Found Spouses: {rec_sp}")
-
-            born = rec_sp.Born.iloc[0]
-            died = rec_sp.Died.iloc[0]
-            spouse_label = f"{w}\n{born}-{died}\n{g_loc['MARRIED_IN']}{married}"
-            href = rec_sp.Href.iloc[0]
-        if href.startswith("http"):
+        # Add member node
+        mem_label = f"{mem}\n{born}-{dbuff['Died']}"
+        if dbuff["Href"].startswith("http"):
             dot.node(
-                w, spouse_label, {"color": "aquamarine", "style": "filled"}, href=href
+                mem, 
+                label=mem_label, 
+                shape="doubleoctagon", 
+                style="filled", 
+                href=dbuff["Href"]
             )
         else:
-            dot.node(w, spouse_label, {"color": "aquamarine", "style": "filled"})
+            dot.node(
+                mem, 
+                label=mem_label, 
+                shape="doubleoctagon", 
+                style="filled"
+            )
 
-        # Add edges from Dad to Mom
-        dot.attr("edge", color="red")
-        dot.edge(dbuff["Name"], w, label=g_loc["REL_MARRIED"])
+        # check if this male-member not married
+        if rec.Status.iloc[0] == g_single:
+            # single
+            return dot
 
-        # search for any kids, whose Mom is 'w'
-        filter = "Mom == @w"
-        kids = all_members.query(filter)
-        if kids.empty:
-            # no kids associated with this Mom
-            continue  # to the next spouse
+        # iterating this male-member list of spouses
+        cnt_sp = len(rec.Spouse.index)
+        for i, w in zip(range(cnt_sp), rec.Spouse):
+            married = rec.Married.iloc[i]
+            filter = "Name == @w and Spouse == @mem"
+            rec_sp = all_members.query(filter)
+            if rec_sp.empty:
+                # spouse info is not on file
+                spouse_label = (
+                    f"{w}\n{g_loc['MEMBER_NOT_REG']}\n{g_loc['MARRIED_IN']}{married}"
+                )
+                href = ""
+            else:
+                # spouse info exists
+                logger.debug(f"Found Spouses: {rec_sp}")
 
-        # found kids
-        # drop duplicated rows with the same name, and birth-year
-        kids = kids.drop_duplicates(subset=["Name", "Born"], keep="first")
+                born = rec_sp.Born.iloc[0]
+                died = rec_sp.Died.iloc[0]
+                spouse_label = f"{w}\n{born}-{died}\n{g_loc['MARRIED_IN']}{married}"
+                href = rec_sp.Href.iloc[0]
+            if href.startswith("http"):
+                dot.node(
+                    w, 
+                    label=spouse_label, 
+                    color="aquamarine", 
+                    style="filled",
+                    href=href
+                )
+            else:
+                dot.node(
+                    w, 
+                    label=spouse_label, 
+                    color="aquamarine", 
+                    style="filled"
+                )
 
-        logging.debug(f"Found Kids: {kids}")
-        # add nodes for kids, associated with this Mom
-        with dot.subgraph() as s:
-            s.attr(rank="same")
+            # Add edges from Dad to Mom
+            dot.attr("edge", color="red")
+            dot.edge(dbuff["Name"], w, label=g_loc["REL_MARRIED"])
 
-            # loop thru the list of kids
-            for k in kids.Name:
-                # search for right kid
-                filter = "Name == @k and Dad == @dbuff['Name'] and Mom == @w"
-                rec_k = all_members.query(filter)
-                if rec_k.empty:
-                    # kid's info not on file
-                    href = ""
-                    continue  # to the next kid
-                else:
-                    # kid's info found
-                    born = rec_k.Born.iloc[0]
-                    died = rec_k.Died.iloc[0]
-                    rel = rec_k.Relation.iloc[0]
-                    kid_label = f"{k}\n{born}-{died}"
-                    href = rec_k.Href.iloc[0]
+            # search for any kids, whose Mom is 'w'
+            filter = "Mom == @w"
+            all_members['Name'] = all_members['Name'].astype(str)
+            all_members['Dad'] = all_members['Dad'].astype(str)
+            all_members['Mom'] = all_members['Mom'].astype(str)
+            kids = all_members.query(filter)
+            if kids.empty:
+                # no kids associated with this Mom
+                continue  # to the next spouse
 
-                # add kid node
-                if href.startswith("http"):
-                    dot.node(k, kid_label, shape="box", href=href)
-                else:
-                    dot.node(k, kid_label, shape="box")
+            # found kids
+            # drop duplicated rows with the same name, and birth-year
+            kids = kids.drop_duplicates(subset=["Name", "Born"], keep="first")
 
-                # join the subgraph
-                s.node(k)
+            logger.debug(f"Found Kids: {kids}")
+            # add nodes for kids, associated with this Mom
+            with dot.subgraph(name=f'cluster_{w}') as s:
+                logger.debug(f"Subgraph for kids: {s}")
+                s.attr("graph", label=w, rank="same")
 
-                # Add directed edge from Mom to kid
-                if g_lrelation[rel] == g_loc["REL_ADOPT"]:
-                    dot.attr("edge", color="green")
-                    dot.edge(w, k, label=g_loc["REL_ADOPT"])
-                elif g_lrelation[rel] == g_loc["REL_STEP"]:
-                    dot.attr("edge", color="blue")
-                    dot.edge(w, k, label=g_loc["REL_STEP"])
-                else:
-                    dot.attr("edge", color="black")
-                    dot.edge(w, k, label=g_loc["REL_BIO"])
-
-                # check if kid not married
-                if rec_k.Status.iloc[0] == g_single:
-                    # single
-                    continue  # to the next kid
-
-                # This kid not single, iterating married kid's spouse list
-                cnt_kw = len(rec_k.Spouse.index)
-                for i, kw in zip(range(cnt_kw), rec_k.Spouse):
-                    # find out marriage-year
-                    married = rec_k.Married.iloc[i]
-
-                    # search for kid's spouse
-                    filter = "Name == @kw and Spouse == @k"
-                    rec_kw = all_members.query(filter)
-                    if rec_kw.empty:
-                        # kid's spouse info not registered, skip
-                        continue
+                # loop thru the list of kids
+                for k in kids.Name:
+                    # Filter 用法錯誤，不能直接使用 @dbuff["Name"]
+                    d_name = dbuff["Name"]
+                    filter = "Name == @k and Dad == @d_name and Mom == @w"
+                    logger.debug(f"Search for right kid: {filter}")
+                    rec_k = all_members.query(filter)
+                    logger.debug(f"Search for right kid: {rec_k}")
+                    if rec_k.empty:
+                        # kid's info not on file
+                        href = ""
+                        logger.debug(f"Kid not found: {k}, continue")
+                        continue  # to the next kid
                     else:
-                        born = rec_kw.Born.iloc[0]
-                        died = rec_kw.Died.iloc[0]
-                        spouse_label = (
-                            f"{kw}\n{born}-{died}\n{g_loc['MARRIED_IN']}{married}"
-                        )
-                        href = rec_kw.Href.iloc[0]
+                        # kid's info found
+                        born = int(rec_k.Born.iloc[0]) if pd.notna(rec_k.Born.iloc[0]) else 0
+                        died = int(rec_k.Died.iloc[0]) if pd.notna(rec_k.Died.iloc[0]) else 0
+                        rel = int(rec_k.Relation.iloc[0]) if pd.notna(rec_k.Relation.iloc[0]) else 0
+                        kid_label = f"{k}\n{born}-{died}"
+                        href = rec_k.Href.iloc[0] if pd.notna(rec_k.Href.iloc[0]) else ""
+                        logger.debug(f"Found Kid: {k}, {born}, {died}, {rel}, {href}")
 
-                        # Add kid's spouse node
+                        # add kid node
                         if href.startswith("http"):
-                            dot.node(
-                                kw,
-                                spouse_label,
-                                color="lightblue",
-                                style="filled",
-                                href=href,
-                            )
+                            s.node(k, label=kid_label, shape="box", href=href)
                         else:
-                            dot.node(
-                                kw, spouse_label, color="lightblue", style="filled"
-                            )
-                        # join the subgraph
-                        s.node(kw)
+                            s.node(k, label=kid_label, shape="box")
 
-                        # Add directed edge from kid to kw
-                        dot.attr("edge", color="red")
-                        dot.edge(k, kw, label=g_loc["REL_MARRIED"])
+                        # Add directed edge from Mom to kid
+                        if g_lrelation[rel] == g_loc["REL_ADOPT"]:
+                            dot.attr("edge", color="green")
+                            dot.edge(w, k, label=g_loc["REL_ADOPT"])
+                        elif g_lrelation[rel] == g_loc["REL_STEP"]:
+                            dot.attr("edge", color="blue")
+                            dot.edge(w, k, label=g_loc["REL_STEP"])
+                        else:
+                            dot.attr("edge", color="black")
+                            dot.edge(w, k, label=g_loc["REL_BIO"])
+
+                        # check if kid not married
+                        if rec_k.Status.iloc[0] == g_single:
+                            # single
+                            logger.debug(f"Kid single: {k}, continue")    
+                            continue  # to the next kid
+
+                        # This kid not single, iterating married kid's spouse list
+                        cnt_kw = len(rec_k.Spouse.index)
+                        for i, kw in zip(range(cnt_kw), rec_k.Spouse):
+                            # find out marriage-year
+                            married = rec_k.Married.iloc[i] if pd.notna(rec_k.Married.iloc[i]) else 0
+
+                            # search for kid's spouse
+                            filter = "Name == @kw and Spouse == @k"
+                            logger.debug(f"Search for kid's spouse: {filter}")
+                            rec_kw = all_members.query(filter)
+                            if rec_kw.empty:
+                                # kid's spouse info not registered, skip
+                                logger.debug(f"Kid's spouse not found: {k}, {kw}, continue")
+                                continue
+                            else:
+                                born = int(rec_kw.Born.iloc[0]) if pd.notna(rec_kw.Born.iloc[0]) else 0
+                                died = int(rec_kw.Died.iloc[0]) if pd.notna(rec_kw.Died.iloc[0]) else 0
+                                spouse_label = (
+                                    f"{kw}\n{born}-{died}\n{g_loc['MARRIED_IN']}{married}"
+                                )
+                                href = rec_kw.Href.iloc[0] if pd.notna(rec_kw.Href.iloc[0]) else ""
+                                logger.debug(f"Found Kid's Spouse: {kw}, {born}, {died}, {spouse_label}, {href}")
+
+                            # Add kid's spouse node
+                            if href.startswith("http"):
+                                dot.node(
+                                    kw,
+                                    label=spouse_label,
+                                    color="lightblue",
+                                    style="filled",
+                                    href=href,
+                                )
+                            else:
+                                dot.node(
+                                    kw, 
+                                    label=spouse_label, 
+                                    color="lightblue", 
+                                    style="filled"
+                                )
+                            # join the subgraph
+                            s.node(kw)
+
+                            # Add directed edge from kid to kw
+                            dot.attr("edge", color="red")
+                            dot.edge(k, kw, label=g_loc["REL_MARRIED"])
+    except FileNotFoundError as e:
+        logger.error(f"File not found error in build_spouse_graph: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in build_spouse_graph: {e}")
+        raise
+    logger.debug(f"build_spouse_graph: {dot} returned")
     return dot
 
 
 # Display the basic info about member's Dad(s) via Streamlit
 def display_dad(dmem):
     """
-    Display the basic info about member's Dad(s) via Streamlit
+    透過Streamlit顯示成員父親的基本資訊
+
     Args:
-        dmem: dict obj containing member info
-    Return:
+        dmem (dict): 包含成員資訊的字典
+
+    Returns:
         None
     """
     global all_members, bio_members, adopt_members, step_members
@@ -328,13 +400,12 @@ def display_dad(dmem):
 # Display the basic info about member's Mom(s) via Streamlit
 def display_mom(dmem):
     """
-    Display the basic info about member's Mom(s) via Streamlit
+    透過Streamlit顯示成員母親的基本資訊
 
     Args:
-        dmem (dict): dict obj about member
+        dmem (dict): 包含成員資訊的字典
 
-        dmem: dict obj about member
-    Return:
+    Returns:
         None
     """
     global all_members, bio_members, adopt_members, step_members
@@ -386,7 +457,6 @@ def display_mom(dmem):
     st.markdown(desc)
     display_kids(bio_mom_name)
 
-    # Setup filter for extra Moms
     # setup filter for extra Moms
     filter = "Name == @mem"
     filter_mom = "Mom == @mem"
@@ -424,14 +494,10 @@ def display_mom(dmem):
                 st.markdown(f"#### => {g_loc['KID']}({g_loc['REL_ADOPT']}): {name}")
 
     # Any step-Moms?
-    # any step-Moms?
     if step_members.empty != True:
         moms = step_members.query(filter)
         if moms.empty != True:
-            # Display step-Moms
-            # Need to iterate dataframe
             # display step-Moms
-            # need to iterate dataframe
             for idx in moms.index:
                 name = moms["Mom"][idx]
                 st.markdown(f"#### => {g_loc['MOM']}({g_loc['REL_STEP']}): {name}")
@@ -460,10 +526,15 @@ def display_mom(dmem):
 
 # Display the basic info about member's Spouse via Streamlit
 def display_spouse(dmem):
-    # Args:
-    #     dmem: dict obj about member
-    # Return:
-    #     None
+    """
+    透過Streamlit顯示成員配偶的基本資訊
+
+    Args:
+        dmem (dict): 包含成員資訊的字典
+
+    Returns:
+        None
+    """
     global all_members
     global g_loc
 
@@ -508,11 +579,15 @@ def display_spouse(dmem):
 # Display the basic info about kids who are bilogically
 # related to Mom via Streamlit.
 def display_kids(w):
-    # Args:
-    #     w: mom-name
-    # Return:
-    #     None
+    """
+    透過Streamlit顯示與母親有血緣關係的子女資訊
 
+    Args:
+        w: 母親姓名
+
+    Returns:
+        None
+    """
     global all_members
     global g_loc
 
@@ -530,12 +605,12 @@ def display_kids(w):
     # loop thru to retrieve kid's info
     cnt_k = len(kids.index)
     for i, k in zip(range(cnt_k), kids.Name):
-        born = kids.Born.iloc[i]
-        died = kids.Died.iloc[i]
+        born = int(kids.Born.iloc[i]) if pd.notna(kids.Born.iloc[i]) else 0
+        died = int(kids.Died.iloc[i]) if pd.notna(kids.Died.iloc[i]) else 0
         kid_sex = g_lsex[kids.Sex.iloc[i]]
         kid_rel = g_lrelation[kids.Relation.iloc[i]]
         kid_label = f"{k} {born}-{died}"
-        kid_href = kids.Href.iloc[i]
+        kid_href = kids.Href.iloc[i] if pd.notna(kids.Href.iloc[i]) else ""
 
         # associate different emoji with both male and female
         if kid_sex == g_loc["SEX_MALE"] or kid_sex == g_loc["SEX_INLAW_MALE"]:
@@ -554,15 +629,13 @@ def display_kids(w):
 # three generations via Streamlit.
 def display_3gen(dmem):
     """
-    Display a list of members who are related across three generations
-        via Streamlit, given by member dict object.
-    Each member displays basic info about member, Dad, Mom, and
-        Spouse, which are formated as a string, consisting of:
-        1. name,
-        2. 'birth-deadth'-years
-        3. associated URL
-    In case of female spouse, if any, the marriage year will be added.
-        And followed by all the basic info of her kids.
+    透過Streamlit顯示與成員在三代範圍內相關的成員列表
+
+    Args:
+        dmem (dict): 包含成員資訊的字典
+
+    Returns:
+        None
     """
     global g_loc
     global g_lsex
@@ -591,15 +664,16 @@ def display_3gen(dmem):
     return
 
 
-# Display the detail info about member via Streamlit.
+# 顯示成員的詳細資訊並處理更新
 def display_update_member():
-    # Args: None
-    # On the web page,
-    #     1. display fields, arranged in row-column layout.
-    #     2. Solicitate user for an update
+    """
+    這個函數會在網頁上：
+        1. 以行-列布局顯示欄位
+        2. 請求用戶進行更新
 
-    # Return:
-    #     A 'dbuff' dict obj
+    Returns:
+        None
+    """
     global g_loc, gbuff
 
     # row 1
@@ -709,16 +783,20 @@ def display_update_member():
 # Return a Pandas dataframe obj
 def get_gen(gen_begin, num):
     """
-    Return a Pandas dataframe obj, containing
-        from given 'gen_begin' generation, to ('num'-1) generations below.
+    獲取從指定代數開始的多代成員資料
 
-    The returned dataframe is sorted by gen id (Order), birth-year (Born).
+    Args:
+        gen_begin (int): 開始的代數
+        num (int): 要獲取的代數範圍
 
-    Raise 'FileNotFoundError' if not found.
+    Returns:
+        pandas.DataFrame: 包含成員資料的數據框
+
+    Raises:
+        FileNotFoundError: 當找不到資料時
     """
     gen_end = gen_begin + num
 
-    # build filter
     filter = "Order >= @gen_begin and Order <= @gen_end"
     target_members = all_members.query(filter)
     if target_members.empty:
@@ -733,26 +811,21 @@ def get_gen(gen_begin, num):
 # given a member-name.
 def get_umember(name, spouse="?", dad="?", mom="?", born="0", order="0"):
     """
-    # The selection criteria might include
-    # the following five optional attributes:
-    #     1. Spouse-name (optional)
-    #     2. Dad-name (optional)
-    #     3. Mom-name (optional)
-    #     4. Birth-year (optional)
-    #     5. Generation-order (optional)
-    # Args:
-    #     name (mandatory): member-name
-    #     spouse (optional): spouse-name
-    #     dad (optional): Dad's name, default '?'
-    #     mom (optional): Mom's name, default '?'
-    #     born (optional): birth-year, default '0'
-    #     order (optional): generation-order, default '0'
-    # Usecases:
-    #     1. To iterate members of the same name is needed.
-    #     2. To iterate relations of a given member-name is required.
-    # Return:
-    #   A member (row index and its associated dict obj) at a time,
-    #   or 'FileNotFoundError' if not found
+    獲取指定條件的唯一成員
+
+    Args:
+        name (str): 成員姓名（必填）
+        spouse (str, optional): 配偶姓名. Defaults to "?".
+        dad (str, optional): 父親姓名. Defaults to "?".
+        mom (str, optional): 母親姓名. Defaults to "?".
+        born (str, optional): 出生年. Defaults to "0".
+        order (str, optional): 代數順序. Defaults to "0".
+
+    Returns:
+        tuple: 包含成員索引和相關字典物件的生成器
+
+    Raises:
+        FileNotFoundError: 當找不到符合條件的成員時
     """
     global all_members, g_loc
 
@@ -772,11 +845,14 @@ def get_umember(name, spouse="?", dad="?", mom="?", born="0", order="0"):
         filter = filter + " and Order == @order"
 
     # retrieve matched members into a dataframe
+    all_members['Name'] = all_members['Name'].astype(str)
+    all_members['Dad'] = all_members['Dad'].astype(str)
+    all_members['Mom'] = all_members['Mom'].astype(str)
     rec = all_members.query(filter)
     if rec.empty:
         raise (FileNotFoundError)
 
-    logging.debug(f"Found Member: {rec}")
+    logger.debug(f"Found Member: {rec}")
 
     didx = rec.to_dict("index")
     for i in didx:
@@ -788,9 +864,14 @@ def get_umember(name, spouse="?", dad="?", mom="?", born="0", order="0"):
 @func_timer_decorator
 def main_page(nav, lname_idx):
     """
-    Upon selecting a side-bar function one the right portion of the
-    main widget via Streamlit, launching corresponding funtion and
-    displaying output on the left portion of the main widget
+    主頁面控制函數，根據側邊欄選項顯示相應內容
+
+    Args:
+        nav (str): 選擇的導航選項
+        lname_idx (dict): 姓氏索引字典
+
+    Returns:
+        None
     """
     global g_username, g_lname
     global gbuff, gbuff_idx
@@ -855,7 +936,7 @@ def main_page(nav, lname_idx):
                 index=lname_idx,
                 help=g_loc["L1_HELP"],
             )
-            logging.debug(f"Selected Tuple= {tmem}")
+            logger.debug(f"Selected Tuple= {tmem}")
             order, mem, born = tmem
             lname_idx = lname.index(tmem)
             st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(lname)}")
@@ -874,7 +955,7 @@ def main_page(nav, lname_idx):
                     break
 
                 # build the graph using the first member got
-                logging.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+                logger.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
                 load_buff(gbuff["Name"], gbuff["Born"], g_dirtyTree)
 
                 dot = build_spouse_graph(gbuff)
@@ -883,7 +964,7 @@ def main_page(nav, lname_idx):
                 return
 
             # Show graph on Streamlit Page
-            logging.debug(dot.source)
+            logger.debug(dot.source)
             st.graphviz_chart(dot, use_container_width=True)
 
         except:
@@ -1135,6 +1216,7 @@ def main_page(nav, lname_idx):
         if st.button(g_loc["B5_MEMBER_INQUERY"]):
             with st.spinner(g_loc["IN_PROGRESS"]):
                 filter = "Name == @rec_name"
+                all_members['Name'] = all_members['Name'].astype(str)
                 df2 = g_df.query(filter)
                 if df2.empty:
                     st.error(
@@ -1175,7 +1257,7 @@ def main_page(nav, lname_idx):
                 # finally, add case insensitive search
                 rec_grp = filter + " case=False)"
 
-                logging.debug(f"Query: {rec_grp}")
+                logger.debug(f"Query: {rec_grp}")
 
                 # drops NA-value rows
                 df2 = g_df.dropna()
@@ -1195,7 +1277,7 @@ def main_page(nav, lname_idx):
                             f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['DONE']}"
                         )
                 except Exception as err:
-                    logging.error(err)
+                    logger.error(err)
                     st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
         return
 
@@ -1413,11 +1495,19 @@ def main_page(nav, lname_idx):
 # Clear all caches every 5 min = 300 seconds
 @st.cache_data(ttl=300)
 def get_data_from_csv(f, base=None):
-    # Load the family tree from a CSV file, into a dataframe, 'g_df'.
-    # and strip out the first record into a dataframe, 'all_members',
-    #   containing all family members, duplicated names included.
-    # The first '?'-record, is a place-holder for non-registered
-    # (i.e. "?") members.
+    """
+    從CSV檔案讀取家譜資料
+
+    Args:
+        f (str): CSV檔案路徑
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        tuple: 包含原始數據框和成員數據框的元組
+
+    Raises:
+        FileNotFoundError: 當找不到檔案時
+    """
     try:
         fileCSV = open(f, "r")
     except:
@@ -1426,13 +1516,13 @@ def get_data_from_csv(f, base=None):
             temp_contents = temp.read()
         with open(f, "w") as ft:
             print(temp_contents, file=ft)
-        logging.debug(f"{f} not existed, CREATED a NEW family tree.")
+        logger.debug(f"{f} not existed, CREATED a NEW family tree.")
 
     df = pd.read_csv(f)
     members = df.drop(index=0)
-    logging.debug(f"{f} LOADED.")
-    logging.debug(f"{df.tail(3)}")
-    logging.debug(f"{members.head(3)}")
+    logger.debug(f"{f} LOADED.")
+    logger.debug(f"{df.tail(3)}")
+    logger.debug(f"{members.head(3)}")
 
     return df, members
 
@@ -1440,10 +1530,17 @@ def get_data_from_csv(f, base=None):
 # --- Selecting records from all family members --- from here
 @st.cache_data(ttl=300)
 def load_dataframe(members, rel, base=None):
-    # return members in a Pandas Dataframe
-    # whose key is defined as: Generation Order + Born
-    # (i.e. birth-year). Only first duplicated member is kept.
+    """
+    載入所有家庭成員的記錄
 
+    Args:
+        members (pandas.DataFrame): 成員數據框
+        rel (str): 關係類型
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: 處理後的 Pandas DataFrame
+    """
     filter = "Relation == @rel"
     df1 = members.query(filter).sort_values(by=["Order", "Born"])
     return df1
@@ -1452,10 +1549,16 @@ def load_dataframe(members, rel, base=None):
 # --- Load up Male Members --- from here
 @st.cache_data(ttl=300)
 def load_male_gen(lname, base=None):
-    # return the latest generation ordeer from male members list, 'lname'
-    # assume lname is a ordered list of tuple, consisting of
-    # (Generation-order, Member-name, Year-born)
+    """
+    載入男性成員列表
 
+    Args:
+        lname (list of tuples): 男性成員列表，每個元組包含 (代數順序, 姓名, 出生年)
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        int: 最新一代的代數順序
+    """
     if not lname:
         return 0
     order, _, _ = lname[-1]
@@ -1465,9 +1568,18 @@ def load_male_gen(lname, base=None):
 # --- Load Male Members into list of tuples --- from here
 @st.cache_data(ttl=300)
 def slice_male_list(order, born1, born2, base=None):
-    # return male members in a list, given by generation order, 'order'
-    # The list consists of tuples with
-    # (Generation-order, Member-name, Year-born)
+    """
+    根據代數和出生年份範圍篩選男性成員列表
+
+    Args:
+        order (str): 代數順序
+        born1 (str): 起始出生年
+        born2 (str): 結束出生年
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        list: 符合條件的男性成員列表
+    """
     global g_lname
 
     lname = []
@@ -1483,10 +1595,16 @@ def slice_male_list(order, born1, born2, base=None):
 # --- Load up Male Members --- from here
 @st.cache_data()
 def load_male_members(members, base=None):
-    # return male members in a dataframe, 'm_members',
-    # containing male-members,
-    # droping duplcated rows with the same
-    # generation order, name, and birth-year
+    """
+    載入男性成員資料
+
+    Args:
+        members (pandas.DataFrame): 成員數據框
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        tuple: 包含男性成員數據框、姓氏列表和姓氏索引的元組
+    """
     global g_loc, g_lsex
     global g_df, g_dirtyTree
 
@@ -1519,7 +1637,7 @@ def load_male_members(members, base=None):
         # initialize index to the latest joined male member, i.e.
         # the end of g_lname list
         lname_idx = len(g_lname) - 1
-        logging.debug(f"lname_idx={lname_idx}")
+        logger.debug(f"lname_idx={lname_idx}")
 
         mem = m_members.tail(1).Name.iloc[0]
         born = m_members.tail(1).Born.iloc[0]
@@ -1531,6 +1649,14 @@ def load_male_members(members, base=None):
 # --- Load up Buffer (name and born-year) into environment --- from here
 @st.cache_data()
 def load_buff(mem, born, base=None):
+    """
+    將緩衝區（姓名和出生年）載入環境中
+
+    Args:
+        mem (str): 成員姓名
+        born (str): 出生年
+        base (str, optional): 基準路徑. Defaults to None.
+    """
     # save to environemnt
     os.environ["FT_NAME"] = mem
     os.environ["FT_BORN"] = str(born)
@@ -1540,6 +1666,15 @@ def load_buff(mem, born, base=None):
 # --- Load up User L10N --- from here
 @st.cache_data(ttl=300)
 def load_user_l10n(base=None):
+    """
+    載入用戶本地初始化設置
+
+    Args:
+        base (str, optional): 基準路徑. Defaults to None.
+
+    Returns:
+        tuple: 包含語言鍵和語言字典的元組
+    """
     # --- Initialize System L10N Settings ---- from here
     # set system L10N setting as default locator key , 'g_loc_key'
     # and associated language dictionary, 'g_loc'
@@ -1549,16 +1684,18 @@ def load_user_l10n(base=None):
     return g_loc_key, g_loc
 
 
-# --- Main Program --- from here
+# --- 主程式入口 --- from here
+#     1. 初始化系統環境
+#     2. 設置日誌層級
+#     3. 載入本地化設置
+#     4. 初始化全局變數
+#     5. 開始主程式循環
 if __name__ == "__main__":
+
     st.empty()
 
     g_dirtyTree = os.getenv("DIRTY_TREE")
     g_dirtyUser = os.getenv("DIRTY_USER")
-
-    # --- Set Server logging levels ---
-    g_logging = os.getenv("LOGGING")
-    logging.basicConfig(level=logging._nameToLevel.get(g_logging, logging.INFO))
 
     # --- global L10N dictionary --- from here
     # Load 'g_L10N', for all languages
@@ -1570,10 +1707,10 @@ if __name__ == "__main__":
     g_loc_key, g_loc = load_user_l10n(base=g_dirtyUser)
 
     # logging check-points --- here
-    logging.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
-    logging.debug(f"{g_loc['SVR_L10N']}: {g_loc_key}")
-    logging.debug(f"DIRTY_TREE: {g_dirtyTree}")
-    logging.debug(f"DIRTY_USER: {g_dirtyUser}")
+    logger.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
+    logger.debug(f"{g_loc['SVR_L10N']}: {g_loc_key}")
+    logger.debug(f"DIRTY_TREE: {g_dirtyTree}")
+    logger.debug(f"DIRTY_USER: {g_dirtyUser}")
 
     # Set default user's L10N settings
     g_username = "me"
@@ -1581,7 +1718,7 @@ if __name__ == "__main__":
 
     # Set user-specific L10N dict obj
     g_loc = g_L10N[g_loc_key]
-    logging.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
+    logger.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
 
     # ---- SIDEBAR ---- from here
     # Define the title of sidebar widget
@@ -1661,7 +1798,7 @@ if __name__ == "__main__":
     # Define a global list of male members, 'g_lname'
     # and its index, 'lname_idx'
     m_members, g_lname, lname_idx = load_male_members(all_members, base=g_dirtyTree)
-    logging.debug(f"lname_idx={lname_idx}")
+    logger.debug(f"lname_idx={lname_idx}")
 
     # retrieve from environment
     mem = os.getenv("FT_NAME")
@@ -1678,5 +1815,5 @@ if __name__ == "__main__":
 
     # Invoke main page via Streamlit
     main_page(nav, lname_idx)
-    logging.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
-    logging.debug(f"{nav} <=== FINISHED.")
+    logger.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
+    logger.debug(f"{nav} <=== FINISHED.")
