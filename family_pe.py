@@ -13,13 +13,13 @@ FamilyTrees Personal Release 2.4 2025/5/9
         2. 移除未使用的 logging 模組 in funcUtils.py。
         3. 移除未使用的 sys 模組 in family_pe.py。
         4. 移除未使用的 time 模組 in family_pe.py。
-        5. 移除未使用的 datetime 模組 in family_pe.py。
 """
 PAGE_TITLE = "FamilyTrees PE 2.4"
 
 # Modules required
-import pandas as pd  # pip install pandas
 import os
+import pandas as pd  # pip install pandas
+import datetime
 from dotenv import load_dotenv  # pip install python-dotenv
 from pathlib import Path  # 添加這行導入
 
@@ -1045,7 +1045,7 @@ def main_page(nav, lname_idx):
                     order = gbuff["Order"]
                     sex = g_lsex[gbuff["Sex"]]
                     st.markdown(
-                        f"#### {g_loc['GEN_ORDER']}: {order} {g_loc['MEMBER']}{g_loc['INDEX']}: {idx} {mem}({born},{sex})"
+                        f"#### {g_loc['GEN_ORDER']}: {order} {g_loc['MEMBER']} {g_loc['INDEX']}:{idx} {mem}({born},{sex})"
                     )
                     break
             except:
