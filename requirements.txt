@@ -2,3 +2,4 @@ graphviz
 numpy
 pandas
 streamlit
+python-dotenv

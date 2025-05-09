@@ -1,5 +1,5 @@
 """
-FamilyTrees Personal Release 2.3 2025/5/2
+FamilyTrees Personal Release 2.4 2025/5/9
     Todo: 在正式發布前，請記得：
         1. 將修訂版本同步到 PAGE_TITLE 中。
         2. 更新 README.md 中的發布說明。
@@ -10,16 +10,16 @@ FamilyTrees Personal Release 2.3 2025/5/2
 
     Bug 修復：
         1. Pandas query() 中的 Filter 用法錯誤，修正直接使用字典變數的 bug。
+        2. 移除未使用的 logging 模組 in funcUtils.py。
+        3. 移除未使用的 sys 模組 in family_pe.py。
+        4. 移除未使用的 time 模組 in family_pe.py。
+        5. 移除未使用的 datetime 模組 in family_pe.py。
 """
-PAGE_TITLE = "FamilyTrees PE 2.3"
+PAGE_TITLE = "FamilyTrees PE 2.4"
 
 # Modules required
 import pandas as pd  # pip install pandas
 import os
-import sys
-import logging
-import time
-import datetime
 from dotenv import load_dotenv  # pip install python-dotenv
 from pathlib import Path  # 添加這行導入
 
