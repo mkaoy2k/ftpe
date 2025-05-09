@@ -1,200 +1,186 @@
-
 import os
 from dotenv import load_dotenv  # pip install python-dotenv
 import json
 import streamlit as st  # pip install streamlit
-import glog as log  # pip install glog
-
-# Import email packages
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ssl
-
-# Using 'smtplib' module to create an SMTP client session object 
-# that sends an email to any SMTP server
 import smtplib
-
-# Tempory file module
 import tempfile
 
 def load_menu(fn):
-
-    # reading the data from the language-definition file
+    """
+    讀取菜單設定檔
+    
+    參數:
+        fn (str): 設定檔路徑
+    
+    回傳:
+        dict: 設定檔內容
+    """
     with open(fn) as f:
         data = f.read()
-        
-    # reconstructing languages as a dictionary
-    js = json.loads(data)
-    
-    return js
+    return json.loads(data)
 
-# --- Load supported L10N dictionaries ---
+
 @st.cache_data(ttl=300)
 def load_L10N(base=None):
-    # Build and return a dictionary for all supported languages, 
-    # with key of language name and associated L10N dictionaries.
-    # Load the environment variables from file
+    """
+    載入支援的本地化字典
+    
+    參數:
+        base (str, optional): 基準目錄
+    
+    回傳:
+        dict: 包含所有支援語言的本地化字典
+    """
     load_dotenv(".env")
     f_l10n = os.getenv("L10N_FILE")
-
-    # reading the data from the language-definition file
+    
     with open(f_l10n) as f:
         data = f.read()
-        
-    # reconstructing languages as a dictionary
     js = json.loads(data)
     
     dl10n = {}
-    # iterate all supported languages
     for key, fl in js.items():
-        # load each language-specific L10N settings
         with open(fl) as f:
             data = f.read()
-      
-        # reconstructing the data as a dictionary
         d = json.loads(data)
         dl10n[key] = d
-  
+    
     return dl10n
 
-# send file(s) to someone 
-def send_email(someone, subject=None, 
-               f_text=None, 
-               f_html=None, 
-               f_attached=None):
-    """ 
-    This function to send an email via Google email account
-    with plain text and alternative html parts.
-    Pre-requisites:
-    1. Need to configure your sender Google email account with
-        1) two-step confirmation
-        2) create an app password
+
+def send_email(someone, subject=None, f_text=None, f_html=None, f_attached=None):
     """
-    email_receiver = someone
-    # Load the environment variables from file
-    load_dotenv(".env")
+    透過 Google 電子郵件帳號發送郵件
     
-    # Load the environment variable for logging
+    參數:
+        someone (str): 收件人電子郵件
+        subject (str, optional): 郵件主題
+        f_text (str, optional): 文本檔案路徑
+        f_html (str, optional): HTML 檔案路徑
+        f_attached (str, optional): 附件檔案路徑
+    
+    前置條件:
+        1. 需要設定發件人的 Google 電子郵件帳號
+            1) 開啟兩步驗證
+            2) 建立應用程式密碼
+    """
+    load_dotenv(".env")
     email_password = os.getenv("EMAIL_PW")
     email_sender = os.getenv("EMAIL_SENDER")
+    
     em = MIMEMultipart("alternative")
     em['From'] = email_sender
-    em['To'] = email_receiver
+    em['To'] = someone
     em['Subject'] = subject
 
-    # Compose the email object combines these into a signle 
-    # email message with two alternative rendering options.
-    # Add plain and html parts to MIMEMultipart message
-    # The recipiant client will try to render the last part first
-
+    # 設定郵件內容
     if f_text:
         with open(f_text, 'r') as f:
             text = f.read()
-        if subject == None:
+        if subject is None:
             subject = f'The Contents of {f_text}'
     else:
         text = "Empty Text"
     
-    # Compose Text part
     part1 = MIMEText(text, "plain")
     em.attach(part1)
 
     if f_html:
         with open(f_html, 'r') as f:
             html = f.read()
-        if subject == None:
+        if subject is None:
             subject = f'The Contents of {f_html}'
     else:
         html = "<html><body><h1>Empty HTML</h1></body></html>"
-        
-    # Compose HTML part
+    
     part2 = MIMEText(html, "html")
     em.attach(part2)
 
     if f_attached:
-        # Add attachment
         with open(f_attached, "rb") as attachment:
             part3 = MIMEBase("application", "octet-stream")
             part3.set_payload(attachment.read())
-
-        # encode the above part
+        
         encoders.encode_base64(part3)
-
-        # Add specific content header to the attachment
-        part3.add_header("Content-Disposition", "attachment", 
-                         filename=f_attached)
+        part3.add_header("Content-Disposition", "attachment", filename=f_attached)
         em.attach(part3)
         
-    # Create SMTP connection
+    # 發送郵件
     context = ssl.create_default_context()
-
     with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
         smtp.login(email_sender, email_password)
+        smtp.sendmail(email_sender, someone, em.as_string())
 
-        # Send out the email
-        try:
-            smtp.sendmail(email_sender, email_receiver, em.as_string())
-
-        except Exception as err:
-            raise(err)
-    return
 
 def verify_email(email, subject, action, msg, template=None):
-    # create a verification email to new applicant
-    # The email has 3 parts: header (greeting), action (link attached)
-    # and the best wishes.
-    fc = tempfile.NamedTemporaryFile(mode='w+t')
-    header = f"<html><body><h1>{subject}</h1>"
-    fc.writelines(header)
-    fc.writelines(action)
-    fc.writelines(msg)
-                
-    if template:
-        with open(template, 'r') as f:
-            temp_contents = f.read()
-
-            fc.writelines(temp_contents)
-    fc.seek(0)
+    """
+    建立並發送驗證電子郵件
     
-    # send the verification via email
-    send_email(email,
-            subject=f"{subject}, please confirm from FamilyTrees!",
-            f_html=fc.name,
-            )
+    參數:
+        email (str): 收件人電子郵件
+        subject (str): 郵件主題
+        action (str): 行動連結
+        msg (str): 郵件內容
+        template (str, optional): 模板檔案路徑
+    """
+    with tempfile.NamedTemporaryFile(mode='w+t') as fc:
+        fc.writelines(f"<html><body><h1>{subject}</h1>")
+        fc.writelines(action)
+        fc.writelines(msg)
+        
+        if template:
+            with open(template, 'r') as f:
+                fc.writelines(f.read())
+        
+        fc.seek(0)
+        send_email(email,
+                   subject=f"{subject}, please confirm from FamilyTrees!",
+                   f_html=fc.name)
 
-    fc.close()        
-    return
 
 @st.cache_data(ttl=300)
 def get_1st_mbr_dict(df, mem, born, base=None):
     """
-    Return an index and associated dict obj, containing the FIRST record 
-    found in 'df' dataframe, matching given member-name and birth-year.
+    在 DataFrame 中查找第一筆符合條件的成員記錄
     
-    Raise 'FileNotFoundError' if not found, otherwise.
+    參數:
+        df (pd.DataFrame): 資料框
+        mem (str): 成員姓名
+        born (int): 出生年份
+        base (str, optional): 基準目錄
+    
+    回傳:
+        tuple: (index, member_dict)
+            index: 記錄索引
+            member_dict: 成員資料字典
+    
+    異常:
+        FileNotFoundError: 如果找不到符合條件的記錄
     """
-    log.debug(f"Filter = 'Name == {mem} and Born = {born}'")
     filter = f"Name == @mem and Born == @born"
     try:
         rec = df.query(filter)
         if rec.empty:
-            raise(FileNotFoundError)
-    except:
-        raise(FileNotFoundError)
+            raise FileNotFoundError("找不到符合條件的記錄")
+    except Exception as e:
+        raise
     
-    # drop duplicates for the same person with multiple records
+    # 移除重複記錄，只保留第一筆
     rec = rec[0:1]
-    
-    # convert the single-record dataframe to a tuple (index, dict),
-    # in which only dict obj is returned.
     idx, member = rec.to_dict('index').popitem()
     return idx, member
 
-# Functional testing
+
 if __name__ == '__main__':
-    path_dir = 'data'  # relative to the current dir
+    """
+    功能測試代碼
+    """
+    path_dir = 'data'  # 相對於當前目錄
     email_receiver = "mkaoy2k@yahoo.com"
     confirm_template = f"{path_dir}/confirm.html"
     email_text = f'{path_dir}/template.txt'
@@ -213,34 +199,3 @@ if __name__ == '__main__':
     except Exception as err:
         print(f"Caught '{err}'. class is {type(err)}")
         print(f"send confirm email failed")    
-        
-    # try:
-    #     send_email(email_receiver,
-    #         subject="Test1",
-    #         )
-    #     print(f'No body email sent to {email_receiver} ok\n')
-        
-    #     send_email(email_receiver,
-    #         subject="Test2",
-    #         f_text=email_text,
-    #         )
-    #     print(f'Text email sent to {email_receiver} ok\n')
-
-    #     send_email(email_receiver,
-    #         subject="Test3",
-    #         f_text=email_text,
-    #         f_html=email_html,
-    #         )
-    #     print(f'Text & HTML email sent to {email_receiver} ok\n')
-
-    #     send_email(email_receiver,
-    #         subject="Test4",
-    #         f_text=email_text,
-    #         f_html=email_html,
-    #         f_attached=email_attached 
-    #         )
-    #     print(f'Text & HTML Email with attachment sent to {email_receiver} ok\n')
-
-    # except Exception as err:
-    #     print(f"Caught '{err}'. class is {type(err)}")
-    #     print(f'send_email(): failed\n')

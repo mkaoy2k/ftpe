@@ -18,7 +18,7 @@ The `ftpe` not only helps you to build your family heritage, but also provides y
 
 2. _Multi-Language Support_:
 
-   Currently, there are currently five supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, and Korean. You are welcome if you are interested in localizing any language of yours or any comments. Please let [me](mailto:mkaoy2k@gmail.com) know.
+   Currently, there are currently five supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, and Korean. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to  let [me](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
@@ -99,9 +99,9 @@ There are two running environments that are supported to run `ftpe` App.
 
 ## FAQ
 
-1. _Where is the my FamilyTree stored?_
+1. _Where is the my FamilyTree data stored?_
 
-   The data is stored in a CSV format, called me.csv, located in the sub-directory, call 'data'.
+   The data file is stored in a CSV format, called me.csv, located in the sub-directory, call 'data'.
 
 2. _Who created 'FamilyTrees PE'?_
 
