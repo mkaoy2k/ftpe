@@ -1,25 +1,32 @@
 """
-FamilyTrees Personal Release 2.4 2025/5/9
+FamilyTrees Personal Release 2.5 2025/5/14
     Todo: 在正式發布前，請記得：
         1. 將修訂版本同步到 PAGE_TITLE 中。
         2. 更新 README.md 中的發布說明。
 
     功能增強：
-        1. 增強了程式碼的中文文件。
-        2. 增強了日誌輸出及除錯功能。
+        1. Added upto 10 languages support.
+        2. Dynamically set logging level based on environment 
+        variable LOGGING in the .env file.
+        3. Added environment variables tracing at debug-level 
+        logging. 
+        4. Set default logging level to INFO.
+        5. Set default language to 繁中.
+        6. Set default DIRTY_TREE flag to 0.
+        7. Set default L10N_FILE to L10N.json in funcUtils.py.
+        8. Set default DIRTY_USER flag to 0.
+        9. Cleaned up .env template file
 
     Bug 修復：
-        1. Pandas query() 中的 Filter 用法錯誤，修正直接使用字典變數的 bug。
-        2. 移除未使用的 logging 模組 in funcUtils.py。
-        3. 移除未使用的 sys 模組 in family_pe.py。
-        4. 移除未使用的 time 模組 in family_pe.py。
+        1. Added 'time' module back
 """
-PAGE_TITLE = "FamilyTrees PE 2.4"
+PAGE_TITLE = "FamilyTrees PE 2.5"
 
 # Modules required
 import os
 import pandas as pd  # pip install pandas
 import datetime
+import time  # 添加 time 模組導入
 from dotenv import load_dotenv  # pip install python-dotenv
 from pathlib import Path  # 添加這行導入
 
@@ -42,31 +49,52 @@ import logging
 from glogTime import func_timer_decorator
 
 # --- Initialize system environment --- from here
-load_dotenv()
+script_path = Path(__file__).resolve()
+script_dir = script_path.parent
+env_path = script_dir / '.env'
+
+# 載入 .env 文件
+load_dotenv(env_path, override=True)
 
 # --- Set Server logging levels ---
-g_logging = os.getenv("LOGGING", "INFO")  # 預設為 INFO
-    
+g_logging = os.getenv("LOGGING", "INFO").strip('\"\'').upper()  # 預設為 INFO，並移除可能的引號
+
 # 創建日誌器
 logger = logging.getLogger(__name__)
-if g_logging == "INFO":
-    logger.setLevel(logging.INFO)
-else:
-    logger.setLevel(logging.DEBUG)
 
 # 設置日誌格式
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
 
 # 設置控制台處理器
 console_handler = logging.StreamHandler()
-if g_logging == "INFO":
-    console_handler.setLevel(logging.INFO)  
-else:
+
+# 根據環境變數設置日誌級別
+if g_logging == "DEBUG":
+    logger.setLevel(logging.DEBUG)
     console_handler.setLevel(logging.DEBUG)
+    logger.debug("Debug logging is enabled")
+else:
+    logger.setLevel(logging.INFO)
+    console_handler.setLevel(logging.INFO)
+
 console_handler.setFormatter(formatter)
+
+# 移除所有現有的處理器，避免重複日誌
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
 
 # 添加處理器到日誌器
 logger.addHandler(console_handler)
+
+# 確保根日誌器不會干擾
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger().setLevel(logging.WARNING)
+
+# 打印所有環境變數用於調試
+logger.debug("Environment variables:")
+for key, value in os.environ.items():
+    if key == 'LOGGING' or key.startswith('L10N') or key.startswith('DIRTY'):
+        logger.debug(f"{key}={value}")
 
 # --- Internal Functions --- from here
 def build_spouse_graph(dbuff):
@@ -1355,7 +1383,7 @@ def main_page(nav, lname_idx):
                     order = dmem["Order"]
                     sex = g_lsex[dmem["Sex"]]
                     st.markdown(
-                        f"#### {g_loc['GEN_ORDER']}:{order} {g_loc['MEMBER']} {g_loc['INDEX']}:{idx} {mem}({born}, {sex})"
+                        f"#### {g_loc['GEN_ORDER']}:{order} {g_loc['MEMBER']} {g_loc['INDEX']}:{idx} {mem}({born},{sex})"
                     )
                     display_3gen(dmem)
                     st.markdown("---")
@@ -1679,8 +1707,10 @@ def load_user_l10n(base=None):
     # set system L10N setting as default locator key , 'g_loc_key'
     # and associated language dictionary, 'g_loc'
 
-    g_loc_key = os.getenv("L10N")
+    g_loc_key = os.getenv("L10N", "繁中").strip('"\'').upper()
     g_loc = g_L10N[g_loc_key]
+    logger.debug(f"g_loc_key={g_loc_key}")
+    logger.debug(f"g_loc={g_loc}")
     return g_loc_key, g_loc
 
 
@@ -1694,8 +1724,11 @@ if __name__ == "__main__":
 
     st.empty()
 
-    g_dirtyTree = os.getenv("DIRTY_TREE")
-    g_dirtyUser = os.getenv("DIRTY_USER")
+    g_dirtyTree = os.getenv("DIRTY_TREE", "0")
+    logger.debug(f"DIRTY_TREE: {g_dirtyTree}")
+
+    g_dirtyUser = os.getenv("DIRTY_USER", "0")
+    logger.debug(f"DIRTY_USER: {g_dirtyUser}")
 
     # --- global L10N dictionary --- from here
     # Load 'g_L10N', for all languages
@@ -1709,8 +1742,6 @@ if __name__ == "__main__":
     # logging check-points --- here
     logger.debug(f"{g_loc['SVR_LOGGING']}: {g_logging}")
     logger.debug(f"{g_loc['SVR_L10N']}: {g_loc_key}")
-    logger.debug(f"DIRTY_TREE: {g_dirtyTree}")
-    logger.debug(f"DIRTY_USER: {g_dirtyUser}")
 
     # Set default user's L10N settings
     g_username = "me"

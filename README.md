@@ -18,7 +18,7 @@ The `ftpe` not only helps you to build your family heritage, but also provides y
 
 2. _Multi-Language Support_:
 
-   Currently, there are currently five supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, and Korean. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to  let [me](mailto:mkaoy2k@gmail.com) know.
+   Currently, there are currently 10 supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, Korean, Danish, German, French, Lithuanian, and Polish. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to  let [me](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
@@ -51,17 +51,20 @@ LOGGING="INFO"
 
 comment out what you don't want.
 
-### Languages: 5 options available
+### Languages: 10 options available currently
 
-```bash
-L10N = "繁中"
-L10N = "US"
-L10N = "简中"
-L10N = "日本語"
-L10N = "한국어"
-```
+    "繁中"  : "L10N_TW.json",
+    "简中"  : "L10N_CN.json",
+    "日本語" : "L10N_JP.json",
+    "한국어" : "L10N_KR.json",
+    "DANISH" : "L10N_DK.json",
+    "GERMAN" : "L10N_DE.json",
+    "FRENCH" : "L10N_FR.json",
+    "LITHUANIAN" : "L10N_LT.json",
+    "POLISH" : "L10N_PL.json",
+    "US"   : "L10N_US.json"
 
-To set the default language, comment out what you don't want.
+To set your preferred language, goto the 'ftpe' App and select your preferred language from the 'User Settings' on the left bar menu.
 
 ## How to Use
 
