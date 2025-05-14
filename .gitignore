@@ -37,6 +37,7 @@ demo.py
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.ruff_cache
 *.py[cod]
 *$py.class
 

@@ -37,7 +37,7 @@ def load_L10N(base=None):
         dict: 包含所有支援語言的本地化字典
     """
     load_dotenv(".env")
-    f_l10n = os.getenv("L10N_FILE")
+    f_l10n = os.getenv("L10N_FILE", "L10N.json")
     
     with open(f_l10n) as f:
         data = f.read()
