@@ -38,6 +38,14 @@ To install the `ftpe` App in Python environment, follow the following steps:
    uv run python -m pip install -r requirements.txt
    ```
 
+## Directory Structure
+
+ftpe/
+  ├── admin_ui.py
+  ├── pages/
+  │   └── 2_json_ui.py
+  └── data.json  # JSON files will be here
+
 ## Configuration Defined in the `.env` file
 
 Rename 'template.env.txt' to '.env' in your environment and configure the followings:
@@ -53,18 +61,20 @@ comment out what you don't want.
 
 ### Languages: 10 options available currently
 
-    "繁中"  : "L10N_TW.json",
-    "简中"  : "L10N_CN.json",
-    "日本語" : "L10N_JP.json",
-    "한국어" : "L10N_KR.json",
-    "DANISH" : "L10N_DK.json",
-    "GERMAN" : "L10N_DE.json",
-    "FRENCH" : "L10N_FR.json",
-    "LITHUANIAN" : "L10N_LT.json",
-    "POLISH" : "L10N_PL.json",
-    "US"   : "L10N_US.json"
+```bash
+"繁中"  : "L10N_TW.json",
+"简中"  : "L10N_CN.json",
+"日本語" : "L10N_JP.json",
+"한국어" : "L10N_KR.json",
+"DANISH" : "L10N_DK.json",
+"GERMAN" : "L10N_DE.json",
+"FRENCH" : "L10N_FR.json",
+"LITHUANIAN" : "L10N_LT.json",
+"POLISH" : "L10N_PL.json",
+"US"   : "L10N_US.json"
+```
 
-To set your preferred language, goto the 'ftpe' App and select your preferred language from the 'User Settings' on the left bar menu.
+To set your preferred language, run the `ftpe` App and on the left bar menu, select your preferred language from the 'User Language' drop-down list.
 
 ## How to Use
 
@@ -88,7 +98,7 @@ There are two running environments that are supported to run `ftpe` App.
 
    - Ensure that you have installed the required dependencies in the `.env` file.
 
-   - Run the `family_pe.py` file using the Streamlit CLI. Execute the following command to launch 'ftpe' server:
+   - Run the `family_pe.py` file using the Streamlit CLI. Execute the following command to launch `ftpe` server:
 
    ```bash
    streamlit run family_pe.py
@@ -106,7 +116,7 @@ There are two running environments that are supported to run `ftpe` App.
 
    The data file is stored in a CSV format, called me.csv, located in the sub-directory, call 'data'.
 
-2. _Who created 'FamilyTrees PE'?_
+2. _Who created 'ftpe' (FamilyTrees PE)?_
 
    Created with ❤️ by:
-   [Michael Kao](https://github.com/mkaoy2k)
+   [Michael Kao](https://github.com/mkaoy2k/ftpe)

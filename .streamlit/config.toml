@@ -1,0 +1,30 @@
+[runner]
+# Enable or disable the cache data API
+enableCacheDataAPI = true
+
+[runner.memory]
+# Configure the cache storage manager
+# Options: "memory" (default), "disk"
+storage_manager = "disk"
+
+# Enable or disable the cache data API warning
+showWarningOnDirectExecution = false
+
+# Configure the cache data API
+[cache_data]
+# Maximum number of entries to keep in the cache
+max_entries = 100
+# Time to live for cache entries (in seconds)
+ttl = 86400  # 24 hours
+
+# Suppress specific warnings
+[logger]
+level = "error"
+
+[client]
+# Disable the cache warning
+disableCacheWarning = true
+
+[server]
+# Disable the file watcher which can cause warnings
+fileWatcherType = "none"

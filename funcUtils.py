@@ -9,6 +9,8 @@ from email.mime.multipart import MIMEMultipart
 import ssl
 import smtplib
 import tempfile
+from auth_utils import hash_password
+from pathlib import Path
 
 def load_menu(fn):
     """
@@ -39,6 +41,7 @@ def load_L10N(base=None):
     load_dotenv(".env")
     f_l10n = os.getenv("L10N_FILE", "L10N.json")
     
+    # 讀取 L10N.json which contains all supported languages
     with open(f_l10n) as f:
         data = f.read()
     js = json.loads(data)

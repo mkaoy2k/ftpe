@@ -1437,12 +1437,33 @@ def main_page(nav, lname_idx):
     # Configure User Settings
     if nav == g_loc["MENU_SETTINGS"]:
         # Three settings are supported:
-        # 1. Update Server setting: L10N
-        # 2. Import CVS to merge into family tree
-        # 3. Export current family tree to local 'Download' folder
+        # 1. Change User Language Setting
+        # 2. Import a family tree from a CSV file and
+        #   merge into the current family tree
+        # 3. Export the current family tree to 
+        #   a local 'Download' folder
+        # todo: 4. Export the csv to family.db SQLite DB file in data folder.
+        # There are two tables in family.db:
+        # Table members and relatives with fields: 
+        # 1. id
+        # 2. last_name
+        # 3. family_id
+        # 4. first_name
+        # 5. middle_name
+        # 6. alias (comma separated if more)
+        # 7. email
+        # 8. url
+        # 9. born
+        # 10. died
+        # 11. gen_order
+        # 12. status: born, single, married, divorced, senior, died
+        # 13. dad_id
+        # 14. mom_id
 
         st.subheader(g_loc["T10_USR_SETTINGS"])
 
+        # create two tables in family.db if not exists
+        
         # --- User L10N Settings --- from here
         c1, c2 = st.columns([3, 7])
 
@@ -1459,7 +1480,7 @@ def main_page(nav, lname_idx):
         filename = c2.text_input(lexport, placeholder=g_loc["BX_EXPORT_HELP"])
 
         # --- User Export CSV --- from here
-        # # enter file name to export
+        # enter a CSV file name to export/download
         with c2:
             with open(g_fTree) as f:
                 fn = f"{filename}.csv"
