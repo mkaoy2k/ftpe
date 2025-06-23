@@ -13,8 +13,7 @@
 config.yaml
 
 # FamilyTrees support files
-db_*.py
-ops_*.py
+test_*.py
 wip.py
 prod_*
 __init__*.py
