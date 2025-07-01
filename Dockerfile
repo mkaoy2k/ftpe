@@ -6,4 +6,4 @@ COPY . .
 
 RUN python -m pip install -r requirements.txt
 
-CMD [ "streamlit", "run", "./family_pe.py" ]
+CMD [ "streamlit", "run", "./admin_ui.py" ]
