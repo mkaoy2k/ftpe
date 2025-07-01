@@ -15,7 +15,8 @@ It includes features for:
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-import json
+from admin_ui import init_session_state
+import os
 import time
 
 def load_csv(file_path):
@@ -73,7 +74,7 @@ def main():
     dirs = {
         'Data': Path(__file__).parent.parent / "data",  # Data directory
         'Project Root': Path(__file__).parent.parent   # Project root
-   }
+    }
     
     selected_dir_name = st.sidebar.selectbox(
         "Select a directory",
@@ -101,9 +102,13 @@ def main():
     else:
         file_path = selected_dir / selected_file if selected_file != "Create New..." else None
     
-    # Handle file loading and reloading
     def load_file_content():
-        """Load file content into session state"""
+        """
+        Load file content into a DataFrame.
+
+        Returns:
+            DataFrame: Loaded data as a pandas DataFrame, or an empty DataFrame if the file is empty or does not exist.
+        """
         try:
             if file_path and file_path.exists():
                 # Read CSV with error handling for empty files
@@ -231,5 +236,12 @@ def main():
         else:
             st.info("No data to display")
 
-if __name__ == "__main__":
+    
+# Initialize session state
+init_session_state()
+    
+# Check authentication
+if not st.session_state.get('authenticated', False):
+    st.switch_page("admin_ui.py")
+else:
     main()

@@ -1,7 +1,7 @@
 """
-FamilyTrees Personal Release 2.5 2025/5/14
+FamilyTrees Personal Release 2.6 2025/6/24
     Todo: 在正式發布前，請記得：
-        1. 將修訂版本同步到 PAGE_TITLE 中。
+        1. 將 `.env` 文件中的 `RELEASE` 更新版本
         2. 更新 README.md 中的發布說明。
 
     功能增強：
@@ -20,7 +20,6 @@ FamilyTrees Personal Release 2.5 2025/5/14
     Bug 修復：
         1. Added 'time' module back
 """
-PAGE_TITLE = "FamilyTrees PE 2.5"
 
 # Modules required
 import os
@@ -33,11 +32,6 @@ from pathlib import Path  # 添加這行導入
 # Import Web App modules
 import streamlit as st  # pip install streamlit
 
-st.set_page_config(
-    page_title=PAGE_TITLE,
-    page_icon=":books:",
-)
-
 # Import graphviz module
 import graphviz as gv  # pip install graphviz
 
@@ -48,6 +42,7 @@ from funcUtils import *
 import logging
 from glogTime import func_timer_decorator
 
+
 # --- Initialize system environment --- from here
 script_path = Path(__file__).resolve()
 script_dir = script_path.parent
@@ -55,6 +50,14 @@ env_path = script_dir / '.env'
 
 # 載入 .env 文件
 load_dotenv(env_path, override=True)
+
+PAGE_TITLE = "FamilyTrees PE " + os.getenv("RELEASE", "")
+
+st.set_page_config(
+    page_title=PAGE_TITLE,
+    page_icon=":books:",
+)
+
 
 # --- Set Server logging levels ---
 g_logging = os.getenv("LOGGING", "INFO").strip('\"\'').upper()  # 預設為 INFO，並移除可能的引號
@@ -1442,24 +1445,8 @@ def main_page(nav, lname_idx):
         #   merge into the current family tree
         # 3. Export the current family tree to 
         #   a local 'Download' folder
-        # todo: 4. Export the csv to family.db SQLite DB file in data folder.
-        # There are two tables in family.db:
-        # Table members and relatives with fields: 
-        # 1. id
-        # 2. last_name
-        # 3. family_id
-        # 4. first_name
-        # 5. middle_name
-        # 6. alias (comma separated if more)
-        # 7. email
-        # 8. url
-        # 9. born
-        # 10. died
-        # 11. gen_order
-        # 12. status: born, single, married, divorced, senior, died
-        # 13. dad_id
-        # 14. mom_id
-
+        # 4. Export the csv to family.db SQLite DB file in data folder.
+        
         st.subheader(g_loc["T10_USR_SETTINGS"])
 
         # create two tables in family.db if not exists

@@ -9,7 +9,7 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 import streamlit as st
 import db_utils as dbm
-from funcUtils import load_L10N
+import funcUtils as fu
 
 # 載入環境變數
 load_dotenv()
@@ -18,23 +18,20 @@ load_dotenv()
 # These settings can be imported by other modules using context_utils
 
 # General Settings
-TIMEZONE = "UTC"
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 ENABLE_MAINTENANCE = False
-SITE_TITLE = "Admin DBM"
+SITE_TITLE = "Admin"
+RELEASE = os.getenv("RELEASE", "")
 
 # Language Settings
-g_L10N = load_L10N()
-g_L10N_options = list(g_L10N.keys())
-if g_L10N_options:
-    LANGUAGE = g_L10N_options[0]
-    LANGUAGES = g_L10N_options
-else:
-    LANGUAGE = "US"
-    LANGUAGES = ["US"]
+language_list = fu.get_languages()
+LANGUAGES = language_list
+LANGUAGE = os.getenv("L10N", "US")
 
 # Email Settings
 EMAIL_NOTIFICATIONS = True
-DEFAULT_EMAIL = os.getenv("DB_ADMIN", "mkaoy2k@gmail.com")
+MAIL_USER = os.getenv("MAIL_USERNAME", "")
+MAIL_PASS = os.getenv("MAIL_PASSWORD", "")
 
 # UI Settings
 DARK_MODE = False
@@ -44,6 +41,15 @@ ITEMS_PER_PAGE = 20
 PASSWORD_RESET_TIMEOUT = 24  # hours
 MAX_LOGIN_ATTEMPTS = 5
 
+# Server Settings
+OPS_SVR=os.getenv("OPS_SVR", "http://localhost:5555")
+
+# File System Settings
+FILE_SYSTEM_SETTINGS = {
+    'dir_path': os.getenv("FSS_DIR_PATH", "./data"),
+    'file_name': os.getenv("FSS_FILE_NAME", "users"),
+    'file_type': os.getenv("FSS_FILE_TYPE", "CSV")
+}
 # ===== End of Module Settings =====
 
 def init_context() -> Dict[str, Any]:
@@ -60,8 +66,11 @@ def init_context() -> Dict[str, Any]:
         'site_title': SITE_TITLE,
         'language': LANGUAGE,
         'languages': LANGUAGES,
-        'default_email': DEFAULT_EMAIL,
         'email_notifications': EMAIL_NOTIFICATIONS,
+        'mail_user': MAIL_USER,
+        'mail_pass': MAIL_PASS,
+        'ops_svr': OPS_SVR,
+        'file_system_settings': FILE_SYSTEM_SETTINGS,
         'dark_mode': DARK_MODE,
         'items_per_page': ITEMS_PER_PAGE,
         'password_reset_timeout': PASSWORD_RESET_TIMEOUT,

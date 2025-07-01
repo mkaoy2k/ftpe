@@ -9,10 +9,9 @@ This page provides user management functionality including:
 import streamlit as st
 import pandas as pd
 import db_utils as dbm
-from admin_ui import show_admin_sidebar, init_session_state
+from admin_ui import show_admin_sidebar, show_member_sidebar, init_session_state
 from context_utils import init_context, update_context
-from db_utils import import_users_from_file, export_users_to_file
-import sqlite3
+from auth_utils import create_member_user
 
 def format_timestamps(df):
     """Convert UTC timestamps to Pacific Time (with DST) and format"""
@@ -24,14 +23,66 @@ def format_timestamps(df):
     return df
 
 def show_page():
-    # Show admin sidebar
-    show_admin_sidebar()
-    context = st.session_state.get('app_context', init_context())
+    # Initialize logging
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
     
-    st.title("User Table Management")
+    # Default context values
+    default_context = {
+        'languages': ['US'],
+        'language': 'US',
+        'mail_user': 'mkaoy2k@gmail.com'
+    }
+    
+    try:
+        logger.debug("Initializing show_page")
+        
+        # Initialize or get context from session state
+        if 'app_context' not in st.session_state or not isinstance(st.session_state.app_context, dict):
+            logger.debug("Initializing new app_context")
+            context = default_context.copy()
+            try:
+                initialized_context = init_context()
+                if isinstance(initialized_context, dict):
+                    context.update(initialized_context)
+                st.session_state.app_context = context
+            except Exception as init_error:
+                logger.error(f"Error initializing context: {init_error}", exc_info=True)
+                st.session_state.app_context = default_context
+        
+        # Get context from session state
+        context = st.session_state.get('app_context', default_context)
+        logger.debug(f"Context: {context}")
+        
+        # Ensure all required keys exist
+        for key, default_value in default_context.items():
+            if key not in context or context.get(key) is None:
+                context[key] = default_value
+        
+        # Update session state with validated context
+        st.session_state.app_context = context
+        logger.debug(f"Final context: {context}")
+        
+        if st.session_state.user_state == dbm.User_State['admin']:
+            # Show admin sidebar
+            show_admin_sidebar()
+        elif st.session_state.user_state == dbm.User_State['member']:
+            # Show member sidebar
+            show_member_sidebar()
+        else:
+            st.error("You do not have permission to access this page.")
+            return
+        
+        st.title("User Management")
+        
+    except Exception as e:
+        logger.error(f"Error initializing page: {str(e)}", exc_info=True)
+        st.error(f"An error occurred while initializing the page: {str(e)}")
+        return
+    
     try:
         # --- manage users --- from here
-        st.markdown("---")
         st.subheader("Query Subscribers")
         df = pd.DataFrame()
         btn11, btn12, btn13, btn14 = st.columns([5,5,5,5])
@@ -87,17 +138,20 @@ def show_page():
                         st.info("No subscribers found")
     
         # --- manage a specific user --- from here
-        st.markdown("---")
         st.subheader("Manage User")
-        # Create three columns for better layout
-        col1, col2, col3 = st.columns([5,5,5])
+        # Create four columns for better layout
+        col1, col2, col3 = st.columns([2,1,1])
         with col1:
-            email = st.text_input(':blue[Email:]', 
-                        value=context.get('default_email', 'mkaoy2k@gmail.com'))
+            email_value = context.get('mail_user', 'mkaoy2k@gmail.com')
+            logger.debug(f"Setting email input with value: {email_value}")
+            email = st.text_input(':blue[Email:]', value=email_value)
             email = email.strip()
+            
         with col2:
             lang_list = context.get('languages', ['US'])
             current_lang = context.get('language', 'US')
+            logger.debug(f"Languages: {lang_list}, Current: {current_lang}")
+            
             # Ensure the current language is in the list to avoid ValueError
             default_index = 0
             if current_lang in lang_list:
@@ -111,7 +165,25 @@ def show_page():
                                   min_value=1,
                                   max_value=100000,
                                   value=1)
-        if st.button("Query"):
+        
+        # Add a new column for creating member users
+        st.subheader("Create New Member")
+        with st.form("create_member_form"):
+            new_email = st.text_input("New Email:", key="new_member_email")
+            new_password = st.text_input("Password:", type="password", key="new_member_password")
+            submitted = st.form_submit_button("Create Member")
+            
+            if submitted:
+                if not new_email or not new_password:
+                    st.warning("Please enter both email and password")
+                else:
+                    success, message = create_member_user(new_email, new_password)
+                    if success:
+                        st.success(message)
+                        # The form will automatically clear on the next run
+                    else:
+                        st.error(f"Failed to create member: {message}")
+        if st.button("Query User by Email"):
             user = dbm.get_subscriber(email)
             if user is not None:
                 # Create a vertical display of user data
@@ -134,7 +206,7 @@ def show_page():
             else:            
                 st.warning(f"Email '{email}' not found")
     
-        btn21, btn22, btn23, btn24 = st.columns([5,5,5,5])
+        btn21, btn22, btn23, btn24 = st.columns([1,1,1,1])
     
         with btn22:
             if st.button("Subscribe"):
@@ -152,70 +224,21 @@ def show_page():
                     st.warning(f"Failed to unsubscribe {email}")
     
         with btn21:
-            if st.button("Delete by email"):
+            if st.button("Delete User by Email"):
                 if dbm.delete_subscriber(email):
                     st.info(f"Deleted {email} successfully")
                 else:
                     st.warning(f"Failed to delete {email}")
         
         with btn24:
-            if st.button("Delete by ID"):
+            if st.button("Delete User by ID"):
                 if dbm.delete_user(user_id):
                     st.info(f"Deleted {user_id} successfully")
                 else:
                     st.warning(f"Failed to delete {user_id}")
-        
-        # --- import users --- from here
-        st.markdown("---")
-        st.subheader("Import Users From File to DB")
-        col1, col2, col3 = st.columns([6,8,4])
-        with col1:
-            json_csv_file = st.text_input("File path to import from",
-                          value="data/users.json",
-                          placeholder="json or csv file format allowed")
-        with col2:
-            db_file = st.text_input("DB path to import to",
-                          value="/Users/michaelkao/My_Projects/ftpe/data/family.db")
-        with col3:
-            table_name = st.text_input("Table name to import to",
-                          value="users")
-            
-        if st.button("Import"):
-            conn = sqlite3.connect(db_file)
-            result = import_users_from_file(json_csv_file, conn, table_name)
-            st.info(f"Imported: {result['imported']}, Skipped: {result['skipped']}")
-            if result['errors']:
-                st.error("\nErrors encountered:")
-                for error in result['errors']:
-                        st.error(f"- {error}")
-        
-        # --- export users --- from here
-        st.markdown("---")
-        st.subheader("Export Users From DB to File")
-        col1, col2, col3 = st.columns([8,4,6])
-        with col1:
-            db_file = st.text_input("DB path to export from",
-                          value="/Users/michaelkao/My_Projects/subs/data/users.db")
-        with col2:
-            table_name = st.text_input("Table name to export from",
-                          value="user")
-        with col3:
-            json_csv_file = st.text_input("File path to export to",
-                          value="data/users.json",
-                          placeholder="json or csv file format allowed")
-        
-        if st.button("Export"):
-                conn = sqlite3.connect(db_file)
-                result = export_users_to_file(json_csv_file, conn, table_name)
-                if result['success']:
-                    st.info(result['message'])
-                    st.info(result['file_path'])
-                else:
-                    st.error(result['message'])
-    
     except Exception as err:
         st.error(f"An error occurred: {str(err)}")
-
+    
 # Initialize session state
 init_session_state()
 

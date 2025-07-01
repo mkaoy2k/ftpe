@@ -9,29 +9,14 @@
 ._*
 .DS_*
 
-# FamilyTrees Obsolete files
-config.yaml
+# FamilyTrees Data files
+data/*
+!data/template.csv
 
-# FamilyTrees support files
-test_*.py
-wip.py
+# FamilyTrees Tools or Examples
+test_*
 prod_*
 __init__*.py
-
-# FamilyTrees Data files
-data/*.bak
-data/*.csv
-data/*.gv
-data/*.png
-data/*.log
-
-# Streamlit Examples
-main.py
-account.py
-about.py
-app.py
-demo.py
-*.xlsx
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

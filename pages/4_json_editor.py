@@ -16,6 +16,7 @@ import streamlit as st
 import json
 import os
 from pathlib import Path
+from admin_ui import init_session_state
 
 def load_json(file_path):
     """
@@ -170,5 +171,12 @@ def main():
         except json.JSONDecodeError:
             st.error("Invalid JSON")
 
-if __name__ == "__main__":
+    
+# Initialize session state
+init_session_state()
+    
+# Check authentication
+if not st.session_state.get('authenticated', False):
+    st.switch_page("admin_ui.py")
+else:
     main()
