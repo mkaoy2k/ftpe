@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The 'FamilyTrees' Personal Edition (`ftpe` in short) is a stand-alone web application, wrritten in Python that allows you to record your family tree at your own laptop/PC.
+The 'FamilyTrees' Personal Edition (FamilyTreesPE,`ftpe` in short) is a stand-alone web application, wrritten in Python that allows you to record your family tree at your own laptop/PC.
 
 ## How It Works
 
@@ -18,7 +18,7 @@ The `ftpe` not only helps you to build your family heritage, but also provides y
 
 2. _Multi-Language Support_:
 
-   Currently, there are currently 10 supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, Korean, Danish, German, French, Lithuanian, and Polish. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to  let [me](mailto:mkaoy2k@gmail.com) know.
+   Currently, there are 10 supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, Korean, Danish, German, French, Lithuanian, and Polish. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to let [Creator: Michael Kao](mailto:mkaoy2k@gmail.com) know.
 
 ## Dependencies and Installation
 
@@ -41,10 +41,35 @@ To install the `ftpe` App in Python environment, follow the following steps:
 ## Directory Structure
 
 ftpe/
-  ├── admin_ui.py
-  ├── pages/
-  │   └── 2_json_ui.py
-  └── data.json  # JSON files will be here
+├── admin_ui.py           # Admin interface
+├── auth_utils.py         # Authentication utilities
+├── context_utils.py      # Context management
+├── db_utils.py           # Database utilities
+├── email_utils.py        # Email functionality
+├── family_pe.py          # Main application
+├── funcUtils.py          # Utility functions
+├── genesis.py            # Initialization script
+├── glogTime.py           # Logging utilities
+├── migrate_members.py    # Data migration script
+├── ops_dbMgmt.py         # Database management
+├── prod_backup.sh        # Production backup script
+├── prod_push.sh          # Production deployment script
+├── requirements.txt      # Python dependencies
+├── template.env.txt      # Environment template
+│
+├── data/                 # Data directory
+│   ├── family.db        # Family database
+│   ├── me.csv           # Personal data
+│   ├── members_export_*.csv  # Member exports
+│   ├── template.csv     # CSV template
+│   └── users.json       # User data
+│
+└── pages/                # Application pages
+    ├── 1_usrMgmt.py     # User management
+    ├── 2_memMgmt.py     # Member management
+    ├── 3_csv_editor.py  # CSV editor
+    ├── 4_json_editor.py # JSON editor
+    └── 5_ftpe.py        # Main application page
 
 ## Configuration Defined in the `.env` file
 
@@ -85,10 +110,10 @@ There are two running environments that are supported to run `ftpe` App.
    - After pulling mkaoy2k/ftpe image from the [Docker Hub](https://hub.docker.com), execute the following command to launch `ftpe` container, for example:
 
    ```bash
-   docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:1.7
+   docker run --name ftpe -d -p 8501:8501 mkaoy2k/ftpe:2.6
    ```
 
-   - At your default web browser, displaying the main page by entering:
+   - At your default web browser, displaying the login page by entering:
 
    ```bash
    http://localhost:8501
@@ -98,13 +123,13 @@ There are two running environments that are supported to run `ftpe` App.
 
    - Ensure that you have installed the required dependencies in the `.env` file.
 
-   - Run the `family_pe.py` file using the Streamlit CLI. Execute the following command to launch `ftpe` server:
+   - Run the `admin_ui.py` file using the Streamlit CLI. Execute the following command to launch `ftpe` server:
 
    ```bash
-   streamlit run family_pe.py
+   streamlit run admin_ui.py
    ```
 
-   - When the `ftpe` server is running, your default web browser, displaying the main page, will be launched automatically. Or at will, you may launch your default web browser, displaying the main page by entering:
+   - When the `ftpe` server is running, your default web browser, displaying a login page, will be launched automatically. Or at will, you may launch your default web browser, displaying the login page by entering:
 
    ```bash
    http://localhost:8501

@@ -7,34 +7,21 @@
 
 # USB extFat
 ._*
-
-# FamilyTrees Obsolete files
-config.yaml
-L10N*.py
-
-# FamilyTrees support files
-db_*.py
-ops_*.py
-wip.py
-prod_*
+.DS_*
 
 # FamilyTrees Data files
-data/*.bak
-data/*.csv
-data/*.gv
-data/*.png
+data/*
+!data/template.csv
 
-# Streamlit Examples
-main.py
-account.py
-about.py
-app.py
-demo.py
-*.xlsx
+# FamilyTrees Tools or Examples
+test_*
+prod_*
+__init__*.py
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.ruff_cache
 *.py[cod]
 *$py.class
 
