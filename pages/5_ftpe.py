@@ -1,26 +1,3 @@
-"""
-FamilyTrees Personal Release 2.6 2025/6/24
-    Todo: 在正式發布前，請記得：
-        1. 將 `.env` 文件中的 `RELEASE` 更新版本
-        2. 更新 README.md 中的發布說明。
-
-    功能增強：
-        1. Added upto 10 languages support.
-        2. Dynamically set logging level based on environment 
-        variable LOGGING in the .env file.
-        3. Added environment variables tracing at debug-level 
-        logging. 
-        4. Set default logging level to INFO.
-        5. Set default language to 繁中.
-        6. Set default DIRTY_TREE flag to 0.
-        7. Set default L10N_FILE to L10N.json in funcUtils.py.
-        8. Set default DIRTY_USER flag to 0.
-        9. Cleaned up .env template file
-
-    Bug 修復：
-        1. Added 'time' module back
-"""
-
 # Modules required
 import os
 import pandas as pd  # pip install pandas
@@ -31,12 +8,21 @@ from pathlib import Path  # 添加這行導入
 
 # Import Web App modules
 import streamlit as st  # pip install streamlit
+# Hide the default navigation for members
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Import graphviz module
 import graphviz as gv  # pip install graphviz
 
 # Import utility functions
-from funcUtils import *
+import funcUtils as fu
+from admin_ui import init_session_state
 
 # Import performance logging modules
 import logging
@@ -1722,14 +1708,13 @@ def load_user_l10n(base=None):
     return g_loc_key, g_loc
 
 
-# --- 主程式入口 --- from here
-#     1. 初始化系統環境
-#     2. 設置日誌層級
-#     3. 載入本地化設置
-#     4. 初始化全局變數
-#     5. 開始主程式循環
-if __name__ == "__main__":
-
+# Initialize session state
+init_session_state()
+    
+# Check authentication
+if not st.session_state.get('authenticated', False):
+    st.switch_page("admin_ui.py")
+else:
     st.empty()
 
     g_dirtyTree = os.getenv("DIRTY_TREE", "0")
@@ -1741,7 +1726,7 @@ if __name__ == "__main__":
     # --- global L10N dictionary --- from here
     # Load 'g_L10N', for all languages
     # Load global list, 'g_L10N_options', for all languages
-    g_L10N = load_L10N(base=g_dirtyUser)
+    g_L10N = fu.load_L10N(base=g_dirtyUser)
     g_L10N_options = list(g_L10N.keys())
 
     # --- Load User L10N --- from here
@@ -1760,33 +1745,57 @@ if __name__ == "__main__":
     logger.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
 
     # ---- SIDEBAR ---- from here
+    
     # Define the title of sidebar widget
     g_SBAR_TITLE = (
-        f"{g_fullname}{g_loc['FAMILY_TREE']}\n---\n## {g_loc['WELCOME']} {g_fullname}"
+        f"{g_fullname}{g_loc['FAMILY_TREE']}\n## {g_loc['WELCOME']} {g_fullname}"
     )
-    st.sidebar.title(g_SBAR_TITLE)
-
-    # Show side-bar 9 functions
-    nav = st.sidebar.radio(
-        g_loc["MENU_TITLE"],
-        [
-            g_loc["MENU_DISP_GRAPH_BY_MALE"],
-            g_loc["MENU_QUERY_3G_BY_MALE"],
-            g_loc["MENU_MEMBER_ADD"],
-            g_loc["MENU_MEMBER_UPDATE"],
-            g_loc["MENU_QUERY_TBL_BY_NAME"],
-            g_loc["MENU_QUERY_TBL_BY_ALIAS"],
-            g_loc["MENU_QUERY_TBL_BY_1GEN"],
-            g_loc["MENU_QUERY_3G_BY_NAME"],
-            g_loc["MENU_QUERY_TBL_BY_3GEN"],
-            g_loc["MENU_SETTINGS"],
-        ],
-    )
-
+    
+    # Sidebar with user info and page links
+    with st.sidebar:
+        st.sidebar.title(g_SBAR_TITLE)
+        
+        if 'user_email' in st.session_state and st.session_state.user_email:
+            st.markdown(
+                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                "</div>",
+                unsafe_allow_html=True
+            )
+            
+        # Page Navigation Links
+        st.subheader("Navigation")
+        st.page_link("admin_ui.py", label="Home", icon="🏠")
+        st.page_link("pages/2_memMgmt.py", label="Member Management", icon="👤")
+            
+        st.divider()
+            
+        # Show side-bar 9 functions
+        nav = st.sidebar.radio(
+            g_loc["MENU_TITLE"],
+            [
+                g_loc["MENU_DISP_GRAPH_BY_MALE"],
+                g_loc["MENU_QUERY_3G_BY_MALE"],
+                g_loc["MENU_MEMBER_ADD"],
+                g_loc["MENU_MEMBER_UPDATE"],
+                g_loc["MENU_QUERY_TBL_BY_NAME"],
+                g_loc["MENU_QUERY_TBL_BY_ALIAS"],
+                g_loc["MENU_QUERY_TBL_BY_1GEN"],
+                g_loc["MENU_QUERY_3G_BY_NAME"],
+                g_loc["MENU_QUERY_TBL_BY_3GEN"],
+                g_loc["MENU_SETTINGS"],
+                ],
+            )
+                                    
+        # Add logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
     # ---- SIDEBAR ---- end here
 
     # Define global repository settings
-    g_path_dir = Path(__file__).parent.resolve() / "data"
+    g_path_dir = Path(__file__).parent.parent.resolve() / "data"
     g_fTree = f"{g_path_dir}/{g_username}.csv"
     g_fTree_template = f"{g_path_dir}/template.csv"
     g_fTree_Backup = f"{g_path_dir}/{g_username}_bak.csv"
@@ -1846,7 +1855,7 @@ if __name__ == "__main__":
     try:
         # initialize a global member index, 'gbuff_idx' as template.
         # initialize a global dict obj, 'gbuff' as template.
-        gbuff_idx, gbuff = get_1st_mbr_dict(g_df, mem, born, base=g_dirtyTree)
+        gbuff_idx, gbuff = fu.get_1st_mbr_dict(g_df, mem, born, base=g_dirtyTree)
     except:
         # force to create a new tree cache upon loop-back
         os.environ["DIRTY_TREE"] = str(time.time())
@@ -1856,3 +1865,4 @@ if __name__ == "__main__":
     main_page(nav, lname_idx)
     logger.debug(f"gbuff={gbuff}\ngbuff_idx={gbuff_idx}")
     logger.debug(f"{nav} <=== FINISHED.")
+

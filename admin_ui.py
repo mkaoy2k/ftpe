@@ -4,23 +4,28 @@ Admin UI Module
 This module provides the complete admin interface for the application.
 """
 import streamlit as st
-
-# 頁面配置必須是第一個 Streamlit 命令
-st.set_page_config(
-    page_title="Admin DBM",
-    page_icon="🔒",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-from difflib import context_diff
+from dotenv import load_dotenv
+import os
 import sqlite3
 import db_utils as dbm
-import auth_utils
+import email_utils as eu
+import auth_utils as au
 
 # Import database operations
 from ops_dbMgmt import init_db_management, init_admin_features, get_table_structure, drop_table
 from context_utils import init_context
+
+# Load environment variables
+load_dotenv()
+
+# Set initial page config (will be updated after login)
+st.set_page_config(
+    page_title= os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""),
+    page_icon="🔒",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items=None  # This will be updated after login
+)
 
 def show_login_page():
     """Display the login page"""
@@ -28,8 +33,7 @@ def show_login_page():
     st.empty()
     
     # Set page title and header
-    st.title("Database Management")
-    st.markdown("---")
+    st.title(os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""))
     
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -48,17 +52,61 @@ def show_login_page():
                     if not email or not password:
                         st.error("Please enter both email and password")
                     else:
-                        if auth_utils.verify_admin(email, password):
+                        if au.verify_admin(email, password):
                             st.session_state.authenticated = True
                             st.session_state.user_email = email
+                            st.session_state.user_state = dbm.User_State['admin']
+                            st.rerun()
+                        elif au.verify_member(email, password):
+                            st.session_state.authenticated = True
+                            st.session_state.user_email = email
+                            st.session_state.user_state = dbm.User_State['member']
                             st.rerun()
                         else:
                             st.error("Invalid email or password")
 
+def show_member_sidebar():
+    """Display the member sidebar with limited navigation options"""
+    # Hide the default navigation for members
+    st.markdown("""
+        <style>
+            [data-testid="stSidebarNav"] {
+                display: none;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    with st.sidebar:
+        st.sidebar.title("Member Sidebar")
+        
+        # Show current user info
+        if 'user_email' in st.session_state and st.session_state.user_email:
+            st.markdown(
+                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                "</div>",
+                unsafe_allow_html=True
+            )
+        
+        # Only show the following page options
+        st.sidebar.subheader("Navigation")
+        st.page_link("pages/2_memMgmt.py", label="Member Management", icon="👤")
+        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
+        
+        # Add divider for spacing
+        st.divider()
+        
+        # Logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
+
+        
 def show_admin_sidebar():
     """Display the admin sidebar"""
     with st.sidebar:
-        st.title("Admin Sidebar")
+        st.sidebar.title("Admin Sidebar")
         
         # Show current user info
         if 'user_email' in st.session_state and st.session_state.user_email:
@@ -70,8 +118,7 @@ def show_admin_sidebar():
             )
         
         # Sidebar - Admin User Management
-        st.markdown("---")
-        st.subheader("Admin User Management")
+        st.sidebar.subheader("Admin User Management")
         with st.expander("Create/Update Admin User", expanded=False):
             with st.form("admin_user_form"):
                 st.subheader("Admin User")
@@ -83,7 +130,7 @@ def show_admin_sidebar():
                                                key="confirm_password")
                 
                 if st.form_submit_button("Save Admin User"):
-                    if not email or "@" not in email:
+                    if not email or not eu.validate_email(email):
                         st.error("Please enter a valid email address")
                     elif not new_password:
                         st.error("Please enter a password")
@@ -92,20 +139,20 @@ def show_admin_sidebar():
                     elif len(new_password) < 8:
                         st.error("Password must be at least 8 characters long")
                     else:
-                        success, message = auth_utils.create_admin_user(email, new_password)
+                        success, message = au.create_admin_user(email, new_password)
                         if success:
                             st.success(message)
                         else:
                             st.error(message)
             
         # Display current admin users
-        st.subheader("Current Admin Users")
+        st.sidebar.subheader("Current Admin Users")
         try:
             with dbm.get_db_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(f"""
                         SELECT email, created_at, updated_at 
-                        FROM users
+                        FROM {dbm.db_tables['users']}
                         WHERE is_admin = 1
                         ORDER BY email
                     """)
@@ -144,17 +191,19 @@ def show_admin_sidebar():
             st.error(f"Error fetching admin users: {e}")
     
         # Logout button at the bottom
-        st.sidebar.markdown("---")
         if st.sidebar.button("Logout", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
-
-def show_main_content():
+            
+def show_member_content():
+    """Display the member content area"""
+    st.title("Member Home")
+    
+def show_admin_content():
     """Display the main content area"""
     
-    st.title("Admin DBM")
-    st.markdown("---")
+    st.title("Admin Home")
     
     # Show database tables
     st.header("Database Tables")
@@ -251,6 +300,10 @@ def init_session_state():
         st.session_state.authenticated = False
     if 'user_email' not in st.session_state:
         st.session_state.user_email = None
+    if 'app_context' not in st.session_state:
+        st.session_state.app_context = None
+    if 'user_state' not in st.session_state:
+        st.session_state.user_state = 0
 
 def remove_column_if_exists(table_name, column_name):
     """Remove a column from a table if it exists"""
@@ -305,15 +358,15 @@ def main():
     if not st.session_state.get('authenticated', False):
         show_login_page()
     else:
-        if not st.session_state.get('authenticated', False):
-            show_login_page()
-        else:
-            # 初始化或獲取 context
-            if 'app_context' not in st.session_state:
-                st.session_state.app_context = init_context()
+        # 初始化或獲取 context
+        if 'app_context' not in st.session_state:
+            st.session_state.app_context = init_context()
+        if st.session_state.user_state == dbm.User_State['admin']:
             show_admin_sidebar()
-            # Main content
-            show_main_content()
+            show_admin_content()
+        elif st.session_state.user_state == dbm.User_State['member']:
+            show_member_sidebar()
+            show_member_content()
 
 if __name__ == "__main__":
     main()

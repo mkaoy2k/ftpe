@@ -1,0 +1,42 @@
+[
+  {
+    "id": 26,
+    "email": "mkaoy2k@gmail.com",
+    "password_hash": "5b92becc9aa1e26f485f7091ced8213de0e241510315eb6c4ecc87966e986e93",
+    "salt": "68b0f5515e2ba97be3f09ee3270d1c5a",
+    "is_admin": true,
+    "is_active": true,
+    "created_at": "2025-06-19 00:05:03",
+    "updated_at": "2025-06-19 00:36:40"
+  },
+  {
+    "id": 30,
+    "email": "mkaoy2k@hotmail.com",
+    "password_hash": null,
+    "salt": null,
+    "is_admin": false,
+    "is_active": true,
+    "created_at": "2025-06-19 00:40:28",
+    "updated_at": "2025-06-19 00:40:47"
+  },
+  {
+    "id": 32,
+    "email": "mkaoy2k@icloud.com",
+    "password_hash": null,
+    "salt": null,
+    "is_admin": false,
+    "is_active": true,
+    "created_at": "2025-06-19 00:49:26",
+    "updated_at": "2025-06-19 23:36:08"
+  },
+  {
+    "id": 35,
+    "email": "mkaoy2k@me.com",
+    "password_hash": "3e6b40d9612d150107a8d08a079c884b0a5bad6a7868e9aeeaba708cd561ae27",
+    "salt": "7dd25c33e63a2a34382c363b6182b091",
+    "is_admin": true,
+    "is_active": true,
+    "created_at": "2025-06-22 15:10:29",
+    "updated_at": "2025-06-22 15:59:23"
+  }
+]

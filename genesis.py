@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 from dotenv import load_dotenv
 import db_utils as dbm
+import auth_utils as au
 
 # Load environment variables
 load_dotenv()
@@ -22,11 +23,8 @@ def create_admin_user():
         return False
     
     try:
-        # Import auth_utils here to avoid circular imports
-        import auth_utils as auth
-        
         # Create the admin user
-        if auth.create_admin_user(email, password):
+        if au.create_admin_user(email, password):
             print(f"✅ Successfully created admin user:")
             print(f"   Email: {email}")
             print(f"   Password: {'*' * len(password)}")
