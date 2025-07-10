@@ -10,10 +10,10 @@ import sqlite3
 import db_utils as dbm
 import email_utils as eu
 import auth_utils as au
+import context_utils as cu
 
 # Import database operations
 from ops_dbMgmt import init_db_management, init_admin_features, get_table_structure, drop_table
-from context_utils import init_context
 
 # Load environment variables
 load_dotenv()
@@ -294,17 +294,6 @@ def show_admin_content():
                     else:
                         st.error(f"Failed to drop table '{selected_table}'")
 
-def init_session_state():
-    """Initialize session state variables"""
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user_email' not in st.session_state:
-        st.session_state.user_email = None
-    if 'app_context' not in st.session_state:
-        st.session_state.app_context = None
-    if 'user_state' not in st.session_state:
-        st.session_state.user_state = 0
-
 def remove_column_if_exists(table_name, column_name):
     """Remove a column from a table if it exists"""
     try:
@@ -347,7 +336,7 @@ def remove_column_if_exists(table_name, column_name):
 def main():
     """Main application entry point"""
     # Initialize session state
-    init_session_state()
+    cu.init_session_state()
     
     # Initialize admin features (adds necessary columns to user table)
     if not init_admin_features():
@@ -360,7 +349,7 @@ def main():
     else:
         # 初始化或獲取 context
         if 'app_context' not in st.session_state:
-            st.session_state.app_context = init_context()
+            st.session_state.app_context = cu.init_context()
         if st.session_state.user_state == dbm.User_State['admin']:
             show_admin_sidebar()
             show_admin_content()

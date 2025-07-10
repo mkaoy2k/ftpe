@@ -15,7 +15,7 @@ It includes features for:
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from admin_ui import init_session_state
+import context_utils as cu
 import os
 import time
 
@@ -238,10 +238,10 @@ def main():
 
     
 # Initialize session state
-init_session_state()
+cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("admin_ui.py")
+    st.switch_page("ftpe_ui.py")
 else:
     main()

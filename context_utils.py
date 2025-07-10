@@ -52,6 +52,17 @@ FILE_SYSTEM_SETTINGS = {
 }
 # ===== End of Module Settings =====
 
+def init_session_state():
+    """Initialize session state variables"""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'user_email' not in st.session_state:
+        st.session_state.user_email = None
+    if 'app_context' not in st.session_state:
+        st.session_state.app_context = None
+    if 'user_state' not in st.session_state:
+        st.session_state.user_state = 0
+
 def init_context() -> Dict[str, Any]:
     """
     初始化並返回包含設定的全局字典

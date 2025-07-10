@@ -41,7 +41,7 @@ To install the `ftpe` App in Python environment, follow the following steps:
 ## Directory Structure
 
 ftpe/
-├── admin_ui.py           # Admin interface
+├── ftpe_ui.py           # Admin interface
 ├── auth_utils.py         # Authentication utilities
 ├── context_utils.py      # Context management
 ├── db_utils.py           # Database utilities
@@ -123,10 +123,10 @@ There are two running environments that are supported to run `ftpe` App.
 
    - Ensure that you have installed the required dependencies in the `.env` file.
 
-   - Run the `admin_ui.py` file using the Streamlit CLI. Execute the following command to launch `ftpe` server:
+   - Run the `ftpe_ui.py` file using the Streamlit CLI. Execute the following command to launch `ftpe` server:
 
    ```bash
-   streamlit run admin_ui.py
+   streamlit run ftpe_ui.py
    ```
 
    - When the `ftpe` server is running, your default web browser, displaying a login page, will be launched automatically. Or at will, you may launch your default web browser, displaying the login page by entering:
