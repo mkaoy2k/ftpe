@@ -16,7 +16,7 @@ import streamlit as st
 import json
 import os
 from pathlib import Path
-from admin_ui import init_session_state
+import context_utils as cu
 
 def load_json(file_path):
     """
@@ -65,7 +65,7 @@ def main():
     
     # Directory selection
     dirs = {
-        'Project Root': Path(__file__).parent.parent,  # Go up one level to the project root where admin_ui.py is
+        'Project Root': Path(__file__).parent.parent,  # Go up one level to the project root where ftpe_ui.py is
         'Data': Path(__file__).parent.parent / "data"
     }
     
@@ -173,10 +173,10 @@ def main():
 
     
 # Initialize session state
-init_session_state()
+cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("admin_ui.py")
+    st.switch_page("ftpe_ui.py")
 else:
     main()

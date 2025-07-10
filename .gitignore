@@ -17,6 +17,8 @@ data/*
 test_*
 prod_*
 __init__*.py
+.streamlit/
+# a_*
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

@@ -6,4 +6,4 @@ COPY . .
 
 RUN python -m pip install -r requirements.txt
 
-CMD [ "streamlit", "run", "./admin_ui.py" ]
+CMD [ "streamlit", "run", "./ftpe_ui.py" ]

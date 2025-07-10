@@ -9,9 +9,8 @@ This page provides user management functionality including:
 import streamlit as st
 import pandas as pd
 import db_utils as dbm
-from admin_ui import show_admin_sidebar, show_member_sidebar, init_session_state
-from context_utils import init_context, update_context
-from auth_utils import create_member_user
+from ftpe_ui import show_admin_sidebar, show_member_sidebar
+import context_utils as cu
 
 def format_timestamps(df):
     """Convert UTC timestamps to Pacific Time (with DST) and format"""
@@ -43,7 +42,7 @@ def show_page():
             logger.debug("Initializing new app_context")
             context = default_context.copy()
             try:
-                initialized_context = init_context()
+                initialized_context = cu.init_context()
                 if isinstance(initialized_context, dict):
                     context.update(initialized_context)
                 st.session_state.app_context = context
@@ -240,10 +239,10 @@ def show_page():
         st.error(f"An error occurred: {str(err)}")
     
 # Initialize session state
-init_session_state()
+cu.init_session_state()
 
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("admin_ui.py")
+    st.switch_page("ftpe_ui.py")
 else:
     show_page()

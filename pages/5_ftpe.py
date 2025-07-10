@@ -22,7 +22,7 @@ import graphviz as gv  # pip install graphviz
 
 # Import utility functions
 import funcUtils as fu
-from admin_ui import init_session_state
+import context_utils as cu
 
 # Import performance logging modules
 import logging
@@ -1709,11 +1709,11 @@ def load_user_l10n(base=None):
 
 
 # Initialize session state
-init_session_state()
+cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("admin_ui.py")
+    st.switch_page("ftpe_ui.py")
 else:
     st.empty()
 
@@ -1765,7 +1765,7 @@ else:
             
         # Page Navigation Links
         st.subheader("Navigation")
-        st.page_link("admin_ui.py", label="Home", icon="🏠")
+        st.page_link("ftpe_ui.py", label="Home", icon="🏠")
         st.page_link("pages/2_memMgmt.py", label="Member Management", icon="👤")
             
         st.divider()

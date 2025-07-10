@@ -17,7 +17,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 import pandas as pd
 from typing import List, Dict, Any
-from admin_ui import init_session_state
+import context_utils as cu
 import db_utils as dbm
 import tempfile
 import os
@@ -561,7 +561,7 @@ def main() -> None:
             
         # Page Navigation Links
         st.subheader("Navigation")
-        st.page_link("admin_ui.py", label="Home", icon="🏠")
+        st.page_link("ftpe_ui.py", label="Home", icon="🏠")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
             
         st.divider()
@@ -626,10 +626,10 @@ def main() -> None:
     
 
 # Initialize session state
-init_session_state()
+cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("admin_ui.py")
+    st.switch_page("ftpe_ui.py")
 else:
     main()
