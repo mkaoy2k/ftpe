@@ -4,8 +4,6 @@ Database Management Operations
 This module contains core database operations for the admin interface.
 """
 import sqlite3
-import hashlib
-import secrets
 import db_utils as dbm
 
 
@@ -51,25 +49,25 @@ def init_admin_features():
             cursor = conn.cursor()
             
             # Check if password_hash column exists
-            cursor.execute(f"PRAGMA table_info({dbm.db_tables["users"]})")
+            cursor.execute(f"PRAGMA table_info({dbm.db_tables['users']})")
             columns = [column[1] for column in cursor.fetchall()]
             
             # Add password_hash column if it doesn't exist
             if 'password_hash' not in columns:
                 cursor.execute(f"""
-                    ALTER TABLE {dbm.db_tables["users"]} ADD COLUMN password_hash TEXT
+                    ALTER TABLE {dbm.db_tables['users']} ADD COLUMN password_hash TEXT
                 """)
             
             # Add salt column if it doesn't exist
             if 'salt' not in columns:
                 cursor.execute(f"""
-                    ALTER TABLE {dbm.db_tables["users"]} ADD COLUMN salt TEXT
+                    ALTER TABLE {dbm.db_tables['users']} ADD COLUMN salt TEXT
                 """)
             
             # Add is_admin column if it doesn't exist
             if 'is_admin' not in columns:
                 cursor.execute(f"""
-                    ALTER TABLE {dbm.db_tables["users"]} ADD COLUMN is_admin INTEGER DEFAULT 0
+                    ALTER TABLE {dbm.db_tables['users']} ADD COLUMN is_admin INTEGER DEFAULT 0
                 """)
             
             conn.commit()

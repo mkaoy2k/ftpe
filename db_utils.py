@@ -30,7 +30,8 @@ db_path = os.path.join(os.path.dirname(__file__), database_name)
 db_tables = {
     "users": os.getenv("TBL_USERS", "users"),
     "members": os.getenv("TBL_MEMBERS", "members"),
-    "relations": os.getenv("TBL_RELATIONS", "relations")
+    "relations": os.getenv("TBL_RELATIONS", "relations"),
+    "families": os.getenv("TBL_FAMILIES", "families")
 }
 
 # Subscriber states ~is_active
@@ -45,9 +46,9 @@ Subscriber_State = {
 # User role values
 # Used in the 'is_admin' field of the users table
 User_State = {
-    'admin': 1,     # Administrator with full access
-    'unknown': 0,   # Default/unknown state (should be updated on first login)
-    'member': -1    # Regular member with limited access
+    'p_admin': 2,    # Platform Administrator with full access
+    'f_admin': 1,     # Family Administrator with full access
+    'f_member': 0    # Family Member with limited access
 }
 
 def get_db_connection() -> sqlite3.Connection:
@@ -60,7 +61,6 @@ def get_db_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(database_name)
     conn.row_factory = sqlite3.Row
     return conn
-
 
 def init_db() -> None:
     """
@@ -81,7 +81,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS {db_tables['users']} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
-            is_active INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT -1,
             l10n TEXT DEFAULT 'US',
             token TEXT DEFAULT '',
             is_admin INTEGER DEFAULT 0,
@@ -111,7 +111,9 @@ def init_db() -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (dad_id) REFERENCES members(id),
-            FOREIGN KEY (mom_id) REFERENCES members(id)
+            FOREIGN KEY (mom_id) REFERENCES members(id),
+            FOREIGN KEY (family_id) REFERENCES families(id),
+            FOREIGN KEY (email) REFERENCES users(email)
         )
         """)
         
@@ -127,46 +129,87 @@ def init_db() -> None:
             dad_name TEXT,            -- Father's name
             mom_name TEXT,            -- Mother's name
             join_date DATE,           -- Date when relationship started
-            left_date DATE,           -- Date when relationship ended (if applicable)
+            end_date DATE,           -- Date when relationship ended (if applicable)
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (partner_id) REFERENCES members(id) ON DELETE CASCADE,
-            FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+            FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+            FOREIGN KEY (original_family_id) REFERENCES families(id) ON DELETE CASCADE
+        )
+        """)
+        
+                
+        # Create families table
+        cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS {db_tables["families"]} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            background TEXT,
+            url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
         # Create indexes to improve query performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_members_name ON members(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_members_family ON members(family_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_members_email ON members(email)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_member ON relations(member_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_partner ON relations(partner_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_original ON relations(original_family_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_families_name ON families(name)")
+        
+        # Create triggers to automatically update timestamps on record updates
+        cursor.execute(f"""
+        CREATE TRIGGER IF NOT EXISTS update_users_timestamp
+        AFTER UPDATE ON {db_tables["users"]}
+        FOR EACH ROW
+        BEGIN
+            UPDATE {db_tables["users"]} SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+        END;
+        """)
+
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_member ON relations(member_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_partner ON relations(partner_id)")
         
         # Create triggers to automatically update timestamps on record updates
-        cursor.execute("""
+        cursor.execute(f"""
         CREATE TRIGGER IF NOT EXISTS update_members_timestamp
-        AFTER UPDATE ON members
+        AFTER UPDATE ON {db_tables["members"]}
         FOR EACH ROW
         BEGIN
-            UPDATE members SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+            UPDATE {db_tables["members"]} SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
         END;
         """)
         
-        cursor.execute("""
+        cursor.execute(f"""
         CREATE TRIGGER IF NOT EXISTS update_relations_timestamp
-        AFTER UPDATE ON relations
+        AFTER UPDATE ON {db_tables["relations"]}
         FOR EACH ROW
         BEGIN
-            UPDATE relations SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+            UPDATE {db_tables["relations"]} SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+        END;
+        """)
+
+        cursor.execute(f"""
+        CREATE TRIGGER IF NOT EXISTS update_families_timestamp
+        AFTER UPDATE ON {db_tables["families"]}
+        FOR EACH ROW
+        BEGIN
+            UPDATE {db_tables["families"]} SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
         END;
         """)
 
 def add_subscriber(email: str, token: str, lang: str = None) -> Tuple[bool, str]:
     """
-    Add a new subscriber with pending status or update an existing one with active status.
+    Add a new subscriber with pending status or 
+    update an existing one with active status.
     
     Args:
         email: The email address of the subscriber
         token: Verification token for the subscription
-        lang: Optional language/locale code (e.g., 'en', 'zh-TW')
+        lang: Optional language/locale code (e.g., 'en')
         
     Returns:
         Tuple[bool, str]: (success status, error message if any)
@@ -187,9 +230,11 @@ def add_subscriber(email: str, token: str, lang: str = None) -> Tuple[bool, str]
                 # Update existing user
                 cursor.execute(f"""
                     UPDATE {db_tables['users']} 
-                    SET token = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    SET token = ?, is_active = ?, l10n = ?,
+                    updated_at = CURRENT_TIMESTAMP
                     WHERE email = ?
-                """, (token, Subscriber_State['active'], email))
+                """, (token, Subscriber_State['active'], 
+                      lang, email))
             else:
                 # Insert new user
                 cursor.execute(f"""
@@ -447,6 +492,231 @@ def get_subscriber(email: str) -> Optional[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
+def delete_subscriber(email: str) -> bool:
+    """
+    Permanently delete a subscriber from the database by their email address.
+    
+    This function will remove all records associated with the subscriber's email
+    from the users table. 
+    Use with caution as this action cannot be undone.
+    
+    Args:
+        email: The email address of the subscriber to delete (case-sensitive)
+        
+    Returns:
+        bool: True if the subscriber was successfully deleted, False if the email
+              was not found or if an error occurred
+              
+    Raises:
+        ValueError: If email is empty or not a valid string
+        sqlite3.Error: If there's a database error during deletion
+    """
+    # Validate email
+    if not email or not isinstance(email, str):
+        error_msg = "Email must be a non-empty string"
+        log.error(error_msg)
+        raise ValueError(error_msg)
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # First, verify the subscriber exists and get their ID for logging
+            cursor.execute(f"""
+                SELECT id FROM {db_tables['users']} 
+                WHERE email = ?
+                LIMIT 1
+            """, (email,))
+            
+            result = cursor.fetchone()
+            if not result:
+                log.warning(f"Cannot delete: Subscriber with email '{email}' not found")
+                return False
+                
+            user_id = dict(result).get('id')
+            
+            # Perform the deletion
+            cursor.execute(f"""
+                DELETE FROM {db_tables['users']} 
+                WHERE email = ?
+            """, (email,))
+            
+            rows_affected = cursor.rowcount
+            conn.commit()
+            
+            if rows_affected > 0:
+                log.info(f"Successfully deleted subscriber: {email} (ID: {user_id})")
+                return True
+                
+            log.warning(f"No rows affected when deleting subscriber: {email}")
+            return False
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error deleting subscriber '{email}': {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error deleting subscriber '{email}': {str(e)}"
+        log.error(error_msg)
+        raise
+
+def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[bool, str]:
+    """
+    Add a new user or update an existing user to the database. 
+    If the user already exists, determine whether to update 
+    based on the `update` parameter.
+    
+    Args:
+        email: The user's email address (required)
+        update: If True, update the user when the user already exists; 
+        if False, return an error when the user already exists
+        **user_data: Other user data, may include:
+            - password_hash: Password hash value (required for new users)
+            - salt: Password salt (required for new users)
+            - is_admin: Whether the user is an admin (0: regular user, 1: admin)
+            - is_active: Account status (see Subscriber_State enum)
+            - l10n: Language/locale code (e.g., 'en', 'zh-TW')
+            - token: Verification token
+            - created_at: Creation timestamp (str in ISO format)
+            - updated_at: Last update timestamp (str in ISO format)
+            
+    Returns:
+        Tuple[bool, str]: (success status, error message if any)
+    """
+    if not email or not isinstance(email, str) or '@' not in email:
+        return False, "Invalid email address"
+        
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if user already exists
+            cursor.execute(f"""
+                SELECT id FROM {db_tables['users']} 
+                WHERE email = ?
+            """, (email,))
+            
+            existing_user = cursor.fetchone()
+            
+            if existing_user:
+                if not update:
+                    return False, "User already exists"
+                    
+                # Update existing user
+                update_fields = []
+                params = []
+                
+                for field in ['password_hash', 'salt', 
+                              'is_admin', 'is_active', 'l10n', 'token',
+                              'created_at']:
+                    if field in user_data and user_data[field] is not None:
+                        update_fields.append(f"{field} = ?")
+                        params.append(user_data[field])
+                
+                if not update_fields:
+                    return False, "No fields to update"
+                    
+                # Add update timestamp
+                update_fields.append("updated_at = datetime('now')")
+                
+                query = f"""
+                    UPDATE {db_tables['users']}
+                    SET {', '.join(update_fields)}
+                    WHERE email = ?
+                """
+                params.append(email)
+                
+                cursor.execute(query, params)
+                conn.commit()
+                
+                log.info(f"User updated successfully: {email}")
+                return True, ""
+                
+            else:
+                # Add new user
+                required_fields = ['password_hash', 'salt']
+                for field in required_fields:
+                    if field not in user_data or not user_data[field]:
+                        return False, f"Missing required field: {field}"
+                
+                # Set default values
+                is_admin = user_data.get('is_admin', User_State['f_memeber'])
+                is_active = user_data.get('is_active', Subscriber_State['inactive'])
+                l10n = user_data.get('l10n', 'US')
+                
+                cursor.execute(f"""
+                    INSERT INTO {db_tables['users']} (
+                        email, password_hash, salt, 
+                        is_admin, is_active, l10n, token,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                """, (
+                    email,
+                    user_data['password_hash'],
+                    user_data['salt'],
+                    is_admin,
+                    is_active,
+                    l10n,
+                    user_data.get('token')
+                ))
+                
+                conn.commit()
+                log.info(f"Successfully added user: {email}")
+                return True, ""
+                
+    except sqlite3.IntegrityError as e:
+        error_msg = f"Database integrity error: {str(e)}"
+        log.error(error_msg)
+        return False, error_msg
+    except sqlite3.Error as e:
+        error_msg = f"Database error: {str(e)}"
+        log.error(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error while adding user: {str(e)}"
+        log.error(error_msg)
+        return False, error_msg
+
+def get_users() -> List[Dict[str, Any]]:
+    """
+    Retrieve all users from the database.
+    The order of the users is by id in ascending order.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of user dictionaries, 
+        where each dictionary contains the user's data including all the fields.
+        
+    Raises:
+        sqlite3.Error: If there's a database error while fetching users
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT * FROM {db_tables['users']}
+                ORDER BY id ASC
+            """)
+            
+            # Get column names from cursor description
+            columns = [column[0] for column in cursor.description]
+            
+            # Convert each row to a dictionary
+            users = []
+            for row in cursor.fetchall():
+                users.append(dict(zip(columns, row)))
+                
+            log.info(f"Retrieved {len(users)} users from database")
+            return users
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error while fetching users: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error while fetching users: {str(e)}"
+        log.error(error_msg)
+        raise
+
 def delete_user(user_id: int) -> bool:
     """
     Permanently delete a user from the database by their ID.
@@ -513,274 +783,21 @@ def delete_user(user_id: int) -> bool:
         error_msg = f"Unexpected error deleting user ID {user_id}: {str(e)}"
         log.error(error_msg)
         raise
-
-def delete_subscriber(email: str) -> bool:
-    """
-    Permanently delete a subscriber from the database by their email address.
-    
-    This function will remove all records associated with the subscriber's email
-    from the users table. Use with caution as this action cannot be undone.
-    
-    Args:
-        email: The email address of the subscriber to delete (case-sensitive)
         
-    Returns:
-        bool: True if the subscriber was successfully deleted, False if the email
-              was not found or if an error occurred
-              
-    Raises:
-        ValueError: If email is empty or not a valid string
-        sqlite3.Error: If there's a database error during deletion
+def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> int:
     """
-    # Validate email
-    if not email or not isinstance(email, str):
-        error_msg = "Email must be a non-empty string"
-        log.error(error_msg)
-        raise ValueError(error_msg)
-    
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # First, verify the subscriber exists and get their ID for logging
-            cursor.execute(f"""
-                SELECT id FROM {db_tables['users']} 
-                WHERE email = ?
-                LIMIT 1
-            """, (email,))
-            
-            result = cursor.fetchone()
-            if not result:
-                log.warning(f"Cannot delete: Subscriber with email '{email}' not found")
-                return False
-                
-            user_id = dict(result).get('id')
-            
-            # Perform the deletion
-            cursor.execute(f"""
-                DELETE FROM {db_tables['users']} 
-                WHERE email = ?
-            """, (email,))
-            
-            rows_affected = cursor.rowcount
-            conn.commit()
-            
-            if rows_affected > 0:
-                log.info(f"Successfully deleted subscriber: {email} (ID: {user_id})")
-                return True
-                
-            log.warning(f"No rows affected when deleting subscriber: {email}")
-            return False
-            
-    except sqlite3.Error as e:
-        error_msg = f"Database error deleting subscriber '{email}': {str(e)}"
-        log.error(error_msg)
-        raise
-    except Exception as e:
-        error_msg = f"Unexpected error deleting subscriber '{email}': {str(e)}"
-        log.error(error_msg)
-        raise
-
-def import_users_from_file(file_path: Union[str, Path], db_connection: sqlite3.Connection, table: str) -> Dict[str, Any]:
-    """
-    Import users from a JSON or CSV file into the users table.
-    
-    Args:
-        file_path: Path to the JSON or CSV file containing user data
-        db_connection: SQLite database connection object
-        
-    Returns:
-        Dict with import results: {
-            'success': bool,
-            'imported': int,
-            'skipped': int,
-            'errors': List[str]
-        }
-    """
-    file_path = Path(file_path)
-    if not file_path.exists():
-        return {
-            'success': False,
-            'imported': 0,
-            'skipped': 0,
-            'errors': [f"File not found: {file_path}"]
-        }
-    
-    try:
-        if file_path.suffix.lower() == '.json':
-            with open(file_path, 'r', encoding='utf-8') as f:
-                users = json.load(f)
-                if not isinstance(users, list):
-                    users = [users]  # Handle single user object
-        elif file_path.suffix.lower() == '.csv':
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                users = list(reader)
-        else:
-            return {
-                'success': False,
-                'imported': 0,
-                'skipped': 0,
-                'errors': ["Unsupported file format. Please use JSON or CSV."]
-            }
-        
-        return import_users(users, db_connection, table)
-    
-    except Exception as e:
-        return {
-            'success': False,
-            'imported': 0,
-            'skipped': 0,
-            'errors': [f"Error reading file: {str(e)}"]
-        }
-
-def import_users(users: List[Dict[str, Any]], db_connection: sqlite3.Connection, table: str) -> Dict[str, Any]:
-    """
-    Import users into the database.
-    
-    Args:
-        users: List of user dictionaries with required fields
-        db_connection: SQLite database connection object
-        
-    Returns:
-        Dict with import results
-    """
-    required_fields = {'email', 
-                       'password_hash', 
-                       'salt', 
-                       'is_admin', 
-                       'is_active',
-                       'created_at',
-                       'updated_at'}
-    imported = 0
-    skipped = 0
-    errors = []
-    
-    cursor = db_connection.cursor()
-    
-    for i, user in enumerate(users, 1):
-        try:
-            # Check required fields
-            missing_fields = required_fields - set(user.keys())
-            if missing_fields:
-                errors.append(f"User {i}: Missing required fields: {', '.join(missing_fields)}")
-                skipped += 1
-                continue
-                
-            # Check if user already exists
-            cursor.execute(f"SELECT id FROM {table} WHERE email = ?", (user['email'],))
-            if cursor.fetchone() is not None:
-                errors.append(f"User {i}: User with email '{user['email']}' already exists")
-                skipped += 1
-                continue
-            
-            # Insert user
-            cursor.execute(f"""
-                INSERT INTO {table} (
-                    email, password_hash, salt, is_admin, is_active,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                user['email'],
-                user['password_hash'],
-                user['salt'],
-                user['is_admin'],
-                user['is_active'],
-                user['created_at'],
-                user['updated_at']
-            ))
-            
-            imported += 1
-            
-        except Exception as e:
-            errors.append(f"Error importing user {i} ({user['email']}): {str(e)}")
-            skipped += 1
-    
-    if imported > 0:
-        db_connection.commit()
-    
-    return {
-        'success': len(errors) == 0,
-        'imported': imported,
-        'skipped': skipped,
-        'errors': errors
-    }
-
-def export_users_to_file(file_path: Union[str, Path], db_connection: sqlite3.Connection, table: str) -> Dict[str, Any]:
-    """
-    Export users from the database to a JSON or CSV file.
-    
-    Args:
-        file_path: Path to save the exported file (must end with .json or .csv)
-        db_connection: SQLite database connection object
-        
-    Returns:
-        Dict with export results
-    """
-    file_path = Path(file_path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    try:
-        cursor = db_connection.cursor()
-        cursor.execute(f"""
-            SELECT id, email, password_hash, salt, is_admin, is_active, created_at, updated_at
-            FROM {table}
-            ORDER BY email
-        """)
-        
-        users = []
-        for row in cursor.fetchall():
-            users.append({
-                'id': row[0],
-                'email': row[1],
-                'password_hash': row[2],
-                'salt': row[3],
-                'is_admin': bool(row[4]),
-                'is_active': bool(row[5]),
-                'created_at': row[6],
-                'updated_at': row[7]
-            })
-        
-        if file_path.suffix.lower() == '.json':
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(users, f, indent=2, ensure_ascii=False)
-        elif file_path.suffix.lower() == '.csv':
-            if users:
-                fieldnames = users[0].keys()
-                with open(file_path, 'w', encoding='utf-8', newline='') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(users)
-        else:
-            return {
-                'success': False,
-                'message': "Unsupported file format. Please use .json or .csv"
-            }
-        
-        return {
-            'success': True,
-            'message': f"Successfully exported {len(users)} users to {file_path}",
-            'file_path': str(file_path.absolute())
-        }
-    
-    except Exception as e:
-        return {
-            'success': False,
-            'message': f"Error exporting users: {str(e)}"
-        }
-        
-def add_member(member_data: Dict[str, Any]) -> int:
-    """
-    Add a new member to the database.
+    Add a new member to the database or update an existing one.
     
     This function inserts a new member record into the members table with the provided data.
+    If update is True and a member with the same name, birth date, and generation order exists,
+    it will update the existing record instead of creating a new one.
     
     Args:
         member_data: Dictionary containing member information with the following keys:
             - name (str): Last name (required)
-            - sex (str): Gender (required, typically 'M'/'F'/'O')
             - born (str): Date of birth in YYYY-MM-DD format (required)
-            - gen_order (int, required): Generation order number
+            - gen_order (int, required): Generation order number (required)
+            - sex (str, optional): Gender (typically 'M'/'F'/'O')
             - family_id (str, optional): Family identifier
             - alias (str, optional): Nickname or alternative name
             - email (str, optional): Email address
@@ -788,9 +805,10 @@ def add_member(member_data: Dict[str, Any]) -> int:
             - died (str, optional): Date of death in YYYY-MM-DD format
             - dad_id (int, optional): Father's member ID (must exist in database)
             - mom_id (int, optional): Mother's member ID (must exist in database)
+        update (bool): If True, update existing member with matching name, born, and gen_order
         
     Returns:
-        int: The ID of the newly created member
+        int: The ID of the created or updated member
         
     Raises:
         ValueError: If required fields are missing or data is invalid
@@ -800,44 +818,95 @@ def add_member(member_data: Dict[str, Any]) -> int:
     Example:
         >>> member_data = {
         ...     'name': 'Smith',
-        ...     'sex': 'M',
         ...     'born': '1990-01-01',
         ...     'gen_order': 1,
         ...     'email': 'john@example.com'
         ... }
-        >>> member_id = add_member(member_data)
+        >>> member_id = add_or_update_member(member_data, True)
     """
     # Validate required fields
-    required_fields = ['name', 'sex', 'born', 'gen_order']
+    required_fields = ['name', 'born', 'gen_order']
     missing_fields = [field for field in required_fields if field not in member_data]
     if missing_fields:
         raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
     
-    # Prepare SQL statement and parameters
-    fields = []
-    placeholders = []
-    values = []
-    
-    # Only include fields with non-None values
-    for field, value in member_data.items():
-        if value is not None:
-            fields.append(field)
-            placeholders.append('?')
-            values.append(value)
-    
-    if not fields:
-        raise ValueError("No valid fields provided in member_data")
-    
-    # Build the SQL query
-    sql = f"""
-        INSERT INTO {db_tables['members']} ({', '.join(fields)})
-        VALUES ({', '.join(placeholders)})
-    """
-    
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, values)
+            
+            # Check if member with same name, born, and gen_order exists
+            cursor.execute(f"""
+                SELECT id FROM {db_tables['members']}
+                WHERE name = ? AND born = ? AND gen_order = ?
+            """, (member_data['name'], member_data['born'], member_data['gen_order']))
+            
+            existing_member = cursor.fetchone()
+            
+            if existing_member and update:
+                # Update existing member
+                member_id = existing_member['id']
+                update_fields = []
+                params = []
+                
+                # Build SET clause for update
+                for field, value in member_data.items():
+                    if field not in required_fields and value is not None:
+                        update_fields.append(f"{field} = ?")
+                        params.append(value)
+                
+                if not update_fields:
+                    log.info("No fields to update for existing member")
+                    return member_id
+                
+                # Add updated_at timestamp
+                update_fields.append("updated_at = datetime('now')")
+                
+                # Add member_id to params for WHERE clause
+                params.append(member_id)
+                
+                # Build and execute update query
+                update_sql = f"""
+                    UPDATE {db_tables['members']}
+                    SET {', '.join(update_fields)}
+                    WHERE id = ?
+                """
+                
+                cursor.execute(update_sql, params)
+                conn.commit()
+                
+                log.info(f"Updated existing member ID {member_id}: {member_data.get('name')}")
+                return member_id
+            
+            elif existing_member and not update:
+                raise ValueError(
+                    f"Member '{member_data['name']}' with birth date {member_data['born']} "
+                    f"and generation order {member_data['gen_order']} already exists. "
+                    "Set update=True to update existing member."
+                )
+            
+            # Insert new member
+            # Prepare fields and values for insert
+            fields = []
+            placeholders = []
+            values = []
+            
+            for field, value in member_data.items():
+                if value is not None:
+                    fields.append(field)
+                    placeholders.append('?')
+                    values.append(value)
+            
+            # Add created_at and updated_at timestamps
+            fields.extend(['created_at', 'updated_at'])
+            placeholders.extend(["datetime('now')", "datetime('now')"])
+            
+            # Build and execute insert query
+            insert_sql = f"""
+                INSERT INTO {db_tables['members']} ({', '.join(fields)})
+                VALUES ({', '.join(placeholders)})
+            """
+            
+            cursor.execute(insert_sql, values)
             member_id = cursor.lastrowid
             conn.commit()
             
@@ -845,7 +914,7 @@ def add_member(member_data: Dict[str, Any]) -> int:
             return member_id
             
     except sqlite3.IntegrityError as e:
-        error_msg = "Database integrity error when adding member"
+        error_msg = "Database integrity error when adding/updating member"
         if "FOREIGN KEY" in str(e):
             error_msg = (
                 "Invalid parent ID provided. The specified father or mother "
@@ -855,11 +924,11 @@ def add_member(member_data: Dict[str, Any]) -> int:
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error adding member: {str(e)}"
+        error_msg = f"Database error in add_or_update_member: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error adding member: {str(e)}"
+        error_msg = f"Unexpected error in add_or_update_member: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -881,7 +950,7 @@ def add_related_member(
     3. Optionally updates the new member's family ID and/or name
     
     Args:
-        member_data: Dictionary containing the new member's data. See add_member() for
+        member_data: Dictionary containing the new member's data. See add_or_update_member() for
                    required and optional fields.
         partner_id: ID of the existing member to create a relationship with.
                   Must be a positive integer.
@@ -946,7 +1015,7 @@ def add_related_member(
             
             try:
                 # 1. Add the new member
-                member_id = add_member(member_data)
+                member_id = add_or_update_member(member_data)
                 if not member_id:
                     raise ValueError("Failed to add new member")
                 
@@ -1165,33 +1234,61 @@ def update_related_member(
             cursor.close()
         if conn:
             conn.close()
+
+def get_members() -> List[Dict[str, Any]]:
+    """
+    Retrieve all members from the database.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of member dictionaries, 
+        where each dictionary contains all the fields from the members table.
+        
+    Raises:
+        sqlite3.Error: If there's a database error while fetching members
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT * FROM {db_tables['members']}
+                ORDER BY name, id
+            """)
+            
+            # Get column names from cursor description
+            columns = [column[0] for column in cursor.description]
+            
+            # Convert each row to a dictionary
+            members = []
+            for row in cursor.fetchall():
+                members.append(dict(zip(columns, row)))
+                
+            log.info(f"Retrieved {len(members)} members from database")
+            return members
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error while fetching members: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error while fetching members: {str(e)}"
+        log.error(error_msg)
+        raise
+
 def get_member(member_id: int) -> Optional[Dict[str, Any]]:
     """
-    Retrieve a member's details by their unique ID.
+    Retrieve a member record given by unique member ID.
     
-    This function fetches all available information for a specific member from the database.
+    This function fetches all available information for a specific member record 
+    from the database.
     
     Args:
-        member_id: The unique identifier of the member to retrieve (must be a positive integer)
+        member_id: The unique identifier of the member to retrieve 
+        (must be a positive integer)
         
     Returns:
         Optional[Dict[str, Any]]: A dictionary containing the member's data if found, 
-        None if no member exists with the given ID. The dictionary includes all fields 
-        from the members table, such as:
-            - id (int): Unique identifier
-            - name (str): Last name
-            - sex (str): Gender ('M'/'F'/'O')
-            - born (str): Date of birth (YYYY-MM-DD)
-            - family_id (str): Family identifier
-            - alias (str): Nickname or alternative name
-            - email (str): Contact email
-            - url (str): Personal website URL
-            - died (str): Date of death (YYYY-MM-DD), if applicable
-            - gen_order (int): Generation order number
-            - dad_id (int): Father's member ID, if known
-            - mom_id (int): Mother's member ID, if known
-            - created_at (str): Timestamp of record creation
-            - updated_at (str): Timestamp of last update
+        None if no member exists with the given ID. 
+        The dictionary includes all the fields from the members table.
             
     Raises:
         ValueError: If member_id is not a positive integer
@@ -1339,7 +1436,6 @@ def update_member(member_id: int, update_data: Dict[str, Any]) -> bool:
         log.error(error_msg)
         raise
 
-
 def delete_member(member_id: int) -> bool:
     """
     Delete a member from the database by their ID.
@@ -1418,7 +1514,6 @@ def delete_member(member_id: int) -> bool:
         error_msg = f"Unexpected error deleting member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
-
 
 def search_members(
     name: str = "",
@@ -1555,91 +1650,82 @@ def search_members(
         log.error(error_msg)
         raise
 
-
-def export_members_to_csv(output_path: str) -> bool:
+def get_member_relations(member_id: int) -> List[Dict[str, Any]]:
     """
-    Export database data to compatible CSV-format file
+    Retrieve all relationships for a given member.
+    
+    This function fetches all relationship records where the specified member
+    is either the 'member_id' or 'partner_id' in the relationship. This provides a complete
+    view of all relationships (e.g., spouse, parent, child) for the given member.
     
     Args:
-        output_path: Output file path
-        
+        member_id: The unique identifier of the member to retrieve relationships for.
+                 Must be a positive integer.
+                 
     Returns:
-        bool: True if export is successful, False otherwise
+        List[Dict[str, Any]]: A list of relationship records where each record is a dictionary
+        containing the relationship details. Returns an empty list if no relationships are found.
+        
+        Each relationship dictionary contains the following keys:
+            - id: Relationship record ID
+            - member_id: ID of the first member in the relationship
+            - partner_id: ID of the second member in the relationship
+            - relation: Type of relationship (e.g., 'spouse', 'parent', 'child')
+            - join_date: Date when the relationship started (YYYY-MM-DD format)
+            - left_date: Optional date when the relationship ended (YYYY-MM-DD format)
+            - created_at: Timestamp when the relationship was created
+            - updated_at: Timestamp when the relationship was last updated
+            
+    Raises:
+        ValueError: If member_id is not a positive integer.
+        sqlite3.Error: If a database error occurs during the query.
+        
+    Example:
+        >>> relationships = get_relations(123)
+        >>> for rel in relationships:
+        ...     print(f"Relationship ID: {rel['id']}, Type: {rel['relation']}")
+        ...     print(f"Between members: {rel['member_id']} and {rel['partner_id']}")
+        ...     print(f"Dates: {rel['join_date']} to {rel.get('left_date', 'present')}")
     """
-    import csv
-    from pathlib import Path
-    
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Input validation
+    if not isinstance(member_id, int) or member_id <= 0:
+        raise ValueError("member_id must be a positive integer")
     
     try:
-        with get_db_connection() as conn, open(output_path, 'w', newline='', encoding='utf-8') as f:
+        with get_db_connection() as conn:
+            # Use sqlite3.Row to access columns by name
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # Export members table
-            cursor.execute(f"SELECT * FROM {db_tables['members']}")
-            writer = csv.writer(f)
-            writer.writerow([i[0] for i in cursor.description])  # Write column names
-            writer.writerows(cursor.fetchall())
+            # Query to get all relationships where the member is either member_id or partner_id
+            query = f"""
+                SELECT * 
+                FROM {db_tables["relations"]}
+                WHERE member_id = ? OR partner_id = ?
+                ORDER BY 
+                    CASE 
+                        WHEN left_date IS NULL OR left_date = '' THEN 0  -- Active relationships first
+                        ELSE 1  -- Then inactive relationships
+                    END,
+                    join_date DESC  -- Most recent first within each group
+            """
             
-        return True
+            cursor.execute(query, (member_id, member_id))
+            
+            # Convert Row objects to dictionaries for better serialization
+            results = [dict(row) for row in cursor.fetchall()]
+            
+            log.debug(f"Found {len(results)} relationships for member {member_id}")
+            return results
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error retrieving relationships for member {member_id}: {str(e)}"
+        log.error(error_msg)
+        raise
     except Exception as e:
-        print(f"Error exporting CSV: {e}")
-        return False
-
-
-def import_members_from_csv(file_path: str) -> Tuple[bool, str]:
-    """
-    Import data from compatible CSV-format file to database
-    
-    Args:
-        file_path: Path to the CSV file
-        
-    Returns:
-        Tuple[bool, str]: (success status, message)
-    """
-    import csv
-    from pathlib import Path
-    
-    if not Path(file_path).exists():
-        return False, f"File does not exist: {file_path}"
-    
-    try:
-        with get_db_connection() as conn, open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            header = next(reader)  # Read header row
-            
-            # Verify required fields exist
-            required_fields = {'name', 'born'}
-            if not required_fields.issubset(header):
-                return False, f"CSV file is missing required fields: {required_fields - set(header)}"
-            
-            # Start transaction
-            cursor = conn.cursor()
-            
-            # Clear existing data (optional, adjust according to needs)
-            cursor.execute(f"DELETE FROM {db_tables['members']}")
-            
-            # Insert new data
-            placeholders = ", ".join(["?"] * len(header))
-            insert_sql = f"INSERT INTO {db_tables['members']} ({', '.join(header)}) VALUES ({placeholders})"
-            
-            # Initialize counter
-            count = 0
-            
-            # Process each row
-            for row in reader:
-                if len(row) == len(header):
-                    cursor.execute(insert_sql, row)
-                    count += 1
-            
-            conn.commit()
-            return True, f"Successfully imported {count} members"
-            
-    except Exception as e:
-        if 'conn' in locals():
-            conn.rollback()
-        return False, f"Error occurred while importing data: {str(e)}"
+        error_msg = f"Unexpected error retrieving relationships: {str(e)}"
+        log.error(error_msg)
+        raise
 
 def update_member_when_joined(
     member_id: int,
@@ -1664,7 +1750,7 @@ def update_member_when_joined(
                    - name: Last name (required)
                    - sex: Gender (required, typically 'M'/'F'/'O')
                    - born: Date of birth in YYYY-MM-DD format (required)
-                   Additional optional fields are passed to add_member().
+                   Additional optional fields are passed to add_or_update_member().
         relation: Type of relationship to establish. Common values include:
                 - 'spouse': For marital relationships
                 - 'parent': For parent-child relationships
@@ -1730,7 +1816,7 @@ def update_member_when_joined(
         
         # Add the new member to the members table
         try:
-            spouse_id = add_member(spouse_data)
+            spouse_id = add_or_update_member(spouse_data)
             log.info(f"Added new member with ID {spouse_id} for relationship with member {member_id}")
             
             # Create relationship in the relations table
@@ -1907,7 +1993,6 @@ def update_member_when_ended(
         if conn:
             conn.close()
 
-
 def update_member_when_died(
     member_id: int,
     died_date: str
@@ -2004,84 +2089,6 @@ def update_member_when_died(
         if conn:
             conn.close()
 
-
-def get_relations(member_id: int) -> List[Dict[str, Any]]:
-    """
-    Retrieve all relationships for a given member.
-    
-    This function fetches all relationship records where the specified member
-    is either the 'member_id' or 'partner_id' in the relationship. This provides a complete
-    view of all relationships (e.g., spouse, parent, child) for the given member.
-    
-    Args:
-        member_id: The unique identifier of the member to retrieve relationships for.
-                 Must be a positive integer.
-                 
-    Returns:
-        List[Dict[str, Any]]: A list of relationship records where each record is a dictionary
-        containing the relationship details. Returns an empty list if no relationships are found.
-        
-        Each relationship dictionary contains the following keys:
-            - id: Relationship record ID
-            - member_id: ID of the first member in the relationship
-            - partner_id: ID of the second member in the relationship
-            - relation: Type of relationship (e.g., 'spouse', 'parent', 'child')
-            - join_date: Date when the relationship started (YYYY-MM-DD format)
-            - left_date: Optional date when the relationship ended (YYYY-MM-DD format)
-            - created_at: Timestamp when the relationship was created
-            - updated_at: Timestamp when the relationship was last updated
-            
-    Raises:
-        ValueError: If member_id is not a positive integer.
-        sqlite3.Error: If a database error occurs during the query.
-        
-    Example:
-        >>> relationships = get_relations(123)
-        >>> for rel in relationships:
-        ...     print(f"Relationship ID: {rel['id']}, Type: {rel['relation']}")
-        ...     print(f"Between members: {rel['member_id']} and {rel['partner_id']}")
-        ...     print(f"Dates: {rel['join_date']} to {rel.get('left_date', 'present')}")
-    """
-    # Input validation
-    if not isinstance(member_id, int) or member_id <= 0:
-        raise ValueError("member_id must be a positive integer")
-    
-    try:
-        with get_db_connection() as conn:
-            # Use sqlite3.Row to access columns by name
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # Query to get all relationships where the member is either member_id or partner_id
-            query = f"""
-                SELECT * 
-                FROM {db_tables["relations"]}
-                WHERE member_id = ? OR partner_id = ?
-                ORDER BY 
-                    CASE 
-                        WHEN left_date IS NULL OR left_date = '' THEN 0  -- Active relationships first
-                        ELSE 1  -- Then inactive relationships
-                    END,
-                    join_date DESC  -- Most recent first within each group
-            """
-            
-            cursor.execute(query, (member_id, member_id))
-            
-            # Convert Row objects to dictionaries for better serialization
-            results = [dict(row) for row in cursor.fetchall()]
-            
-            log.debug(f"Found {len(results)} relationships for member {member_id}")
-            return results
-            
-    except sqlite3.Error as e:
-        error_msg = f"Database error retrieving relationships for member {member_id}: {str(e)}"
-        log.error(error_msg)
-        raise
-    except Exception as e:
-        error_msg = f"Unexpected error retrieving relationships: {str(e)}"
-        log.error(error_msg)
-        raise
-
 def get_members_when_born_in(month: int) -> List[Dict[str, Any]]:
     """
     取得指定月份出生的所有在世成員列表
@@ -2119,7 +2126,6 @@ def get_members_when_born_in(month: int) -> List[Dict[str, Any]]:
         except sqlite3.Error as e:
             raise sqlite3.Error(f"查詢出生月份為 {month} 月的在世成員時發生錯誤: {str(e)}")
 
-
 def get_members_when_alive() -> List[Dict[str, Any]]:
     """
     取得所有在世成員的列表
@@ -2152,32 +2158,538 @@ def get_members_when_alive() -> List[Dict[str, Any]]:
         except sqlite3.Error as e:
             raise sqlite3.Error(f"查詢在世成員時發生錯誤: {str(e)}")
 
+def get_relations() -> List[Dict[str, Any]]:
+    """
+    Retrieve all the records from the relations table.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of relation dictionaries, where each dictionary contains
+        all fields from the relations table including id, original_family_id, original_name,
+        partner_id, member_id, relation, join_date, end_date, created_at, and updated_at.
+        
+    Raises:
+        sqlite3.Error: If there's a database error while fetching relations
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT * FROM {db_tables['relations']}
+                ORDER BY created_at DESC, id
+            """)
+            
+            # Get column names from cursor description
+            columns = [column[0] for column in cursor.description]
+            
+            # Convert each row to a dictionary
+            relations = []
+            for row in cursor.fetchall():
+                relations.append(dict(zip(columns, row)))
+                
+            log.info(f"Retrieved {len(relations)} relations from database")
+            return relations
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error while fetching relations: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error while fetching relations: {str(e)}"
+        log.error(error_msg)
+        raise
 
-# 初始化資料庫（如果尚未初始化）
+def get_families() -> List[Dict[str, Any]]:
+    """
+    Retrieve all the records from the families table.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of family dictionaries, where each dictionary contains
+        all fields from the families table including id, name, background, url, created_at,
+        and updated_at.
+        
+    Raises:
+        sqlite3.Error: If there's a database error while fetching families
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT * FROM {db_tables['families']}
+                ORDER BY name, id
+            """)
+            
+            # Get column names from cursor description
+            columns = [column[0] for column in cursor.description]
+            
+            # Convert each row to a dictionary
+            families = []
+            for row in cursor.fetchall():
+                families.append(dict(zip(columns, row)))
+                
+            log.info(f"Retrieved {len(families)} families from database")
+            return families
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error while fetching families: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error while fetching families: {str(e)}"
+        log.error(error_msg)
+        raise
+
+def import_users(users: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Import users into the db_tables['users'] table.
+    
+    Args:
+        users: List of user dictionaries with required fields
+        
+    Returns:
+        Dict with import results
+    """
+    imported = 0
+    skipped = 0
+    errors = []
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+    
+    for i, user in enumerate(users, 1):
+        try:
+            # Prepare user data for add_user function
+            user_data = {
+                'password_hash': user.get('password_hash'),
+                'salt': user.get('salt'),
+                'is_admin': user.get('is_admin', User_State['f_member']),
+                'is_active': user.get('is_active', Subscriber_State['inactive']),
+                'l10n': user.get('l10n', 'US'),
+                'token': user.get('token'),
+                'created_at': user.get('created_at'),
+                'updated_at': user.get('updated_at')
+            }
+            
+            # Use add_or_update_user function to prevent overwriting existing users
+            success, message = add_or_update_user(
+                email=user['email'],
+                **user_data
+            )
+            
+            if success:
+                imported += 1
+            else:
+                errors.append(f"User {i} ({user.get('email', 'unknown')}): {message}")
+                skipped += 1
+            
+        except Exception as e:
+            errors.append(f"Error importing user {i} ({user['email']}): {str(e)}")
+            skipped += 1
+    
+    if imported > 0:
+        db_connection.commit()
+    
+    return {
+        'success': len(errors) == 0,
+        'imported': imported,
+        'skipped': skipped,
+        'errors': errors
+    }
+
+
+def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Import members into the db_tables['members'] table.
+    
+    Args:
+        members: List of member dictionaries with required fields:
+            - name (str): Last name (required)
+            - family_id (str): Family identifier (required)
+            - born (str): Date of birth in YYYY-MM-DD format (required)
+            - sex (str): Gender, typically 'M' or 'F' (required)
+            - gen_order (int): Generation order (required)
+            
+            Optional fields:
+            - alias (str): Nickname or alias
+            - email (str): Email address
+            - url (str): Personal URL
+            - died (str): Date of death in YYYY-MM-DD format
+            - dad_id (int): Father's member ID
+            - mom_id (int): Mother's member ID
+    
+    Returns:
+        Dict with import results:
+        {
+            'success': bool,
+            'imported': int,
+            'skipped': int,
+            'errors': List[str]
+        }
+    """
+    imported = 0
+    skipped = 0
+    errors = []
+    
+    required_fields = ['name', 'family_id', 'born', 'sex', 'gen_order']
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        for i, member in enumerate(members, 1):
+            try:
+                # Check for required fields
+                missing_fields = [field for field in required_fields if field not in member]
+                if missing_fields:
+                    errors.append(f"Member {i} is missing required fields: {', '.join(missing_fields)}")
+                    skipped += 1
+                    continue
+                
+                # Prepare member data
+                member_data = {
+                    'name': member['name'],
+                    'family_id': member['family_id'],
+                    'born': member['born'],
+                    'sex': member['sex'],
+                    'gen_order': member['gen_order'],
+                    'alias': member.get('alias'),
+                    'email': member.get('email'),
+                    'url': member.get('url'),
+                    'died': member.get('died'),
+                    'dad_id': member.get('dad_id'),
+                    'mom_id': member.get('mom_id')
+                }
+                
+                # Add new member only
+                member_id = add_or_update_member(member_data)
+                if member_id:
+                    imported += 1
+                else:
+                    errors.append(f"Failed to import member {i}: {member.get('name', 'Unknown')}")
+                    skipped += 1
+                
+            except Exception as e:
+                errors.append(f"Error importing member {i} ({member.get('name', 'Unknown')}): {str(e)}")
+                skipped += 1
+        
+        if imported > 0:
+            conn.commit()
+    
+    return {
+        'success': len(errors) == 0,
+        'imported': imported,
+        'skipped': skipped,
+        'errors': errors
+    }
+
+
+def import_relations(relations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Import member relations into the db_tables['relations'] table.
+    
+    Args:
+        relations: List of relation dictionaries with required fields:
+            - member_id (int): ID of the first member in the relationship (required)
+            - partner_id (int): ID of the second member in the relationship (required)
+            - relation (str): Type of relationship, e.g., 'spouse', 'parent' (required)
+            - join_date (str): Date when relationship started in YYYY-MM-DD format (required)
+            
+            Optional fields:
+            - original_family_id (str): Original family ID before joining
+            - original_name (str): Original name before marriage
+            - end_date (str): Date when relationship ended in YYYY-MM-DD format
+    
+    Returns:
+        Dict with import results
+    """
+    imported = 0
+    skipped = 0
+    errors = []
+    
+    required_fields = ['member_id', 'partner_id', 'relation', 'join_date']
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        for i, rel in enumerate(relations, 1):
+            try:
+                # Check for required fields
+                missing_fields = [field for field in required_fields if field not in rel]
+                if missing_fields:
+                    errors.append(f"Relation {i} is missing required fields: {', '.join(missing_fields)}")
+                    skipped += 1
+                    continue
+                
+                # Check if both members exist
+                cursor.execute(f"SELECT id FROM {db_tables['members']} WHERE id IN (?, ?)", 
+                             (rel['member_id'], rel['partner_id']))
+                existing_members = {row['id'] for row in cursor.fetchall()}
+                
+                if len(existing_members) != 2:
+                    errors.append(f"Relation {i}: One or both member IDs do not exist: {rel['member_id']}, {rel['partner_id']}")
+                    skipped += 1
+                    continue
+                
+                # Check if relation already exists
+                cursor.execute(f"""
+                    SELECT id FROM {db_tables['relations']} 
+                    WHERE (member_id = ? AND partner_id = ?) 
+                    OR (member_id = ? AND partner_id = ?)
+                """, (rel['member_id'], rel['partner_id'], 
+                     rel['partner_id'], rel['member_id']))
+                
+                if cursor.fetchone():
+                    errors.append(f"Relation {i}: Relationship already exists between members {rel['member_id']} and {rel['partner_id']}")
+                    skipped += 1
+                    continue
+                
+                # Insert new relation
+                cursor.execute(f"""
+                    INSERT INTO {db_tables['relations']} (
+                        member_id, partner_id, relation, join_date,
+                        original_family_id, original_name, end_date,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (
+                    rel['member_id'],
+                    rel['partner_id'],
+                    rel['relation'],
+                    rel['join_date'],
+                    rel.get('original_family_id'),
+                    rel.get('original_name'),
+                    rel.get('end_date')
+                ))
+                
+                imported += 1
+                
+            except Exception as e:
+                errors.append(f"Error importing relation {i} (members {rel.get('member_id', '?')}-{rel.get('partner_id', '?')}): {str(e)}")
+                skipped += 1
+        
+        if imported > 0:
+            conn.commit()
+    
+    return {
+        'success': len(errors) == 0,
+        'imported': imported,
+        'skipped': skipped,
+        'errors': errors
+    }
+
+
+def import_families(families: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Import families into the db_tables['families'] table.
+    
+    Args:
+        families: List of family dictionaries with required fields:
+            - name (str): Family name (required)
+            
+            Optional fields:
+            - background (str): Family background/history
+            - url (str): Family website URL
+    
+    Returns:
+        Dict with import results
+    """
+    imported = 0
+    skipped = 0
+    errors = []
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        for i, family in enumerate(families, 1):
+            try:
+                # Check for required fields
+                if 'name' not in family:
+                    errors.append(f"Family {i} is missing required field: name")
+                    skipped += 1
+                    continue
+                
+                # Check if family already exists
+                cursor.execute(f"SELECT id FROM {db_tables['families']} WHERE name = ?", 
+                             (family['name'],))
+                
+                if cursor.fetchone():
+                    errors.append(f"Family '{family['name']}' already exists")
+                    skipped += 1
+                    continue
+                
+                # Insert new family
+                cursor.execute(f"""
+                    INSERT INTO {db_tables['families']} (
+                        name, background, url, created_at, updated_at
+                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (
+                    family['name'],
+                    family.get('background', ''),
+                    family.get('url', '')
+                ))
+                
+                imported += 1
+                
+            except Exception as e:
+                errors.append(f"Error importing family {i} ('{family.get('name', 'Unknown')}'): {str(e)}")
+                skipped += 1
+        
+        if imported > 0:
+            conn.commit()
+    
+    return {
+        'success': len(errors) == 0,
+        'imported': imported,
+        'skipped': skipped,
+        'errors': errors
+    }
+
+def import_from_file(file_path: Union[str, Path], table: str) -> Dict[str, Any]:
+    """
+    Import records from a JSON or CSV file into the specified table.
+    
+    Args:
+        file_path: Path to the JSON or CSV file containing records data
+        db_connection: SQLite database connection object
+        
+    Returns:
+        Dict with import results: {
+            'success': bool,
+            'imported': int,
+            'skipped': int,
+            'errors': List[str]
+        }
+    """
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return {
+            'success': False,
+            'imported': 0,
+            'skipped': 0,
+            'errors': [f"File not found: {file_path}"]
+        }
+    
+    try:
+        if file_path.suffix.lower() == '.json':
+            with open(file_path, 'r', encoding='utf-8') as f:
+                rcds = json.load(f)
+                if not isinstance(rcds, list):
+                    rcds = [rcds]  # Handle single user object
+        elif file_path.suffix.lower() == '.csv':
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rcds = list(reader)
+        else:
+            return {
+                'success': False,
+                'imported': 0,
+                'skipped': 0,
+                'errors': ["Unsupported file format. Please use JSON or CSV."]
+            }
+        if table == db_tables['users']:
+            return import_users(rcds)
+        elif table == db_tables['members']:
+            return import_members(rcds)
+        elif table == db_tables['relations']:
+            return import_relations(rcds)
+        elif table == db_tables['families']:
+            return import_families(rcds)
+        else:
+            return {
+                'success': False,
+                'imported': 0,
+                'skipped': 0,
+                'errors': [f"Unsupported table: {table}"]
+        }
+    
+    except Exception as e:
+        return {
+            'success': False,
+            'imported': 0,
+            'skipped': 0,
+            'errors': [f"Error reading file: {str(e)}"]
+        }
+
+def export_to_file(file_path: Union[str, Path], table: str) -> Dict[str, Any]:
+    """
+    Export a table from the database to a JSON or CSV file.
+    
+    Args:
+        file_path: Path to save the exported file (must end with .json or .csv)
+        table: Name of the table to export
+        
+    Returns:
+        Dict with export results
+    """
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        if table == db_tables['users']:
+            rcds = get_users()
+        elif table == db_tables['members']:
+            rcds = get_members()
+        elif table == db_tables['relations']:
+            rcds = get_relations()
+        elif table == db_tables['families']:
+            rcds = get_families()
+        else:
+            return {
+                'success': False,
+                'message': "Unsupported table. Please use users, members, relations, or families"
+            }
+        
+        if file_path.suffix.lower() == '.json':
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(rcds, f, indent=2, ensure_ascii=False)
+        elif file_path.suffix.lower() == '.csv':
+            if rcds:
+                fieldnames = rcds[0].keys()
+                with open(file_path, 'w', encoding='utf-8', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rcds)
+        else:
+            return {
+                'success': False,
+                'message': "Unsupported file format. Please use .json or .csv"
+            }
+        
+        return {
+            'success': True,
+            'message': f"Successfully exported {len(rcds)} records to {file_path}",
+            'file_path': str(file_path.absolute()),
+            'count': len(rcds)
+        }
+    
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f"Error exporting records: {str(e)}"
+        }
+
+# Initialize database (if not already initialized)
 init_db()
 if __name__ == "__main__":
-    # 測試資料庫連接和初始化
-    print("資料庫初始化完成")
-    print(f"資料庫位置: {db_path}")
+    # Test database connection and initialization
+    print("Database initialization completed")
+    print(f"Database location: {db_path}")
     
-    # 測試查詢在世成員
+    # Test query for living members
     # try:
     #     alive_members = get_members_when_alive()
-    #     print(f"找到 {len(alive_members)} 位在世成員")
-    #     for member in alive_members[:5]:  # 只顯示前5位成員
+    #     print(f"Found {len(alive_members)} living members")
+    #     for member in alive_members[:5]:  # Only show first 5 members
     #         print(f"- {member.get('name', '')} (ID: {member.get('id')})")
     #     if len(alive_members) > 5:
-    #         print(f"... 及其他 {len(alive_members) - 5} 位成員")
+    #         print(f"... and {len(alive_members) - 5} more members")
             
-    #     # 假設要查詢ID為123的成員的所有關係
+    #     # Example: Query all relationships for member with ID 123
     #     relations = get_relations(123)
     
     #     if relations:
-    #         print(f"找到 {len(relations)} 筆相關記錄：")
+    #         print(f"Found {len(relations)} related records:")
     #         for rel in relations:
-    #             print(f"關係ID: {rel['id']}, 成員1: {rel['member_id']}, 成員2: {rel['partner_id']}, 關係類型: {rel['relation_type']}")
+    #             print(f"Relationship ID: {rel['id']}, Member 1: {rel['member_id']}, Member 2: {rel['partner_id']}, Relationship Type: {rel['relation_type']}")
     #     else:
-    #         print("沒有找到相關的關係記錄")
+    #         print("No related relationship records found")
         
     # except sqlite3.Error as e:
-    #     print(f"錯誤: {str(e)}")
+    #     print(f"Error: {str(e)}")

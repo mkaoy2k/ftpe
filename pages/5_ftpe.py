@@ -8,14 +8,6 @@ from pathlib import Path  # 添加這行導入
 
 # Import Web App modules
 import streamlit as st  # pip install streamlit
-# Hide the default navigation for members
-st.markdown("""
-    <style>
-        [data-testid="stSidebarNav"] {
-            display: none !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 # Import graphviz module
 import graphviz as gv  # pip install graphviz
@@ -23,6 +15,7 @@ import graphviz as gv  # pip install graphviz
 # Import utility functions
 import funcUtils as fu
 import context_utils as cu
+import db_utils as dbm
 
 # Import performance logging modules
 import logging
@@ -36,14 +29,6 @@ env_path = script_dir / '.env'
 
 # 載入 .env 文件
 load_dotenv(env_path, override=True)
-
-PAGE_TITLE = "FamilyTrees PE " + os.getenv("RELEASE", "")
-
-st.set_page_config(
-    page_title=PAGE_TITLE,
-    page_icon=":books:",
-)
-
 
 # --- Set Server logging levels ---
 g_logging = os.getenv("LOGGING", "INFO").strip('\"\'').upper()  # 預設為 INFO，並移除可能的引號
@@ -1751,24 +1736,27 @@ else:
         f"{g_fullname}{g_loc['FAMILY_TREE']}\n## {g_loc['WELCOME']} {g_fullname}"
     )
     
-    # Sidebar with user info and page links
+    # Sidebar with page links, functions and logout button
     with st.sidebar:
         st.sidebar.title(g_SBAR_TITLE)
         
-        if 'user_email' in st.session_state and st.session_state.user_email:
-            st.markdown(
-                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
-                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
-                "</div>",
-                unsafe_allow_html=True
-            )
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            # Hide the default navigation for non-padmin users
+            st.markdown("""
+            <style>
+                [data-testid="stSidebarNav"] {
+                    display: none !important;
+                }
+            </style>""", unsafe_allow_html=True)
+        
+            # Page Navigation Links
+            st.sidebar.subheader("Navigation")
+            st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
+            st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🌲")
+            st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🌲")
             
-        # Page Navigation Links
-        st.subheader("Navigation")
-        st.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.page_link("pages/2_memMgmt.py", label="Member Management", icon="👤")
-            
-        st.divider()
+            st.sidebar.divider()
             
         # Show side-bar 9 functions
         nav = st.sidebar.radio(
