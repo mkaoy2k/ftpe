@@ -24,10 +24,12 @@ def create_admin_user():
     
     try:
         # Create the admin user
-        if au.create_admin_user(email, password):
+        user_id = au.create_user(email, password, 
+                role=dbm.User_State['p_admin'])
+        if user_id:
             print(f"✅ Successfully created admin user:")
             print(f"   Email: {email}")
-            print(f"   Password: {'*' * len(password)}")
+            print(f"   User ID: {user_id}")
             return True
         else:
             print("❌ Failed to create admin user.")

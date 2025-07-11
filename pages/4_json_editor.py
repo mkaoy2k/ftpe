@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import context_utils as cu
+import db_utils as dbm
 
 def load_json(file_path):
     """
@@ -58,10 +59,23 @@ def save_json(file_path, data):
 
 def main():
     st.title("JSON Editor")
-    
-    # Initialize session state for file content
-    if 'file_content' not in st.session_state:
-        st.session_state.file_content = ""
+    # --- Sidebar --- from here
+    if st.session_state.user_state != dbm.User_State['p_admin']:
+        # Hide the default navigation for non-padmin users
+        st.markdown("""
+        <style>
+            [data-testid="stSidebarNav"] {
+                display: none !important;
+            }
+        </style>""", unsafe_allow_html=True)
+        
+        st.sidebar.subheader("Navigation")
+        st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
+        st.sidebar.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
+        st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+        st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+        st.sidebar.divider()
     
     # Directory selection
     dirs = {
@@ -115,9 +129,9 @@ def main():
     # Display current file path
     if file_path:
         st.sidebar.write(f"Editing: `{file_path}`")
+    # --- Sidebar --- to here
     
-    # JSON editor --- from here
-    st.markdown("---")
+    # --- Main Content --- from here
     st.subheader("Editing Area")
     # Ensure file_content is a string
     if not isinstance(st.session_state.file_content, str):
@@ -138,7 +152,7 @@ def main():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("Save Changes") and file_path:
+        if st.button("Save Changes", type="primary") and file_path:
             try:
                 parsed_json = json.loads(edited_json)
                 if save_json(file_path, parsed_json):
@@ -147,7 +161,7 @@ def main():
                 st.error(f"Invalid JSON: {e}")
     
     with col2:
-        if st.button("Reload") and file_path and file_path.exists():
+        if st.button("Reload", type="secondary") and file_path and file_path.exists():
             # Clear the current file content to force a reload
             if 'file_content' in st.session_state:
                 del st.session_state.file_content
@@ -155,7 +169,7 @@ def main():
             st.rerun()
     
     with col3:
-        if st.button("Download"):
+        if st.button("Download", type="secondary"):
             st.download_button(
                 label="Download JSON",
                 data=edited_json,
@@ -170,7 +184,7 @@ def main():
             st.json(parsed)
         except json.JSONDecodeError:
             st.error("Invalid JSON")
-
+    # --- Main Content --- to here
     
 # Initialize session state
 cu.init_session_state()
@@ -179,4 +193,7 @@ cu.init_session_state()
 if not st.session_state.get('authenticated', False):
     st.switch_page("ftpe_ui.py")
 else:
+    # Initialize session state for file content
+    if 'file_content' not in st.session_state:
+        st.session_state.file_content = ""
     main()

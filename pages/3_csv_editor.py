@@ -15,7 +15,8 @@ It includes features for:
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-import context_utils as cu
+from context_utils import init_session_state
+import db_utils as dbm
 import os
 import time
 
@@ -57,19 +58,24 @@ def save_csv(file_path, df):
 
 def main():
     st.title("CSV Editor")
-    
-    # Initialize session state variables
-    if 'file_content' not in st.session_state:
-        st.session_state.file_content = pd.DataFrame()
-    if 'current_file' not in st.session_state:
-        st.session_state.current_file = None
-    if 'force_reload' not in st.session_state:
-        st.session_state.force_reload = False
-    if 'reload_file_path' not in st.session_state:
-        st.session_state.reload_file_path = None
-    if 'reload_file' not in st.session_state:
-        st.session_state.reload_file = False
-    
+    # --- Sidebar --- from here
+    if st.session_state.user_state != dbm.User_State['p_admin']:
+        # Hide the default navigation for non-padmin users
+        st.markdown("""
+        <style>
+            [data-testid="stSidebarNav"] {
+                display: none !important;
+            }
+        </style>""", unsafe_allow_html=True)
+        
+        st.sidebar.subheader("Navigation")
+        st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
+        st.sidebar.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
+        st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+        st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+        st.sidebar.divider()
+        
     # Directory selection
     dirs = {
         'Data': Path(__file__).parent.parent / "data",  # Data directory
@@ -95,7 +101,7 @@ def main():
     
     # Handle new file creation
     if selected_file == "Create New...":
-        new_file = st.sidebar.text_input("New filename (e.g., data.csv)")
+        new_file = st.sidebar.text_input("New filename (e.g., me.csv)")
         if new_file and not new_file.endswith('.csv'):
             new_file += '.csv'
         file_path = selected_dir / new_file if new_file else None
@@ -107,7 +113,8 @@ def main():
         Load file content into a DataFrame.
 
         Returns:
-            DataFrame: Loaded data as a pandas DataFrame, or an empty DataFrame if the file is empty or does not exist.
+            DataFrame: Loaded data as a pandas DataFrame, 
+            or an empty DataFrame if the file is empty or does not exist.
         """
         try:
             if file_path and file_path.exists():
@@ -166,7 +173,7 @@ def main():
     if not isinstance(st.session_state.file_content, pd.DataFrame):
         st.session_state.file_content = pd.DataFrame(columns=['Column 1'])
     
-    st.markdown("---")
+    # --- Main Content --- from here
     st.subheader("Editing Area")
     # Data editor - use a unique key from session state or generate a new one
     if 'editor_key' not in st.session_state:
@@ -191,7 +198,7 @@ def main():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("Save Changes") and file_path:
+        if st.button("Save Changes", type="primary") and file_path:
             try:
                 if save_csv(file_path, edited_df):
                     st.success(f"Saved to {file_path}")
@@ -236,12 +243,22 @@ def main():
         else:
             st.info("No data to display")
 
-    
 # Initialize session state
-cu.init_session_state()
+init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
     st.switch_page("ftpe_ui.py")
 else:
+    # Initialize session state variables
+    if 'file_content' not in st.session_state:
+        st.session_state.file_content = pd.DataFrame()
+    if 'current_file' not in st.session_state:
+        st.session_state.current_file = None
+    if 'force_reload' not in st.session_state:
+        st.session_state.force_reload = False
+    if 'reload_file_path' not in st.session_state:
+        st.session_state.reload_file_path = None
+    if 'reload_file' not in st.session_state:
+        st.session_state.reload_file = False
     main()

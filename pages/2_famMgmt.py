@@ -4,7 +4,8 @@ Member Management Page
 This module provides a Streamlit interface for managing family members including
 searching, adding, updating, and deleting member information.
 """
-
+import context_utils as cu
+import auth_utils as au
 import streamlit as st
 
 # Hide the default navigation for members
@@ -17,16 +18,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 import pandas as pd
 from typing import List, Dict, Any
-import context_utils as cu
 import db_utils as dbm
 import tempfile
 import os
+import time
 
 # Constants for UI text
 UI_TEXTS = {
     "search": {
-        "title": "Member Search",
-        "form_title": "Search Members",
+        "title": "Search Family Members",
+        "form_title": "Search Criteria",
         "name": "Name",
         "alias": "Alias",
         "family_id": "Family ID",
@@ -42,7 +43,7 @@ UI_TEXTS = {
         "results_count": "Found {count} records"
     },
     "add": {
-        "title": "Add Member",
+        "title": "Add Family Member",
         "name": "Full Name*",
         "sex": "Gender*",
         "sex_options": ["", "Male", "Female", "Other"],
@@ -52,14 +53,17 @@ UI_TEXTS = {
         "alias": "Alias",
         "generation": "Generation",
         "email": "Email",
+        "password": "Password",
+        "confirm_password": "Confirm Password",
         "url": "Website",
         "submit_button": "Add Member",
         "success": "Member added successfully! Member ID: {id}",
+        "no_update_user_table": "User table not updated. Please update manually.",
         "error_required": "Please fill in all required fields (marked with *)",
         "error_generic": "Error adding member: {error}"
     },
     "update": {
-        "title": "Update Member",
+        "title": "Update Family Member",
         "member_id_prompt": "Enter Member ID to update",
         "not_found": "Member not found",
         "form_title": "Update Member: {name} (ID: {id})",
@@ -69,7 +73,7 @@ UI_TEXTS = {
         "nothing_to_update": "No changes to update"
     },
     "delete": {
-        "title": "Delete Member",
+        "title": "Delete Family Member",
         "member_id_prompt": "Enter Member ID to delete",
         "not_found": "Member not found",
         "warning": "⚠️ Warning: This action cannot be undone!",
@@ -80,28 +84,10 @@ UI_TEXTS = {
         "error": "Error deleting member"
     },
     "common": {
-        "app_title": "Member Functions",
-        "navigation": ["Search", "Add", 
-                       "Update", "Delete", 
-                       "Import", "Export"
+        "app_title": "Family Member Management",
+        "navigation": ["Search-Members", "Add-Member", 
+                       "Update-Member", "Delete-Member" 
                     ]
-    },
-    "import": {
-        "title": "Import Members",
-        "description": "Upload a CSV file to import member data.",
-        "file_uploader_label": "Choose a CSV file",
-        "import_button": "Import Members",
-        "no_file": "Please select a file to import",
-        "file_type_error": "Only CSV files are supported"
-    },
-    "export": {
-        "title": "Export Members",
-        "description": "Export all members to a CSV file.",
-        "filename": "members_export",
-        "export_button": "Export Members",
-        "success": "Successfully exported {count} members to {filename}",
-        "error": "Error exporting members: {error}",
-        "download_button": "Download CSV"
     }
 }
 
@@ -220,16 +206,21 @@ def add_member_page() -> None:
                 placeholder=UI_TEXTS["add"]["birth_date_placeholder"]
             )
             family_id = st.text_input(UI_TEXTS["add"]["family_id"], "")
-            
-        with col2:
-            alias = st.text_input(UI_TEXTS["add"]["alias"], "")
             gen_order = st.number_input(
                 UI_TEXTS["add"]["generation"],
                 min_value=0,
                 step=1,
                 value=0
             )
+        with col2:
+            alias = st.text_input(UI_TEXTS["add"]["alias"], "")
+            
             email = st.text_input(UI_TEXTS["add"]["email"], "")
+            password = st.text_input(UI_TEXTS["add"]["password"], "", type="password")
+            confirm_password = st.text_input(UI_TEXTS["add"]["confirm_password"], "", type="password")
+            if password != confirm_password:
+                st.error(UI_TEXTS["add"]["error_password_match"])
+                return
             url = st.text_input(UI_TEXTS["add"]["url"], "")
         
         submitted = st.form_submit_button(UI_TEXTS["add"]["submit_button"])
@@ -252,9 +243,20 @@ def add_member_page() -> None:
                     'gen_order': gen_order if gen_order > 0 else None
                 }
                 
-                # Add member to database
-                member_id = dbm.add_member(member_data)
-                st.success(UI_TEXTS["add"]["success"].format(id=member_id))
+                # Add new or update existing family member
+                member_id = dbm.add_or_update_member(member_data, True)
+                if member_id:
+                    if email and password:
+                        # Create user in users table
+                        user_id = au.create_user(email, password,
+                                role=dbm.User_State['f_member'],
+                                member_id=member_id)
+                        if user_id:
+                            st.success(UI_TEXTS["add"]["success"].format(id=member_id))
+                    else:
+                        st.info(UI_TEXTS["add"]["no_update_user_table"])
+                else:
+                    st.error(UI_TEXTS["add"]["error_generic"].format(error="Failed to add member"))
                 
             except Exception as e:
                 st.error(UI_TEXTS["add"]["error_generic"].format(error=str(e)))
@@ -418,128 +420,6 @@ def delete_member_page() -> None:
                 except Exception as e:
                     st.error(f"Error deleting member: {str(e)}")
 
-
-def import_members_page() -> None:
-    """Display the interface for importing members from a CSV file."""
-    st.subheader(UI_TEXTS["import"]["title"])
-    st.write(UI_TEXTS["import"]["description"])
-    
-    uploaded_file = st.file_uploader(
-        UI_TEXTS["import"]["file_uploader_label"],
-        type=["csv"]
-    )
-    
-    if st.button(UI_TEXTS["import"]["import_button"], type="primary"):
-        if uploaded_file is not None:
-            try:
-                # Save the uploaded file to a temporary location
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
-                    tmp_file_path = tmp_file.name
-                
-                # Import the members
-                success, message = dbm.import_members_from_csv(tmp_file_path)
-                
-                # Clean up the temporary file
-                try:
-                    os.unlink(tmp_file_path)
-                except Exception as e:
-                    st.warning(f"Warning: Could not remove temporary file: {str(e)}")
-                
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
-                    
-            except Exception as e:
-                st.error(str(e))
-        else:
-            st.warning(UI_TEXTS["import"]["no_file"])
-
-
-def export_members_page() -> None:
-    """Display the interface for exporting members to a CSV file."""
-    st.subheader(UI_TEXTS["export"]["title"])
-    st.write(UI_TEXTS["export"]["description"])
-    
-    # Get a default filename with timestamp
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    default_filename = f"{UI_TEXTS['export']['filename']}_{timestamp}.csv"
-    
-    # Let user customize the filename
-    filename = st.text_input(
-        "Filename",
-        value=default_filename
-    )
-    
-    if st.button(UI_TEXTS["export"]["export_button"], type="primary"):
-        try:
-            # Create a temporary file for the export
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
-                tmp_file_path = tmp_file.name
-            
-            # Export the members
-            success = dbm.export_members_to_csv(tmp_file_path)
-            
-            if success:
-                # Count the number of exported members
-                with open(tmp_file_path, 'r', encoding='utf-8') as f:
-                    # Subtract 1 for the header row
-                    count = sum(1 for _ in f) - 1
-                
-                # Create a download button for the file
-                with open(tmp_file_path, 'rb') as f:
-                    st.download_button(
-                        label=UI_TEXTS["export"]["download_button"],
-                        data=f,
-                        file_name=filename,
-                        mime='text/csv',
-                    )
-                
-                st.success(UI_TEXTS["export"]["success"].format(
-                    count=count,
-                    filename=filename
-                ))
-                
-                # Clean up the temporary file after the user has downloaded it
-                try:
-                    os.unlink(tmp_file_path)
-                except Exception as e:
-                    st.warning(f"Warning: Could not remove temporary file: {str(e)}")
-            else:
-                st.error(UI_TEXTS["export"]["error"].format(error="Export failed"))
-                
-        except Exception as e:
-            st.error(UI_TEXTS["export"]["error"].format(error=str(e)))
-            
-            # Clean up the temporary file if it exists
-            if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
-                try:
-                    os.unlink(tmp_file_path)
-                except Exception as cleanup_error:
-                    st.warning(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
-
-
-# Authentication functions
-def show_login_form() -> bool:
-    """Display login form and handle authentication."""
-    with st.sidebar:
-        with st.form("login_form"):
-            st.subheader("Login")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.form_submit_button("Login"):
-                if au.verify_member(email, password):
-                    st.session_state.authenticated = True
-                    st.session_state.user_email = email
-                    st.session_state.user_state = dbm.User_State['member']
-                    st.rerun()
-                else:
-                    st.error("Invalid email or password")
-        return False
-
-# Main application
 def main() -> None:
     """Main application entry point."""
     # Check authentication
@@ -547,10 +427,17 @@ def main() -> None:
         show_login_form()
         return
         
-    # Sidebar with user info and page links
+    # Sidebar with login button, page links, and logout button
     with st.sidebar:
-        st.sidebar.title("Member Sidebar")
-
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            # Hide the default navigation for non-padmin users
+            st.markdown("""
+            <style>
+                [data-testid="stSidebarNav"] {
+                    display: none !important;
+                }
+            </style>""", unsafe_allow_html=True)
+        
         if 'user_email' in st.session_state and st.session_state.user_email:
             st.markdown(
                 f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
@@ -558,42 +445,15 @@ def main() -> None:
                 "</div>",
                 unsafe_allow_html=True
             )
-            
-        # Page Navigation Links
+        
         st.subheader("Navigation")
         st.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
+        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
             
         st.divider()
             
-        # Sidebar - Member User Management
-        st.subheader("Member User Management")
-        with st.expander("Create/Update Member User", expanded=False):
-            with st.form("member_user_form"):
-                st.subheader("Member User")
-                email = st.text_input("Email", key="member_email", 
-                                   help="Enter the email address for the member user")
-                new_password = st.text_input("Password", type="password", key="new_password",
-                                          help="Enter a password (at least 8 characters)")
-                confirm_password = st.text_input("Confirm Password", type="password", 
-                                               key="confirm_password")
-                
-                if st.form_submit_button("Save Member User"):
-                    if not email or not fu.validate_email(email):
-                        st.error("Please enter a valid email address")
-                    elif not new_password:
-                        st.error("Please enter a password")
-                    elif new_password != confirm_password:
-                        st.error("Passwords do not match")
-                    elif len(new_password) < 8:
-                        st.error("Password must be at least 8 characters long")
-                    else:
-                        success, message = au.create_member_user(email, new_password)
-                        if success:
-                            st.success(message)
-                        else:
-                            st.error(message)
-                                    
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
             st.session_state.authenticated = False
@@ -601,10 +461,10 @@ def main() -> None:
             st.rerun()
     
     # Main content area
-    st.title("Member Management")
-    
+    st.title("Family Tree Management")
+    context = st.session_state.get('app_context', cu.init_context())
     # Navigation tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(UI_TEXTS["common"]["navigation"])
+    tab1, tab2, tab3, tab4 = st.tabs(UI_TEXTS["common"]["navigation"])
     
     with tab1:  # Search Members
         search_members_page()
@@ -617,13 +477,6 @@ def main() -> None:
         
     with tab4:  # Delete Member
         delete_member_page()
-        
-    with tab5:  # Import Members
-        import_members_page()
-        
-    with tab6:  # Export Members
-        export_members_page()
-    
 
 # Initialize session state
 cu.init_session_state()

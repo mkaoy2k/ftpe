@@ -20,28 +20,107 @@ The `ftpe` not only helps you to build your family heritage, but also provides y
 
    Currently, there are 10 supported languages: English, Traditional Chinese, Simplified Chinese, Japanese, Korean, Danish, German, French, Lithuanian, and Polish. You are welcome if you would like to localize any language of yours or to provide any comments. Don't hesitate to let [Creator: Michael Kao](mailto:mkaoy2k@gmail.com) know.
 
-## Dependencies and Installation
+### System Requirements
 
-To install the `ftpe` App in Python environment, follow the following steps:
+- Python 3.8 or newer
+- SQLite 3 (built-in)
+- Email service (e.g., Gmail)
 
-1. Clone the repository to your local machine.
+### Installation Steps
 
-2. Install the required dependencies by running the following command if using Conda environment:
+1. **Clone the Repository**
+
+   ```bash
+   git clone https://github.com/mkaoy2k/subs.git
+   cd subs
+   ```
+
+2. **Create Virtual Environment (Recommended)**
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/Mac
+   # or
+   .\.venv\Scripts\activate  # Windows
+   ```
+
+3. **Install Dependencies**
+
+   Install the required dependencies by running the following command if using Conda environment:
 
    ```bash
    conda env create -f environment.yaml
    ```
 
-3. Or under uv environment, run:
+   Or under uv environment, run:
 
    ```bash
    uv run python -m pip install -r requirements.txt
    ```
 
+   Or under pip environment, run:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure Environment Variables** defined in the `.env` file
+
+   ```bash
+   cp template.env.txt .env
+   ```
+
+   Edit the `.env` file to tailor your environment:
+   - Set server paths
+   - Set your language, release, and version etc.
+   - Configure email service
+   - Set application name, DB admin name, DB admin password
+   - Set DB name, DB host, DB port
+   - Configure server URL
+
+   Edit `L10N.json` if your language is newly added. The default languages are Traditional Chinese (繁中) and English (US).
+
+   Edit `L10N_<your language>.json` if your language is newly added. The current localization files include:
+
+   ```bash
+   "繁中"  : "L10N_TW.json",
+   "简中"  : "L10N_CN.json",
+   "日本語" : "L10N_JP.json",
+   "한국어" : "L10N_KR.json",
+   "DANISH" : "L10N_DK.json",
+   "GERMAN" : "L10N_DE.json",
+   "FRENCH" : "L10N_FR.json",
+   "LITHUANIAN" : "L10N_LT.json",
+   "POLISH" : "L10N_PL.json",
+   "US"   : "L10N_US.json"
+   ```
+
+   To set your preferred language, you can specify your preferred language in the `.env` file, e.g.:
+
+   ```bash
+   L10N_FILE="L10N.json"
+   L10N="繁中"
+   # L10N="US"
+   ```
+
+   At the run time, from `Settings` sidebar, you can also select your preferred language from the 'User Language' drop-down list.
+
+5. **Initialize Data Directory**
+
+   ```bash
+   mkdir -p data
+   ```
+
+6. **Initialize Admin User Database**
+
+   ```bash
+   python genesis.py
+   ```
+
 ## Directory Structure
 
 ftpe/
-├── ftpe_ui.py           # Admin interface
+├── ftpe_ui.py           # Main interface
 ├── auth_utils.py         # Authentication utilities
 ├── context_utils.py      # Context management
 ├── db_utils.py           # Database utilities
@@ -66,40 +145,10 @@ ftpe/
 │
 └── pages/                # Application pages
     ├── 1_usrMgmt.py     # User management
-    ├── 2_memMgmt.py     # Member management
+    ├── 2_famMgmt.py     # Family management
     ├── 3_csv_editor.py  # CSV editor
     ├── 4_json_editor.py # JSON editor
     └── 5_ftpe.py        # Main application page
-
-## Configuration Defined in the `.env` file
-
-Rename 'template.env.txt' to '.env' in your environment and configure the followings:
-
-### Server Logging: 2 options available
-
-```bash
-LOGGING="DEBUG"
-LOGGING="INFO"
-```
-
-comment out what you don't want.
-
-### Languages: 10 options available currently
-
-```bash
-"繁中"  : "L10N_TW.json",
-"简中"  : "L10N_CN.json",
-"日本語" : "L10N_JP.json",
-"한국어" : "L10N_KR.json",
-"DANISH" : "L10N_DK.json",
-"GERMAN" : "L10N_DE.json",
-"FRENCH" : "L10N_FR.json",
-"LITHUANIAN" : "L10N_LT.json",
-"POLISH" : "L10N_PL.json",
-"US"   : "L10N_US.json"
-```
-
-To set your preferred language, run the `ftpe` App and on the left bar menu, select your preferred language from the 'User Language' drop-down list.
 
 ## How to Use
 
