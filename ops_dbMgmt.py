@@ -5,18 +5,18 @@ This module contains core database operations for the admin interface.
 """
 import sqlite3
 import db_utils as dbm
+import logging
+
+log = logging.getLogger(__name__)
 
 
 def init_db_management():
     """Initialize database management"""
     try:
-        with dbm.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'")
-            tables = [row[0] for row in cursor.fetchall()]
-            return tables
+        log.debug("Initializing database management")
+        return get_tables()
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        log.error(f"Database error: {e}")
         return []
 
 def get_table_structure(table_name):
@@ -27,7 +27,7 @@ def get_table_structure(table_name):
             cursor.execute(f"PRAGMA table_info({table_name})")
             return cursor.fetchall()
     except sqlite3.Error as e:
-        print(f"Error getting table structure: {e}")
+        log.error(f"Error getting table structure: {e}")
         return []
 
 def drop_table(table_name):
@@ -39,7 +39,7 @@ def drop_table(table_name):
             conn.commit()
             return True
     except sqlite3.Error as e:
-        print(f"Error dropping table: {e}")
+        log.error(f"Error dropping table: {e}")
         return False
 
 def init_admin_features():
@@ -74,7 +74,7 @@ def init_admin_features():
             return True
             
     except sqlite3.Error as e:
-        print(f"Error initializing admin features: {e}")
+        log.error(f"Error initializing admin features: {e}")
         return False
 
 
@@ -104,7 +104,7 @@ def add_column_if_not_exists(table_name, column_name, column_definition):
             return True  # Column already exists
             
     except sqlite3.Error as e:
-        print(f"Error adding column: {e}")
+        log.error(f"Error adding column: {e}")
         return False
 
 def remove_column_if_exists(table_name, column_name):
@@ -154,7 +154,7 @@ def remove_column_if_exists(table_name, column_name):
             return False  # Column doesn't exist
             
     except sqlite3.Error as e:
-        print(f"Error removing column: {e}")
+        log.error(f"Error removing column: {e}")
         return False
 
 def get_tables():
@@ -162,8 +162,8 @@ def get_tables():
     try:
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'")
             return [row[0] for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        print(f"Error getting tables: {e}")
+        log.error(f"Error getting tables: {e}")
         return []

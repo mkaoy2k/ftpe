@@ -235,7 +235,8 @@ def main():
                 file_name=file_path.name if file_path else "data.csv",
                 mime="text/csv"
             )
-    
+    # Display the number of rows
+    st.write(f"Number of rows: {len(edited_df)}")
     # Display data in a table
     with st.expander("View Formatted Table"):
         if not edited_df.empty:

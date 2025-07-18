@@ -49,8 +49,10 @@ def show_page():
     
     try:
         df = pd.DataFrame()
-        with st.container():
-            st.subheader("Manage Subscriber")
+        
+        # Subscriber Management
+        st.subheader("Manage Subscriber")
+        with st.container(border=True):
             btn11, btn12, btn13, btn14 = st.columns([5,5,5,5])
             info1, info2, info3 = st.columns([18,1,1])
             with btn11:
@@ -134,7 +136,8 @@ def show_page():
             if st.button("Query Subscriber by Email", type="primary", key="query_subscriber_btn"):
                 user = dbm.get_subscriber(email)
                 
-            # Always show the subscriber details section, but only show content if user exists
+            # Always show the subscriber details section, 
+            # but only show content if user exists
             with info31:
                 st.write("### Subscriber Details")
                 
@@ -159,9 +162,12 @@ def show_page():
                 btn41, btn42, btn43 = st.columns([1,1,1])
                 with btn41:
                     if st.button("Subscribe", type="secondary", key="subscribe_btn"):
-                        if dbm.add_subscriber(email, "token", lang=l10n):
+                        success, message = dbm.add_subscriber(email, "By Platform Admin", lang=l10n)
+                        if success:
                             cu.update_context({'language': l10n})
                             st.success(f"✅ Subscribed {email} successfully")
+                        else:
+                            st.error(f"❌ {message}")
                 with btn42:
                     if st.button("Unsubscribe", type="secondary", key="unsubscribe_btn"):
                         if dbm.remove_subscriber(email):
@@ -170,60 +176,77 @@ def show_page():
                             st.error(f"❌ Failed to unsubscribe {email}")
                 with btn43:
                     with st.expander("Danger Zone", expanded=False):
-                        st.warning("This action cannot be undone!")
+                        st.warning(f"⚠️ This action cannot be undone!")
                         if st.button("Delete Subscriber by Email", type="secondary", key="delete_subscriber_btn"):
                             if dbm.delete_subscriber(email):
                                 st.success(f"✅ Deleted {email} successfully")
                             else:
                                 st.error(f"❌ Failed to delete {email}")
     
-        # Add a new column for creating member users
-        st.subheader("Create Family User")
+        # Create Family Admin/Members
+        st.subheader("Create Family Admin/Members")
         with st.form("create_member_form"):
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
+                role = st.radio("Role:", 
+                    ["Family Admin", "Family Member"],
+                    index=0,
+                    key="new_member_role")
                 new_email = st.text_input("New Email:",
                     help="Enter the email address for the new member user",
                     key="new_member_email")
+            
+            with col2:
                 new_password = st.text_input("Password:", 
                     type="password", 
                     help="Enter a password (at least 8 characters)",
                     key="new_member_password")
-            
-            with col2:
-                f_admin = st.selectbox("Family Admin:", 
-                    ["Yes", "No"],
-                    index=0,
-                    key="new_member_f_admin")
                 confirm_password = st.text_input("Confirm Password:", 
                     type="password", 
                     help="Confirm the password",
                     key="new_member_confirm_password")
             
+            with col3:
+                family_id = st.number_input("Family ID:", 
+                    min_value=0,
+                    step=1,
+                    key="new_member_family_id")
+                member_id = st.number_input("Member ID:", 
+                    min_value=0,
+                    step=1,
+                    key="new_member_member_id")
+            
             if new_password != confirm_password:
                 st.error("Passwords do not match")
-            submitted = st.form_submit_button("Create Family User")
+            submitted = st.form_submit_button("Submit")
             
             if submitted:
-                if not new_email or not new_password:
+                if not new_email or not new_password or not confirm_password:
                     st.error("Please enter both email and password")
+                elif new_password != confirm_password:
+                    st.error("Passwords do not match")
+                elif len(new_password) < 8:
+                    st.error("Password must be at least 8 characters long")
                 else:
-                    if f_admin == "Yes":
+                    if role == "Family Admin":
                         role = dbm.User_State['f_admin']
                     else:
+                        # Default to Family Member
                         role = dbm.User_State['f_member']
                     user_id = au.create_user(new_email, 
                                         new_password, 
-                                        role=role)
+                                        role=role,
+                                        family_id=family_id,
+                                        member_id=member_id)
                     if user_id:
-                        st.success(f"✅ Family User created successfully: {user_id}")
+                        st.success(f"✅ Family Admin/Member created successfully: {user_id}")
                         # The form will automatically clear on the next run
                     else:
                         st.error(f"❌ Failed to create family user")
         
         with st.expander("Danger Zone", expanded=False):
-            st.warning("This action cannot be undone!")
+            st.warning(f"⚠️This action cannot be undone!")
             user_id = st.number_input("User ID:",
                                   min_value=1,
                                   max_value=100000,

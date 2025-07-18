@@ -17,7 +17,7 @@ data/*
 test_*
 prod_*
 __init__*.py
-.streamlit/
+.streamlit/*
 # a_*
 
 ### Python ###
