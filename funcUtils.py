@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv  # pip install python-dotenv
 import json
 import streamlit as st  # pip install streamlit
+import datetime as dt
 
 
 def get_languages():
@@ -82,7 +83,45 @@ def get_1st_mbr_dict(df, mem, born, base=None):
     idx, member = rec.to_dict('index').popitem()
     return idx, member
 
-
+# Helper function to format timestamps
+def format_timestamp(ts) -> str:
+    """
+    格式化時間戳記為易讀字串
+    
+    Args:
+        ts: 時間戳記 (可以是 datetime 對象或字串)
+                        
+    Returns:
+        str: 格式化後的時間字串，若解析失敗則返回原始字串
+    """
+    if not ts:
+        return "Never"
+                        
+    # 如果是 datetime 對象，直接格式化
+    if isinstance(ts, dt.datetime):
+        return ts.strftime('%Y-%m-%d %H:%M:%S')
+                        
+    # 如果是字串，嘗試解析
+    ts_str = str(ts)
+    try:
+        # 嘗試 ISO 8601 格式 (包含 'T' 分隔符)
+        if 'T' in ts_str:
+            date_time = dt.fromisoformat(ts_str.replace('Z', '+00:00'))
+        # 嘗試空格分隔的格式
+        else:
+            # 嘗試帶有微秒的格式
+            for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
+                try:
+                    date_time = dt.datetime.strptime(ts_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return ts_str  # 所有格式都失敗，返回原始字串
+            return date_time.strftime('%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError) as e:
+        return ts_str  # 解析失敗，返回原始字串
+                    
 if __name__ == '__main__':
     """
     Function test code

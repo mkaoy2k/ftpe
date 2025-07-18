@@ -28,7 +28,7 @@ LANGUAGES = language_list
 LANGUAGE = os.getenv("L10N", "US")
 
 # Email Settings
-EMAIL_NOTIFICATIONS = True
+EMAIL_SUBSCRIPTION = True
 MAIL_USER = os.getenv("MAIL_USERNAME", "")
 MAIL_PASS = os.getenv("MAIL_PASSWORD", "")
 MAIL_ADMIN = os.getenv("DB_ADMIN", "")
@@ -48,16 +48,22 @@ FT_SVR=os.getenv("FT_SVR", "")
 FILE_SYSTEM_SETTINGS = {
     'dir_path': os.getenv("FSS_DIR_PATH", "./data"),
     'file_name': os.getenv("FSS_FILE_NAME", "users"),
-    'file_type': os.getenv("FSS_FILE_TYPE", "CSV")
+    'file_type': os.getenv("FSS_FILE_TYPE", "CSV"),
+    'db_table': os.getenv("TBL_MEMBERS", "members"),
+    'db_tables': [os.getenv("TBL_MEMBERS", "members"),
+                 os.getenv("TBL_RELATIONS", "relations"),
+                 os.getenv("TBL_FAMILIES", "families"),
+                 os.getenv("TBL_MIRRORS", "mirrors")]
 }
 # ===== End of Module Settings =====
 
 def init_context() -> Dict[str, Any]:
     """
-    初始化並返回包含設定的全局字典
+    Initialize and return a dictionary containing 
+    application settings
     
     Returns:
-        Dict[str, Any]: 包含設定的字典
+        Dict[str, Any]: Dictionary containing settings
     """
     # Default settings
     default_settings = {
@@ -66,7 +72,7 @@ def init_context() -> Dict[str, Any]:
         'site_title': SITE_TITLE,
         'language': LANGUAGE,
         'languages': LANGUAGES,
-        'email_notifications': EMAIL_NOTIFICATIONS,
+        'email_subscription': EMAIL_SUBSCRIPTION,
         'email_user': MAIL_USER,
         'email_pass': MAIL_PASS,
         'email_admin': MAIL_ADMIN,
@@ -75,12 +81,14 @@ def init_context() -> Dict[str, Any]:
         'dark_mode': DARK_MODE,
         'items_per_page': ITEMS_PER_PAGE,
         'password_reset_timeout': PASSWORD_RESET_TIMEOUT,
-        'max_login_attempts': MAX_LOGIN_ATTEMPTS
+        'max_login_attempts': MAX_LOGIN_ATTEMPTS,
+        'member_id': None,
+        'family_id': None
     }
     
     return default_settings
 
-# Function to update context
+# Function to update application context
 def update_context(new_values: dict):
     if 'app_context' not in st.session_state:
         st.session_state.app_context = init_context()
@@ -90,10 +98,10 @@ def init_session_state():
     """Initialize session state variables"""
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    if 'app_context' not in st.session_state:
+        st.session_state.app_context = init_context()
     if 'user_email' not in st.session_state:
         st.session_state.user_email = None
-    if 'app_context' not in st.session_state or st.session_state.app_context is None:
-        st.session_state.app_context = init_context()
     if 'user_state' not in st.session_state:
         st.session_state.user_state = dbm.User_State['f_member']
           

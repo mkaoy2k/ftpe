@@ -166,7 +166,7 @@ def verify_fadmin(email, password):
         st.error(f"Error verifying admin: {e}")
         return False
 
-def create_user(email, password, role, member_id=0):
+def create_user(email, password, role, family_id=0, member_id=0):
     """Create a new user
     
     Args:
@@ -211,10 +211,12 @@ def create_user(email, password, role, member_id=0):
                         salt = ?, 
                         is_admin = ?, 
                         is_active = ?,
+                        family_id = ?,
                         member_id = ?,
                         updated_at = strftime('%%Y-%%m-%%d %%H:%%M:%%f', 'now', 'localtime')
                     WHERE id = ?
-                """, (password_hash, salt, role, sub_state, member_id, user_id))
+                """, (password_hash, salt, role, sub_state, 
+                      family_id, member_id, user_id))
                 conn.commit()
                 return user_id
             else:
@@ -227,19 +229,19 @@ def create_user(email, password, role, member_id=0):
                         salt, 
                         is_admin, 
                         is_active,
+                        family_id,
                         member_id,
                         created_at,
                         updated_at
                     ) 
                     VALUES (?, ?, ?, 
-                    ?, 
-                    ?, 
-                    ?, 
+                    ?, ?, 
+                    ?, ?, 
                     datetime('now'), 
                     datetime('now')
                     )
                 """, (email, password_hash, salt, 
-                      role, sub_state, member_id))
+                      role, sub_state, family_id, member_id))
                 conn.commit()
                 user_id = cursor.lastrowid
                 return user_id

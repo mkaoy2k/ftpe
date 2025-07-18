@@ -1,30 +1,20 @@
-[runner]
-# Enable or disable the cache data API
-enableCacheDataAPI = true
-
-[runner.memory]
-# Configure the cache storage manager
-# Options: "memory" (default), "disk"
-storage_manager = "disk"
-
-# Enable or disable the cache data API warning
-showWarningOnDirectExecution = false
-
-# Configure the cache data API
-[cache_data]
-# Maximum number of entries to keep in the cache
-max_entries = 100
-# Time to live for cache entries (in seconds)
-ttl = 86400  # 24 hours
-
-# Suppress specific warnings
-[logger]
-level = "error"
+[server]
+enableCORS = false
+enableXsrfProtection = false
 
 [client]
-# Disable the cache warning
-disableCacheWarning = true
+showErrorDetails = true
 
-[server]
-# Disable the file watcher which can cause warnings
-fileWatcherType = "none"
+[runner]
+fastReruns = true
+
+[logger]
+level = "info"
+
+[theme]
+base = "dark"  # Changed from "light" to "dark"
+primaryColor = "#FF4B4B"
+backgroundColor = "#0E1117"  # Dark background
+secondaryBackgroundColor = "#1E1E1E"  # Darker secondary background
+textColor = "#FAFAFA"  # Light text for better contrast
+font = "sans serif"

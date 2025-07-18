@@ -10,9 +10,12 @@ import db_utils as dbm
 import email_utils as eu
 import auth_utils as au
 import funcUtils as fu
+import pandas as pd
+import datetime as dt
+
 # Import database operations
 from ops_dbMgmt import init_db_management, init_admin_features, get_table_structure, drop_table
-from context_utils import init_session_state, init_context, update_context
+import context_utils as cu
 
 # Load environment variables
 load_dotenv()
@@ -70,6 +73,8 @@ def show_login_page():
                             st.rerun()
                         else:
                             st.error("Invalid email or password")
+                            st.rerun()
+
 def show_fmember_sidebar():
     """Display the family member sidebar with 
     personal navigation options"""
@@ -94,12 +99,14 @@ def show_fmember_sidebar():
                 "</div>",
                 unsafe_allow_html=True
             )
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
         
         # Only show the following page options
         st.sidebar.subheader("Navigation")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
-        
-        # Add divider for spacing
+        st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
         st.divider()
         
         # Logout button at the bottom
@@ -139,6 +146,9 @@ def show_fadmin_sidebar():
                 "</div>",
                 unsafe_allow_html=True
             )
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
         
         # Page Navigation Links
         st.subheader("Navigation")
@@ -147,8 +157,51 @@ def show_fadmin_sidebar():
         st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-            
+        st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
         st.divider()
+        
+        # Display current family admin users
+        st.sidebar.subheader("Current Family Admin Users")
+        try:
+            admins = dbm.get_users(role=dbm.User_State['f_admin'])
+            if admins:
+                admin_list = [
+                        {
+                            "Email": admin['email'],
+                            "Created": fu.format_timestamp(admin['created_at']),
+                            "Last Updated": fu.format_timestamp(admin['updated_at'])
+                        }
+                        for admin in admins
+                ]
+                
+                st.table(admin_list)
+            else:
+                st.info(f"No admin users found")
+            
+        except sqlite3.Error as e:
+            st.error(f"❌ Error fetching admin users: {e}") 
+        st.divider()
+        # Display current family subscribers
+        st.sidebar.subheader("Current Family Subscribers")
+        try:
+            subscribers = dbm.get_subscribers()
+            if subscribers:
+                sub_list = [
+                        {
+                            "Email": sub['email'],
+                            "Created": fu.format_timestamp(sub['created_at']),
+                            "Last Updated": fu.format_timestamp(sub['updated_at'])
+                        }
+                        for sub in subscribers
+                ]
+                
+                st.table(sub_list)
+            else:
+                st.info(f"No subscribers found")
+                
+        except sqlite3.Error as e:
+            st.error(f"❌ Error fetching subscribers: {e}")
+ 
         # Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
             st.session_state.authenticated = False
@@ -168,9 +221,12 @@ def show_padmin_sidebar():
                 "</div>",
                 unsafe_allow_html=True
             )
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
         
         # Sidebar - Platform Admin User Management
-        st.sidebar.subheader("PlatformAdmin User Management")
+        st.sidebar.subheader("Platform Admin User Management")
         with st.expander("Create/Update Platform Admin User", expanded=False):
             with st.form("admin_user_form"):
                 st.subheader("Platform Admin User")
@@ -195,54 +251,31 @@ def show_padmin_sidebar():
                             email, new_password, 
                             role=dbm.User_State['p_admin'])
                         if user_id:
-                            st.success("Platform Admin User created successfully")
+                            st.success(f"✅ Platform Admin User created successfully")
                         else:
-                            st.error("Failed to create Platform Admin User")
+                            st.error(f"❌ Failed to create Platform Admin User")
             
         # Display current platform admin users
         st.sidebar.subheader("Current Platform Admin Users")
         try:
-            with dbm.get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(f"""
-                        SELECT email, created_at, updated_at 
-                        FROM {dbm.db_tables['users']}
-                        WHERE is_admin = {dbm.User_State['p_admin']}
-                        ORDER BY email
-                    """)
-                admins = cursor.fetchall()
+            admins = dbm.get_users(role=dbm.User_State['p_admin'])
                 
-                if admins:
-                    admin_list = []
-                    for email, created, updated in admins:
-                        # Format timestamps for display
-                        def format_timestamp(ts):
-                            if not ts:
-                                return "Never"
-                            try:
-                                # Try parsing as ISO format first
-                                from datetime import datetime
-                                if 'T' in str(ts):
-                                    dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                                else:
-                                    # Try parsing as space-separated format
-                                    dt = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
-                                return dt.strftime('%Y-%m-%d %H:%M:%S')
-                            except (ValueError, TypeError):
-                                return str(ts)
-                        
-                        admin_list.append({
-                            "Email": email, 
-                            "Created": format_timestamp(created), 
-                            "Last Updated": format_timestamp(updated)
-                        })
+            if admins:
+                admin_list = [
+                        {
+                            "Email": admin['email'],
+                            "Created": fu.format_timestamp(admin['created_at']),
+                            "Last Updated": fu.format_timestamp(admin['updated_at'])
+                        }
+                        for admin in admins
+                    ]
                     
-                    st.table(admin_list)
-                else:
-                    st.info("No admin users found")
-                
+                st.table(admin_list)
+            else:
+                st.info(f"No admin users found")
+            
         except sqlite3.Error as e:
-            st.error(f"Error fetching admin users: {e}")
+            st.error(f"❌ Error fetching admin users: {e}")
     
         # Logout button at the bottom
         if st.sidebar.button("Logout", type="primary", use_container_width=True):
@@ -253,7 +286,11 @@ def show_padmin_sidebar():
 def show_fmember_content():
     """Display the family member content area"""
     st.title("Family Member Home")
-    context = st.session_state.get('app_context', init_context())
+    
+    show_front_end()
+    
+    # Search Family Members
+    search_members_page()
     
     # Reset Password Management
     st.subheader("Reset Password")
@@ -265,118 +302,338 @@ def show_fmember_content():
                 
         if st.form_submit_button("Reset Password"):
             if not new_password:
-                st.error("Please enter a password")
+                st.error(f"❌ Please enter a password")
             elif new_password != confirm_password:
-                st.error("Passwords do not match")
+                st.error(f"❌ Passwords do not match")
             elif len(new_password) < 8:
-                st.error("Password must be at least 8 characters long")
+                st.error(f"❌ Password must be at least 8 characters long")
             else:
                 email = st.session_state.user_email
                 user_id = au.create_user(
                     email, new_password, 
                     role=dbm.User_State['f_member'])
                 if user_id:
-                    st.success("Family Member Password Reset successfully")
+                    st.success(f"✅ Family Member Password Reset successfully")
                 else:
-                    st.error("Failed to reset Family Member Password")
+                    st.error(f"❌ Failed to reset Family Member Password")
+
+def search_members_page() -> None:
+    """
+    Display the member search page with filters and results.
+    """
+    
+    # Initialize session state for search results
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = []
+    
+    # Search form
+    with st.form("search_form"):
+        st.subheader("Search Family Members")
+        
+        # Create three rows of search fields
+        row1_col1, row1_col2, row1_col3 = st.columns(3)
+        row2_col1, row2_col2, row2_col3 = st.columns(3)
+        row3_col1, row3_col2, row3_col3 = st.columns(3)
+        
+        with row1_col1:
+            name = st.text_input("Name", "")
+        with row1_col2:
+            born = st.text_input(
+                "Birth Date",
+                "",
+                placeholder="birth_date_placeholder"
+            )
+        with row1_col3:
+            gen_order = st.number_input(
+                "Generation",
+                min_value=0,
+                step=1,
+                value=0
+            )
+        with row2_col1:
+            alias = st.text_input("Alias", "")
+        with row2_col2:
+            died = st.text_input(
+                "Death Date",
+                "",
+                placeholder="death_date_placeholder"
+            )
+        with row2_col3:
+            family_id = st.text_input("Family ID", "")
+            
+        # Third row of search filters
+        with row3_col1:
+            member_id = st.number_input(
+                "ID",
+                min_value=0,
+                step=1,
+                value=0
+            )
+        with row3_col2:
+            email = st.text_input("Email", "")
+        with row3_col3:
+            sex = st.selectbox(
+                "Gender",
+                ["", "Male", "Female", "Other"]
+            )
+
+        
+        # Search button
+        submitted = st.form_submit_button("Search")
+        
+        if submitted:
+            with st.spinner("Searching..."):
+                # Execute search
+                results = dbm.search_members(
+                    name=name if name else "",
+                    alias=alias if alias else "",
+                    family_id=family_id if family_id else "",
+                    gen_order=gen_order if gen_order > 0 else None,
+                    born=born if born else "",
+                    died=died if died else "",
+                    id=member_id if member_id > 0 else None,
+                    email=email if email else "",
+                    sex={"男": "M", "女": "F", "其他": "O"}.get(sex, "") if sex else ""
+                )
+                st.session_state.search_results = results
+    
+    # Display search results
+    if st.session_state.search_results:
+        st.subheader("Search Results")
+        
+        # Prepare data for display
+        df = pd.DataFrame(st.session_state.search_results)
+        
+        # Define all fields from members table
+        all_fields = [
+            'id', 'name', 'family_id', 'alias', 'email', 'url', 
+            'born', 'died', 'sex', 'gen_order', 'dad_id', 'mom_id', 
+            'created_at', 'updated_at'
+        ]
+        
+        # Ensure all columns exist in the dataframe
+        for field in all_fields:
+            if field not in df.columns:
+                df[field] = None
+        
+        # Display data table with all fields
+        st.dataframe(
+            df[all_fields],
+            column_config={
+                'id': 'ID',
+                'name': 'Name',
+                'family_id': 'Family ID',
+                'alias': 'Alias',
+                'email': 'Email',
+                'url': 'Website',
+                'born': 'Birth Date',
+                'died': 'Death Date',
+                'sex': 'Gender',
+                'gen_order': 'Generation',
+                'dad_id': 'Father ID',
+                'mom_id': 'Mother ID',
+                'created_at': 'Created At',
+                'updated_at': 'Updated At'
+            },
+            hide_index=True,
+            use_container_width=True,
+            column_order=all_fields
+        )
+        
+        # Show result count
+        st.info(f"Total: {len(df)} records")
+    
+    # No results message
+    elif submitted:
+        st.info("No matching members found")
 
 def show_fadmin_content():
     """Display the family admin content area"""
     st.title("Family Admin Home")
-    context = st.session_state.get('app_context', init_context())
-
+    
     show_front_end()
     
-    # Family Admin User Management
-    st.subheader("Family Admin User Management")
-    with st.form("admin_user_form"):
-        email = st.text_input("Email", key="family_admin_email", 
-                    help="Enter the email address for the family admin user")
-        new_password = st.text_input("Password", type="password", key="new_password",
+    # Family User Management
+    st.subheader("Family User Management")
+    with st.container(border=True):
+        col21, col22 = st.columns(2)
+        with col22:
+            new_password = st.text_input("Password", type="password", key="new_password",
                     help="Enter a password (at least 8 characters)")
-        confirm_password = st.text_input("Confirm Password", type="password", 
+            confirm_password = st.text_input("Confirm Password", type="password", 
                     key="confirm_password")
-                
-        if st.form_submit_button("Save Family Admin User"):
-            if not email or not eu.validate_email(email):
-                st.error("Please enter a valid email address")
-            elif not new_password:
-                st.error("Please enter a password")
-            elif new_password != confirm_password:
-                st.error("Passwords do not match")
-            elif len(new_password) < 8:
-                st.error("Password must be at least 8 characters long")
-            else:
-                user_id = au.create_user(
-                    email, new_password, 
-                    role=dbm.User_State['f_admin'])
-                if user_id:
-                    st.success("Family Admin User created successfully")
-                else:
-                    st.error("Failed to create Family Admin User")
-  
-    show_back_end()
+
+        with col21:
+            # Common form fields
+            email = st.text_input("Email", key="family_admin_email", 
+                help="Enter the email address for the family admin/subscriber")
+            # Language selection
+            lang_list = fu.get_languages()
+            if not lang_list:
+                lang_list = ["US", "繁中"]
+            
+            current_lang = st.session_state.app_context.get('language')
+            lang_index = 0
+            if current_lang and current_lang in lang_list:
+                lang_index = lang_list.index(current_lang)
+            
+            l10n = st.selectbox(
+                "Select Subscription Language for Family Subscriber",
+                lang_list,
+                index=lang_index,
+                key="l10n_select"
+            )
+    
+        # Create two separate forms for the buttons
+        col1, col2 = st.columns(2)
+    
+        # Form for Family Admin
+        with col2:
+            with st.form("admin_form"):
+                st.markdown("### Create Family Admin")
+                st.markdown("""
+                <style>
+                @keyframes blink {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.2; }
+                    100% { opacity: 1; }
+                }
+                .blink {
+                    animation: blink 1.5s infinite;
+                }
+                </style>
+                <h4 class="blink">Are you the only family admin?</h4>
+                """, unsafe_allow_html=True)
+                st.markdown("To create **another Family Admin** for backup is always a good idea!")
+                if st.form_submit_button("Create Family Admin"):
+                    if not email or not eu.validate_email(email):
+                        st.error(f"❌ Please enter a valid email address")
+                    elif not new_password:
+                        st.error(f"❌ Please enter a password")
+                    elif new_password != confirm_password:
+                        st.error(f"❌ Passwords do not match")
+                    elif len(new_password) < 8:
+                        st.error(f"❌ Password must be at least 8 characters long")
+                    else:
+                        results = dbm.search_members(email=email)
+                        if len(results) > 1:
+                            st.error(f"❌ Multiple users found with the same email {email}")
+                        elif len(results) == 1:
+                            user_id = au.create_user(
+                                email, new_password, 
+                                role=dbm.User_State['f_admin'])
+                            if user_id:
+                                # Add as a subscriber by default for family admin
+                                success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
+                                if success:
+                                    st.success(f"✅ Family Admin & Subscriber created successfully")
+                                else:
+                                    st.error(f"❌ {message}")
+                            else:
+                                st.error(f"❌ Failed to create Family Admin")
+                        else:
+                            st.error(f"❌ To become a family admin, you must join this family first")
+    
+        # Form for Family Subscriber
+        with col1:
+            with st.form("subscriber_form"):
+                st.markdown("### Family Member Subscription")
+                action = st.radio("Select Action", ["Subscribe", "Unsubscribe"])
+                if st.form_submit_button("Submit"):
+                    if not email or not eu.validate_email(email):
+                        st.error(f"❌ Please enter a valid email address")
+                    elif not new_password:
+                        st.error(f"❌ Please enter a password")
+                    elif new_password != confirm_password:
+                        st.error(f"❌ Passwords do not match")
+                    elif len(new_password) < 8:
+                        st.error(f"❌ Password must be at least 8 characters long")
+                    else:
+                        results = dbm.search_members(email=email)
+                        if len(results) > 1:
+                            st.error(f"❌ Multiple users found with the same email {email}")
+                        elif len(results) == 1:
+                            user_id = au.create_user(
+                                email, new_password, 
+                                role=dbm.User_State['f_member'])
+                            if user_id:
+                                if action == "Subscribe":
+                                    success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
+                                    if success:
+                                        st.success(f"✅ Family member {email} subscribed successfully")
+                                    else:
+                                        st.error(f"❌ {message}")
+                                elif action == "Unsubscribe":
+                                    success, message = dbm.remove_subscriber(email)
+                                    if success:
+                                        st.success(f"✅ Family member {email} unsubscribed successfully")
+                                    else:
+                                        st.error(f"❌ {message}")
+                            else:
+                                st.error(f"❌ Failed to create family member {email}")
+                        else:
+                            st.error(f"❌ To become a family subscriber, you must join this family first")
+    
+    available_tables =  [os.getenv("TBL_MEMBERS", "members"),
+                 os.getenv("TBL_RELATIONS", "relations"),
+                 os.getenv("TBL_MIRRORS", "mirrors")]
+    show_back_end(available_tables)
     
 # Helper function to get full file path with extension
 def get_file_path():
     """Generate full file path with correct extension 
     based on selected file type.
+    
+    Returns:
+        str: Full file path with extension or None if 
+        file name or file type is not configured 
     """
     context = st.session_state.get('app_context', {})
     if not context.get('fss', {}).get('file_name') or not context.get('fss', {}).get('file_type'):
-        return "No file path configured"
+        return None 
+        
     extension = context.get('fss', {}).get('file_type', '').lower()
     dir_path = context.get('fss', {}).get('dir_path', '')
     file_name = context.get('fss', {}).get('file_name', '')
+    
     return f"{os.path.join(dir_path, file_name)}.{extension}"
     
 # Helper function to handle export operations
-def handle_export(export_func, resource_name):
+def handle_export(export_func, file_path, table):
     """Handle export operations with proper error handling and user feedback."""
-    try:
-        file_path = get_file_path()
-        if not file_path:
-            st.error("Please provide both file name and directory path")
-            return
+    try:        
+        st.info(f"Exporting '{table}' table to {file_path}")
                 
-        os.makedirs(context.get('fss', {}).get('dir_path'), exist_ok=True)
-        format_type = context.get('fss', {}).get('file_type').lower()
-            
-        if export_func(file_path, format_type):
-            st.success(f"Successfully exported {resource_name} to {file_path}")
+        results = export_func(file_path, table)
+        if results.get('success'):
+            st.success(f"✅ Successfully exported '{table}' table to {file_path}")
         else:
-            st.error(f"Failed to export {resource_name}. Please check the logs for details.")
+            st.error(f"❌ Failed to export '{table}' table: {results.get('message')}")
                 
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+        st.error(f"❌ An error occurred: {str(e)}")
     
 # Helper function to handle import operations
-def handle_import(import_func, resource_name):
+def handle_import(import_func, file_path, table):
     """Handle import operations with proper error handling and user feedback."""
     try:
-        file_path = get_file_path()
         if not file_path or not os.path.exists(file_path):
             st.error(f"File not found: {file_path or 'No file specified'}")
             return
-                
-        format_type = context.get('fss', {}).get('file_type').lower()
-        success, error, skipped = import_func(file_path, format_type)
             
+        st.info(f"Importing {file_path} to '{table}' table")       
+        success, error, skipped = import_func(file_path, table)
         st.info(
-            f"{resource_name} import completed. "
+            f"Import {file_path} to {table} completed. "
             f"Success: {success}, Errors: {error}, Skipped: {skipped}"
             )
             
     except Exception as e:
-        st.error(f"An error occurred during import: {str(e)}")
+        st.error(f"❌ An error occurred during import: {str(e)}")
 
 def show_front_end():
     st.subheader("Front-end Settings")
    
-    # Initialize context
-    if 'app_context' not in st.session_state or st.session_state.app_context is None:
-        st.session_state.app_context = init_context()
-    
     # Create form with a unique key
     with st.form(key="front_end_form"):
         col1, col2 = st.columns(2)
@@ -420,16 +677,16 @@ def show_front_end():
             )
             
             admin_email = st.text_input(
-                "Admin Email", 
+                "Platform Admin Email", 
                 value=st.session_state.app_context.get('email_admin', ''),
-                key="frontend_admin_email"
+                key="platform_admin_email"
             )
         
         # Checkbox options
-        email_notifications = st.checkbox(
-            "Enable Email Notifications", 
-            value=st.session_state.app_context.get('email_notifications', True),
-            key="email_notifications"
+        email_subscription = st.checkbox(
+            "Enable Email Subscription", 
+            value=st.session_state.app_context.get('email_subscription', True),
+            key="email_subscription"
         )
         
         dark_mode = st.checkbox(
@@ -449,37 +706,69 @@ def show_front_end():
             'email_user': default_email,
             'language': language,
             'email_admin': admin_email,
-            'email_notifications': email_notifications,
+            'email_subscription': email_subscription,
             'dark_mode': dark_mode
         })
         
         # Update context
-        update_context(st.session_state.app_context)
+        cu.update_context(st.session_state.app_context)
         
         st.success("Settings updated successfully!")
 
-def show_back_end():
+def show_back_end(available_tables):
     st.subheader("Back-end Settings")
+    
+    # Ensure fss settings exist in the context
+    if 'fss' not in st.session_state.app_context:
+        st.session_state.app_context['fss'] = {}
+    
+    # Set default values if they don't exist
+    if 'dir_path' not in st.session_state.app_context['fss']:
+        st.session_state.app_context['fss']['dir_path'] = './data'
+    if 'file_name' not in st.session_state.app_context['fss']:
+        st.session_state.app_context['fss']['file_name'] = 'backup'
+    if 'file_type' not in st.session_state.app_context['fss']:
+        st.session_state.app_context['fss']['file_type'] = 'CSV'
+    if 'db_tables' not in st.session_state.app_context['fss']:
+        st.session_state.app_context['fss']['db_tables'] = available_tables
+    if 'db_table' not in st.session_state.app_context['fss']:
+        # Default to 'members' table if available, otherwise use the first table in the list
+        st.session_state.app_context['fss']['db_table'] = available_tables[0] if available_tables else ''
     
     # File system settings section
     with st.form("Back-end Form"):
         # Directory path input
         dir_path = st.text_input(
             "Directory Path",
-            value=st.session_state.app_context.get('fss', {}).get('dir_path', ''),
+            value=st.session_state.app_context['fss'].get('dir_path', ''),
             help="Enter the directory path where files will be saved/loaded"
         )
-        
-        # File settings in columns for better layout
-        col11, col12 = st.columns([3, 2])
+   
+        col11, col12, col13 = st.columns([2, 1, 1])
         with col11:
+            # DB table selection
+            current_table = st.session_state.app_context.get('fss', {}).get('db_table', '')
+            
+            # Find the index of current_table, default to 0 if not found
+            try:
+                table_index = available_tables.index(current_table)
+            except ValueError:
+                table_index = 0
+            
+            db_table = st.selectbox(
+                "DB Table",
+                available_tables,
+                index=table_index,
+                help="Select the database table for import/export"
+            )
+        with col12:
             # File name input
             file_name = st.text_input(
                 "File Name",
-                value=st.session_state.app_context.get('fss', {}).get('file_name', ''),
+                value=st.session_state.app_context['fss'].get('file_name', ''),
                 help="Enter the base file name (without extension)"
             )
-        with col12:
+        with col13:
             # File type selection
             file_type = st.selectbox(
                 "File Type",
@@ -488,69 +777,49 @@ def show_back_end():
                     ["JSON", "CSV"].index(st.session_state.app_context.get('fss', {}).get('file_type', 'JSON')),
                 help="Select the file format for import/export"
             )
-        if st.form_submit_button("Save Back-end Settings"):
-            update_context({
+        choice = st.radio("Pick an action", ["Export", "Import"])
+        if st.form_submit_button("Go", type="primary"):
+            cu.update_context({
                 'fss': {
                     'dir_path': dir_path,
                     'file_name': file_name,
-                    'file_type': file_type
+                    'file_type': file_type,
+                    'db_tables': available_tables,
+                    'db_table': db_table
                 }
             })
             file_path = get_file_path()
-            st.success(f"{file_path} saved successfully!")
-    
-    col21, col22 = st.columns([1, 1])
-    with col21:
-        file_path = get_file_path()
-        st.markdown("File Destination:")
-        st.markdown(f"<p style='font-size: 20px; font-weight: bold;'>{file_path}</p>", unsafe_allow_html=True)
-        if st.button("📤 Export Users", type="primary", help="Export user data to selected file format"):
-            handle_export(dbm.export_users_to_file, 
-                          dbm.db_tables['members'])
-    with col22:
-        file_path = get_file_path()
-        st.markdown("File Source:")
-        st.markdown(f"<p style='font-size: 20px; font-weight: bold;'>{file_path}</p>", unsafe_allow_html=True)
-        if st.button("📥 Import Users", type="secondary", help="Import user data from selected file"):
-            handle_import(dbm.import_users_from_file, 
-                          dbm.db_tables['members'])
-    
-    col31, col32 = st.columns([1, 1])
-    with col31:
-        file_path = get_file_path()
-        st.markdown("File Destination:")
-        st.markdown(f"<p style='font-size: 20px; font-weight: bold;'>{file_path}</p>", unsafe_allow_html=True)
-        if st.button("📤 Export Articles", type="primary", help="Export article data to selected file format"):
-            handle_export(dbm.export_relations_to_file, 
-                          dbm.db_tables['relations'])
-    with col32:
-        file_path = get_file_path()
-        st.markdown("File Source:")
-        st.markdown(f"<p style='font-size: 20px; font-weight: bold;'>{file_path}</p>", unsafe_allow_html=True)
-        if st.button("📥 Import Articles", type="secondary", help="Import article data from selected file"):
-            handle_import(dbm.import_articles_from_file, "Articles")
-       
+            if file_path and choice == "Export":
+                handle_export(dbm.export_to_file, file_path, db_table)
+            elif file_path and choice == "Import":
+                handle_import(dbm.import_from_file, file_path, db_table)
+   
 def show_padmin_content():
     """Display the main content area for platform admin"""
     
     st.title("Platform Admin Home")
-   
-    # Show database tables
-    st.header("Database Tables")
-    tables = init_db_management()
     
-    if not tables:
+    # Show database tables
+    st.header("Database Table Management")
+    available_tables = init_db_management()
+    
+    if not available_tables:
         st.info("No tables found in the database.")
         return
-    
     # Display tables in a select box
-    selected_table = st.selectbox("Select a table", tables)
+    selected_table = st.selectbox("Select a table", available_tables)
     
     if selected_table:
         # Show table structure
         st.subheader(f"Table Structure: {selected_table}")
         columns = get_table_structure(selected_table)
-        
+        cu.update_context({
+            'fss': {
+                'db_tables': available_tables,
+                'db_table': selected_table
+            }
+        })
+       
         if columns:
             # Display columns in a table
             column_data = []
@@ -565,8 +834,18 @@ def show_padmin_content():
                 column_data.append(col_info)
             st.table(column_data)
             
+            # Drop table button
+            with st.expander("Danger Zone", expanded=False):
+                st.warning("This action cannot be undone!")
+                if st.button(f"Drop Table '{selected_table}'", type="primary"):
+                    if drop_table(selected_table):
+                        st.success(f"Dropped table '{selected_table}'")
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to drop table '{selected_table}'")
+            
             # Add column form
-            with st.expander("Add Column"):
+            with st.expander("Add Column", expanded=False):
                 with st.form("add_column_form"):
                     new_col_name = st.text_input("Column Name")
                     col_type = st.selectbox(
@@ -597,7 +876,7 @@ def show_padmin_content():
                             st.error("Please enter a column name")
             
             # Drop column form
-            with st.expander("Remove Column"):
+            with st.expander("Remove Column", expanded=False):
                 if len(columns) > 1:  # Don't allow dropping the last column
                     with st.form("remove_column_form"):
                         col_to_remove = st.selectbox(
@@ -613,22 +892,13 @@ def show_padmin_content():
                                 st.error(f"Failed to remove column '{col_to_remove}'")
                 else:
                     st.warning("Cannot remove the last column from a table")
-            
-            # Drop table button
-            with st.expander("Danger Zone", expanded=False):
-                st.warning("This action cannot be undone!")
-                if st.button(f"Drop Table '{selected_table}'", type="primary"):
-                    if drop_table(selected_table):
-                        st.success(f"Dropped table '{selected_table}'")
-                        st.rerun()
-                    else:
-                        st.error(f"Failed to drop table '{selected_table}'")
+        show_back_end(available_tables)
 
 # Main application
 def main():
     """Main application entry point"""
     # Initialize session state
-    init_session_state()
+    cu.init_session_state()
     
     # Initialize admin features (adds necessary columns to user table)
     if not init_admin_features():
@@ -641,7 +911,22 @@ def main():
     else:
         # Initialize or get context
         if 'app_context' not in st.session_state:
-            st.session_state.app_context = init_context()
+            st.session_state.app_context = cu.init_context()
+        
+        # Retrieve the member_id and family_id via login-email and
+        # update the application context
+        email_user = st.session_state.get('user_email', '')
+        member = dbm.get_member_by_email(email_user)
+        if not member:
+            member = {
+            'id': 0,
+            'family_id': 0
+        }
+        cu.update_context({
+            'member_id': member['id'],
+            'family_id': member['family_id']
+        })    
+
         if st.session_state.user_state == dbm.User_State['p_admin']:
             show_padmin_sidebar()
             show_padmin_content()

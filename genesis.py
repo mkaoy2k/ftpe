@@ -1,7 +1,8 @@
 """
 Database Initialization Script
 
-This script initializes the database with required tables and creates the first admin user.
+This script initializes the database with required tables 
+and creates the first admin user.
 """
 import os
 import sqlite3
