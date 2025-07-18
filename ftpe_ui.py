@@ -158,6 +158,12 @@ def show_fadmin_sidebar():
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
+ 
+        # Logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
         st.divider()
         
         # Display current family admin users
@@ -201,12 +207,6 @@ def show_fadmin_sidebar():
                 
         except sqlite3.Error as e:
             st.error(f"❌ Error fetching subscribers: {e}")
- 
-        # Logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user_email = None
-            st.rerun()
        
 def show_padmin_sidebar():
     """Display the platform admin sidebar"""
@@ -254,6 +254,12 @@ def show_padmin_sidebar():
                             st.success(f"✅ Platform Admin User created successfully")
                         else:
                             st.error(f"❌ Failed to create Platform Admin User")
+    
+        # Logout button at the bottom
+        if st.sidebar.button("Logout", type="primary", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
             
         # Display current platform admin users
         st.sidebar.subheader("Current Platform Admin Users")
@@ -276,12 +282,6 @@ def show_padmin_sidebar():
             
         except sqlite3.Error as e:
             st.error(f"❌ Error fetching admin users: {e}")
-    
-        # Logout button at the bottom
-        if st.sidebar.button("Logout", type="primary", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user_email = None
-            st.rerun()
 
 def show_fmember_content():
     """Display the family member content area"""
@@ -293,29 +293,59 @@ def show_fmember_content():
     search_members_page()
     
     # Reset Password Management
+    reset_password_page()
+    
+def reset_password_page():
+    """
+    Display the reset password page
+    """
     st.subheader("Reset Password")
-    with st.form("member_user_form"):
-        new_password = st.text_input("New Password", type="password", key="new_password",
-                    help="Enter a password (at least 8 characters)")
-        confirm_password = st.text_input("Confirm New Password", type="password", 
-                    key="confirm_password")
-                
-        if st.form_submit_button("Reset Password"):
-            if not new_password:
-                st.error(f"❌ Please enter a password")
-            elif new_password != confirm_password:
-                st.error(f"❌ Passwords do not match")
-            elif len(new_password) < 8:
-                st.error(f"❌ Password must be at least 8 characters long")
-            else:
-                email = st.session_state.user_email
+    
+    # Initialize form state if not exists
+    if 'reset_form_submitted' not in st.session_state:
+        st.session_state.reset_form_submitted = False
+    
+    with st.form("reset_password_form"):
+        email = st.session_state.user_email
+        st.markdown(f"Email: {email}")
+        new_password = st.text_input("New Password", 
+                                  type="password", 
+                                  key="reset_new_password",
+                                  help="Enter a password (at least 8 characters)")
+        
+        confirm_password = st.text_input("Confirm New Password", 
+                                      type="password", 
+                                      key="confirm_new_password")
+        
+        submit_button = st.form_submit_button("Reset Password", type="primary")
+        
+        if submit_button:
+            st.session_state.reset_form_submitted = True
+    
+    # Handle form submission outside the form context
+    if st.session_state.reset_form_submitted:
+        if not new_password:
+            st.error("❌ Please enter a password")
+        elif len(new_password) < 8:
+            st.error("❌ Password must be at least 8 characters long")
+        elif new_password != confirm_password:
+            st.error("❌ Passwords do not match")
+        else:
+            try:
                 user_id = au.create_user(
-                    email, new_password, 
-                    role=dbm.User_State['f_member'])
+                    email, 
+                    new_password, 
+                    role=dbm.User_State['f_member']
+                )
                 if user_id:
-                    st.success(f"✅ Family Member Password Reset successfully")
+                    st.success("✅ Password has been reset successfully")
+                    st.session_state.reset_form_submitted = False
+                    # Clear the form
+                    st.rerun()
                 else:
-                    st.error(f"❌ Failed to reset Family Member Password")
+                    st.error("❌ Failed to reset password. Please try again.")
+            except Exception as e:
+                st.error(f"❌ An error occurred: {str(e)}")
 
 def search_members_page() -> None:
     """
@@ -374,7 +404,7 @@ def search_members_page() -> None:
         with row3_col3:
             sex = st.selectbox(
                 "Gender",
-                ["", "Male", "Female", "Other"]
+                ["Male", "Female", "Other"]
             )
 
         
@@ -441,7 +471,7 @@ def search_members_page() -> None:
         )
         
         # Show result count
-        st.info(f"Total: {len(df)} records")
+        st.markdown(f"### Total: {len(df)} records")
     
     # No results message
     elif submitted:
@@ -452,6 +482,9 @@ def show_fadmin_content():
     st.title("Family Admin Home")
     
     show_front_end()
+    
+    # Search Family Members
+    search_members_page()
     
     # Family User Management
     st.subheader("Family User Management")
@@ -578,6 +611,9 @@ def show_fadmin_content():
                  os.getenv("TBL_RELATIONS", "relations"),
                  os.getenv("TBL_MIRRORS", "mirrors")]
     show_back_end(available_tables)
+    
+    # Reset Password Management
+    reset_password_page()
     
 # Helper function to get full file path with extension
 def get_file_path():
@@ -893,7 +929,10 @@ def show_padmin_content():
                 else:
                     st.warning("Cannot remove the last column from a table")
         show_back_end(available_tables)
-
+    
+    # Reset Password Management
+    reset_password_page()
+    
 # Main application
 def main():
     """Main application entry point"""
