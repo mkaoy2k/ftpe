@@ -153,17 +153,75 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         logger.exception("Error in get_family_members")
         return {}
 
-def create_family_graph(family_data: Dict[str, Any]) -> gv.Digraph:
+def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: int = 15, engine: str = 'dot') -> gv.Digraph:
     """
     Create a Graphviz diagram of the family tree.
     
     Args:
         family_data: Dictionary containing family members data
+        height: Height of the graph in inches (default: 12)
+        width: Width of the graph in inches (default: 15)
+        engine: Graphviz layout engine ('dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo')
         
     Returns:
         graphviz.Digraph: The generated family tree graph
     """
-    # Create a new directed graph with improved styling
+    # Base graph attributes
+    graph_attrs = {
+        'size': f'{width},{height}!',
+        'center': 'true',
+        'margin': '0.2',
+        'pad': '0.5',
+        'dpi': '150',
+        'ratio': 'auto',
+        'splines': 'ortho' if engine in ['dot', 'neato'] else 'spline',
+        'overlap': 'false',
+        'splines': 'true',
+        'nodesep': '0.5',
+        'ranksep': '0.8',
+        'newrank': 'true',
+        'fontname': 'Arial'
+    }
+    
+    # Engine-specific adjustments
+    if engine == 'dot':
+        graph_attrs.update({
+            'rankdir': 'TB',
+            'nodesep': '0.6',
+            'ranksep': '1.0',
+            'concentrate': 'true'
+        })
+    elif engine == 'neato':
+        graph_attrs.update({
+            'mode': 'major',
+            'model': 'subset',
+            'start': '1',
+            'epsilon': '0.0001',
+            'maxiter': '1000',
+            'damping': '0.99'
+        })
+    elif engine in ['fdp', 'sfdp']:
+        graph_attrs.update({
+            'K': '1.0',
+            'maxiter': '1000',
+            'start': '1',
+            'overlap_scaling': '4',
+            'repulsiveforce': '1.0'
+        })
+    elif engine == 'twopi':
+        graph_attrs.update({
+            'ranksep': '2.0',
+            'rank': 'same',
+            'root': 'center'
+        })
+    elif engine == 'circo':
+        graph_attrs.update({
+            'mindist': '1.0',
+            'nodesep': '0.75',
+            'ranksep': '1.5'
+        })
+
+    # Create the graph with the specified engine and attributes
     graph = gv.Digraph(
         'family_tree',
         node_attr={
@@ -171,12 +229,13 @@ def create_family_graph(family_data: Dict[str, Any]) -> gv.Digraph:
             'style': 'rounded,filled',
             'fillcolor': 'white',
             'fontname': 'Arial',
-            'fontsize': '10',
-            'margin': '0.1,0.1',
-            'width': '1.5',
-            'height': '0.3',
+            'fontsize': '14',
+            'margin': '0.15,0.2',
+            'width': '2.5',
+            'height': '0.8',
             'penwidth': '1.0',
-            'color': 'black'
+            'color': 'black',
+            'fixedsize': 'true'
         },
         edge_attr={
             'arrowhead': 'normal',
@@ -185,16 +244,10 @@ def create_family_graph(family_data: Dict[str, Any]) -> gv.Digraph:
             'color': '#333333',
             'constraint': 'true'
         },
-        graph_attr={
-            'rankdir': 'TB',
-            'splines': 'ortho',
-            'nodesep': '0.5',
-            'ranksep': '0.8',
-            'newrank': 'true'
-        },
-        engine='dot'
+        graph_attr=graph_attrs,
+        format='svg',
+        engine=engine
     )
-    
     # Define node attributes
     def get_node_style(member: Dict[str, Any]) -> Dict[str, str]:
         """Get node style based on member attributes."""
@@ -258,10 +311,10 @@ def create_family_graph(family_data: Dict[str, Any]) -> gv.Digraph:
                     death_year = datetime.strptime(died, '%Y-%m-%d').year
                 else:  # Handle YYYY format
                     death_year = int(died)
-                label += f" - †{death_year}"
+                label += f"\n†{death_year}"
             except (ValueError, TypeError):
                 # If parsing fails, just use the raw value
-                label += f" - †{died}"
+                label += f"\n†{died}"
         label += f" ({generation})"
         
         # Add node with attributes
@@ -414,6 +467,34 @@ def main():
             help="Enter the ID of the family member to center the tree on"
         )
         
+        # Add graph configuration options
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            graph_height = st.slider(
+                "Graph Height (inches):",
+                min_value=1,
+                max_value=30,
+                value=12,
+                step=1,
+                help="Adjust the height of the family tree graph"
+            )
+        with col2:
+            graph_width = st.slider(
+                "Graph Width (inches):",
+                min_value=1,
+                max_value=30,
+                value=15,
+                step=1,
+                help="Adjust the width of the family tree graph"
+            )
+        with col3:
+            graph_engine = st.selectbox(
+                "Layout Engine:",
+                options=['dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo'],
+                index=0,
+                help="Choose the layout engine for the graph"
+            )
+        
         submitted = st.form_submit_button("Generate Family Tree", type="primary")
     
     if submitted:
@@ -437,10 +518,59 @@ def main():
                 with tree_container:
                     st.success("✅ Successfully generated family tree!")
                     
-                    # Create and display the graph
+                    # Create and display the graph with user-specified settings
                     try:
-                        graph = create_family_graph(family_data)
-                        st.graphviz_chart(graph, use_container_width=True)
+                        graph = create_family_graph(
+                            family_data, 
+                            height=graph_height, 
+                            width=graph_width,
+                            engine=graph_engine
+                        )
+                        
+                        # Create a scrollable container for the graph
+                        graph_svg = graph.pipe(format='svg').decode('utf-8')
+                        
+                        # Add CSS for the scrollable container
+                        st.markdown("""
+                        <style>
+                        .graph-container {
+                            width: 100%;
+                            max-height: 800px;
+                            overflow: auto;
+                            border: 1px solid #e0e0e0;
+                            border-radius: 0.5rem;
+                            padding: 1rem;
+                            background-color: white;
+                            margin: 1rem 0;
+                        }
+                        .graph-container svg {
+                            min-width: 100%;
+                            min-height: 100%;
+                        }
+                        /* Custom scrollbar */
+                        .graph-container::-webkit-scrollbar {
+                            width: 10px;
+                            height: 10px;
+                        }
+                        .graph-container::-webkit-scrollbar-track {
+                            background: #f1f1f1;
+                            border-radius: 5px;
+                        }
+                        .graph-container::-webkit-scrollbar-thumb {
+                            background: #888;
+                            border-radius: 5px;
+                        }
+                        .graph-container::-webkit-scrollbar-thumb:hover {
+                            background: #555;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                        
+                        # Display the graph in the scrollable container
+                        st.markdown(
+                            f'<div class="graph-container">{graph_svg}</div>',
+                            unsafe_allow_html=True
+                        )
                     except Exception as e:
                         st.error(f"❌ Failed to generate family tree visualization: {str(e)}")
                         logger.exception("Error generating graph")
