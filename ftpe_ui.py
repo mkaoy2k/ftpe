@@ -11,7 +11,6 @@ import email_utils as eu
 import auth_utils as au
 import funcUtils as fu
 import pandas as pd
-import datetime as dt
 
 # Import database operations
 from ops_dbMgmt import init_db_management, init_admin_features, get_table_structure, drop_table
@@ -91,7 +90,7 @@ def show_fmember_sidebar():
     with st.sidebar:
         st.sidebar.title("Family Member Sidebar")
         
-        # Show current user info
+        # Display current login email
         if 'user_email' in st.session_state and st.session_state.user_email:
             st.markdown(
                 f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
@@ -103,13 +102,12 @@ def show_fmember_sidebar():
                 'email_user': st.session_state.user_email
             })
         
-        # Only show the following page options
+        # Display navigation options
         st.sidebar.subheader("Navigation")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
-        st.divider()
         
-        # Logout button at the bottom
+        # Display Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
@@ -164,7 +162,6 @@ def show_fadmin_sidebar():
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
-        st.divider()
         
         # Display current family admin users
         st.sidebar.subheader("Current Family Admin Users")
@@ -179,14 +176,20 @@ def show_fadmin_sidebar():
                         }
                         for admin in admins
                 ]
-                
-                st.table(admin_list)
+                # Convert to DataFrame to handle index properly
+                df = pd.DataFrame(admin_list)
+                st.dataframe(
+                    df,
+                    use_container_width=False,
+                    hide_index=True  # Explicitly hide the index
+                )  
             else:
                 st.info(f"No admin users found")
             
         except sqlite3.Error as e:
             st.error(f"❌ Error fetching admin users: {e}") 
         st.divider()
+
         # Display current family subscribers
         st.sidebar.subheader("Current Family Subscribers")
         try:
@@ -200,8 +203,13 @@ def show_fadmin_sidebar():
                         }
                         for sub in subscribers
                 ]
-                
-                st.table(sub_list)
+                 # Convert to DataFrame to handle index properly
+                df = pd.DataFrame(sub_list)
+                st.dataframe(
+                    df,
+                    use_container_width=False,
+                    hide_index=True  # Explicitly hide the index
+                )
             else:
                 st.info(f"No subscribers found")
                 
@@ -213,7 +221,7 @@ def show_padmin_sidebar():
     with st.sidebar:
         st.sidebar.title("Platform Admin Sidebar")
         
-        # Show current user info
+        # Display current login email
         if 'user_email' in st.session_state and st.session_state.user_email:
             st.markdown(
                 f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
@@ -225,7 +233,7 @@ def show_padmin_sidebar():
                 'email_user': st.session_state.user_email
             })
         
-        # Sidebar - Platform Admin User Management
+        # Display current platform admin info
         st.sidebar.subheader("Platform Admin User Management")
         with st.expander("Create/Update Platform Admin User", expanded=False):
             with st.form("admin_user_form"):
@@ -255,28 +263,34 @@ def show_padmin_sidebar():
                         else:
                             st.error(f"❌ Failed to create Platform Admin User")
     
-        # Logout button at the bottom
+        # Display Logout button at the bottom
         if st.sidebar.button("Logout", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
-            
+
         # Display current platform admin users
         st.sidebar.subheader("Current Platform Admin Users")
         try:
             admins = dbm.get_users(role=dbm.User_State['p_admin'])
                 
             if admins:
-                admin_list = [
-                        {
-                            "Email": admin['email'],
-                            "Created": fu.format_timestamp(admin['created_at']),
-                            "Last Updated": fu.format_timestamp(admin['updated_at'])
-                        }
-                        for admin in admins
-                    ]
-                    
-                st.table(admin_list)
+                admin_data = [
+                    {
+                        "Email": admin['email'],
+                        "Created": fu.format_timestamp(admin['created_at']),
+                        "Last Updated": fu.format_timestamp(admin['updated_at'])
+                    }
+                    for admin in admins
+                ]
+                
+                # Convert to DataFrame to handle index properly
+                df = pd.DataFrame(admin_data)
+                st.dataframe(
+                    df,
+                    use_container_width=False,
+                    hide_index=True  # Explicitly hide the index
+                )
             else:
                 st.info(f"No admin users found")
             

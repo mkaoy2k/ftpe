@@ -344,7 +344,7 @@ def remove_subscriber(email: str) -> bool:
                 
             # If already inactive, no need to update
             if result['is_active'] == Subscriber_State['inactive']:
-                log.info(f"Email already unsubscribed: {email}")
+                log.debug(f"Email already unsubscribed: {email}")
                 return True
                 
             # Update status to inactive
@@ -357,7 +357,7 @@ def remove_subscriber(email: str) -> bool:
             conn.commit()
             
             if cursor.rowcount > 0:
-                log.info(f"Successfully unsubscribed: {email}")
+                log.debug(f"Successfully unsubscribed: {email}")
                 return True
             
             log.warning(f"No records updated when unsubscribing: {email}")
@@ -399,7 +399,7 @@ def verify_token(email: str, token: str) -> bool:
             
             result = cursor.fetchone() is not None
             if result:
-                log.info(f"Token verified for email: {email}")
+                log.debug(f"Token verified for email: {email}")
             else:
                 log.warning(f"Token verification failed for email: {email}")
                 
@@ -469,11 +469,11 @@ def get_subscribers(state: str = 'active', lang: str = None) -> List[Dict[str, A
             cursor.execute(query, params)
             # if no subscribers found, return empty list
             if cursor.rowcount == 0:
-                log.info(f"No subscribers found with state='{state}'" + 
+                log.debug(f"No subscribers found with state='{state}'" + 
                         (f" and language='{lang}'" if lang else ""))
                 return []
             subscribers = [dict(row) for row in cursor.fetchall()]
-            log.info(f"Fetched {len(subscribers)} subscribers with state='{state}'" + 
+            log.debug(f"Fetched {len(subscribers)} subscribers with state='{state}'" + 
                     (f" and language='{lang}'" if lang else ""))
             return subscribers
             
@@ -599,7 +599,7 @@ def delete_subscriber(email: str) -> bool:
             conn.commit()
             
             if rows_affected > 0:
-                log.info(f"Successfully deleted subscriber: {email} (ID: {user_id})")
+                log.debug(f"Successfully deleted subscriber: {email} (ID: {user_id})")
                 return True
                 
             log.warning(f"No rows affected when deleting subscriber: {email}")
@@ -683,7 +683,7 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 cursor.execute(query, params)
                 conn.commit()
                 
-                log.info(f"User updated successfully: {email}")
+                log.debug(f"User updated successfully: {email}")
                 return True, ""
                 
             else:
@@ -715,7 +715,7 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 ))
                 
                 conn.commit()
-                log.info(f"Successfully added user: {email}")
+                log.debug(f"Successfully added user: {email}")
                 return True, ""
                 
     except sqlite3.IntegrityError as e:
@@ -831,7 +831,7 @@ def delete_user(user_id: int) -> bool:
             conn.commit()
             
             if rows_affected > 0:
-                log.info(f"Successfully deleted user: {user_email} (ID: {user_id})")
+                log.debug(f"Successfully deleted user: {user_email} (ID: {user_id})")
                 return True
             
             log.warning(f"No rows affected when deleting user ID: {user_id}")
@@ -917,7 +917,7 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
                         params.append(value)
                 
                 if not update_fields:
-                    log.info("No fields to update for existing member")
+                    log.debug("No fields to update for existing member")
                     return member_id
                 
                 # Add updated_at timestamp
@@ -1083,7 +1083,7 @@ def add_related_member(
                 if not member_id:
                     raise ValueError("Failed to add new member")
                 
-                log.info(f"Added new member with ID: {member_id}")
+                log.debug(f"Added new member with ID: {member_id}")
                 
                 # 2. Create the relationship
                 cursor.execute(f"""
@@ -1099,7 +1099,7 @@ def add_related_member(
                 ))
                 
                 relation_id = cursor.lastrowid
-                log.info(f"Created relationship {relation_id} between members {member_id} and {partner_id}")
+                log.debug(f"Created relationship {relation_id} between members {member_id} and {partner_id}")
                 
                 # 3. Update original family ID and/or name if provided
                 update_fields = []
@@ -1271,7 +1271,7 @@ def update_related_member(
             
         # Commit the transaction
         conn.commit()
-        log.info(f"Successfully updated relationship ID {relation_id}")
+        log.debug(f"Successfully updated relationship ID {relation_id}")
         
         return True
         
@@ -1455,7 +1455,7 @@ def get_member(member_id: int) -> Optional[Dict[str, Any]]:
                 log.debug(f"Retrieved member ID {member_id}: {member_data.get('name')}")
                 return member_data
                 
-            log.info(f"No member found with ID: {member_id}")
+            log.debug(f"No member found with ID: {member_id}")
             return None
             
     except sqlite3.Error as e:
@@ -1519,7 +1519,7 @@ def get_family(family_id: int) -> Optional[Dict[str, Any]]:
                 log.debug(f"Retrieved family ID {family_id}: {family_data.get('family_name')}")
                 return family_data
                 
-            log.info(f"No family found with ID: {family_id}")
+            log.debug(f"No family found with ID: {family_id}")
             return None
             
     except sqlite3.Error as e:
@@ -1528,6 +1528,141 @@ def get_family(family_id: int) -> Optional[Dict[str, Any]]:
         raise
     except Exception as e:
         error_msg = f"Unexpected error fetching family ID {family_id}: {str(e)}"
+        log.error(error_msg)
+        raise
+
+def get_families_by_name(name):
+    """
+    Retrieve a family record given by name-like family records.
+    
+    This function fetches all available information for a specific 
+    family record from the `families` table.
+    
+    Args:
+        name: The name-like string to search for 
+        in the `families` table.
+        
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing 
+        the family's records if found, 
+        empty list if no family exists with the similar name-like string. 
+        Each dictionary includes all the fields from the 
+        `families` table.
+            
+    Raises:
+        ValueError: If name is not a string
+        sqlite3.Error: If a database error occurs
+        
+    Example:
+        >>> families = get_families_by_name("Smith")
+        >>> if families:
+        ...     for family in families:
+        ...         print(f"Found family: {family['name']}")
+        ... else:
+        ...     print("No matching families found")
+    """
+    if not isinstance(name, str):
+        raise ValueError("Name must be a string")
+    
+    if not name.strip():
+        return []
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Use LIKE with wildcards for partial matching and case-insensitive search
+        query = f"""
+            SELECT * FROM {db_tables['families']}
+            WHERE LOWER(name) LIKE LOWER(?)
+            ORDER BY id ASC
+        """
+        
+        cursor.execute(query, (f'%{name}%',))
+        
+        # Get column names from cursor description
+        columns = [col[0] for col in cursor.description]
+        
+        # Convert results to list of dictionaries
+        families = []
+        for row in cursor.fetchall():
+            families.append(dict(zip(columns, row)))
+            
+        return families
+        
+    except sqlite3.Error as e:
+        error_msg = f"❌ Database error in get_families_by_name: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"❌ Unexpected error in get_families_by_name: {str(e)}"
+        log.error(error_msg)
+        raise
+    
+def get_families_by_background(background: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve family records that match the given background search text.
+    
+    This function performs a case-insensitive partial match search on the 
+    background field of the families table.
+    
+    Args:
+        background: The text to search for in the background field
+        
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing 
+        the family records if found, 
+        empty list if no family exists with matching background text. 
+        Each dictionary includes all the fields from the 
+        `families` table.
+            
+    Raises:
+        ValueError: If background is not a string
+        sqlite3.Error: If a database error occurs
+        
+    Example:
+        >>> families = get_families_by_background("merchant")
+        >>> if families:
+        ...     for family in families:
+        ...         print(f"Found family: {family['name']} (ID: {family['id']})")
+        ... else:
+        ...     print("No matching families found")
+    """
+    if not isinstance(background, str):
+        raise ValueError("Background must be a string")
+    
+    if not background.strip():
+        return []
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Use LIKE with wildcards for partial matching and case-insensitive search
+        query = f"""
+            SELECT * FROM {db_tables['families']}
+            WHERE LOWER(background) LIKE LOWER(?)
+            ORDER BY id ASC
+        """
+        
+        cursor.execute(query, (f'%{background}%',))
+        
+        # Get column names from cursor description
+        columns = [col[0] for col in cursor.description]
+        
+        # Convert results to list of dictionaries
+        families = []
+        for row in cursor.fetchall():
+            families.append(dict(zip(columns, row)))
+            
+        return families
+        
+    except sqlite3.Error as e:
+        error_msg = f"❌ Database error in get_families_by_background: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"❌ Unexpected error in get_families_by_background: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1559,8 +1694,8 @@ def get_relation(relation_id: int) -> Optional[Dict[str, Any]]:
         ...     print("Relation not found")
     """
     # Validate input
-    if not isinstance(relation_id, int) or relation_id <= 0:
-        error_msg = f"Invalid relation ID: {relation_id}. Must be a positive integer."
+    if not isinstance(relation_id, int) or relation_id < 0:
+        error_msg = f"Invalid ID to search for relation_id: {relation_id}. Must be a positive integer."
         log.error(error_msg)
         raise ValueError(error_msg)
     
@@ -1575,27 +1710,229 @@ def get_relation(relation_id: int) -> Optional[Dict[str, Any]]:
                 LIMIT 1
             """, (relation_id,))
             
-            # Fetch the result and convert to dictionary if found
+            # Fetch the first result and convert to dictionary if found
             result = cursor.fetchone()
             
             if result:
-                relation_data = dict(result)
-                log.debug(f"Retrieved relation ID {relation_id}: "
-                         f"{relation_data.get('member1_id')} <-> {relation_data.get('member2_id')}")
+                # Get column names from cursor description
+                columns = [col[0] for col in cursor.description]
+                relation_data = dict(zip(columns, result))
+                log.debug(f"Retrieved relation for relation_id {relation_id}")
                 return relation_data
                 
-            log.info(f"No relation found with ID: {relation_id}")
+            log.debug(f"No relation found with relation_id {relation_id}")
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching relation ID {relation_id}: {str(e)}"
+        error_msg = f"Database error fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching relation ID {relation_id}: {str(e)}"
+        error_msg = f"Unexpected error fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
 
+def get_relations_by_id(member_id: int
+) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve a relation record given by ID that either member_id 
+    or partner_id matches.
+    
+    This function fetches all available information for a specific 
+    relation record from the `relations` table.
+    
+    Args:
+        member_id: The unique identifier of the relation to retrieve 
+        (must be a positive integer)
+        
+    Returns:
+        Optional[Dict[str, Any]]: A dictionary containing the relation's data if found, 
+        None if no relation exists with the given ID. 
+        The dictionary includes all the fields from the relations table.
+            
+    Raises:
+        ValueError: If member_id is not a positive integer
+        sqlite3.Error: If a database error occurs
+        
+    Example:
+        >>> member_id = 123
+        >>> relations = get_relations_by_id(member_id)
+        >>> if relations:
+        ...     print(f"Found relation either member id is {member_id} or partner id is {member_id}")
+        ... else:
+        ...     print("Relation not found")
+    """
+    # Validate input
+    if not isinstance(member_id, int) or member_id < 0:
+        error_msg = f"Invalid ID to search for member_id or partner_id: {member_id}. Must be a positive integer."
+        log.error(error_msg)
+        raise ValueError(error_msg)
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Query the database for the relation
+            cursor.execute(f"""
+                SELECT * FROM {db_tables['relations']}
+                WHERE member_id = ? or partner_id = ?
+            """, (member_id, member_id))
+            
+            # Get column names from cursor description
+            columns = [col[0] for col in cursor.description]
+            
+            # Fetch all results and convert to list of dictionaries
+            results = cursor.fetchall()
+            
+            # Convert results to list of dictionaries
+            relations = []
+            for row in results:
+                relations.append(dict(zip(columns, row)))
+            
+            return relations
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        log.error(error_msg)
+        raise
+
+def get_relations_by_relation(relation_type: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve relation records that match the given relation type.
+    
+    This function searches the relations table for records where the relation
+    matches the specified relation type.
+    
+    Args:
+        relation_type (str): The relation type to search for in the relation field
+        
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing 
+        the relation records if found, 
+        empty list if no relation exists with matching relation type. 
+        Each dictionary includes all the fields from the 
+        `relations` table.
+            
+    Raises:
+        ValueError: If relation_type is not a string
+        sqlite3.Error: If a database error occurs
+        
+    Example:
+        >>> relations = get_relation_by_relation("spouse")
+        >>> if relations:
+        ...     for relation in relations:
+        ...         print(f"Found relation between member {relation['member_id']} and {relation['partner_id']}")
+        ... else:
+        ...     print("No matching relations found")
+    """
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Use LIKE with wildcards for partial matching and case-insensitive search
+        query = f"""
+            SELECT * FROM {db_tables['relations']}
+            WHERE LOWER(relation) LIKE LOWER(?)
+            ORDER BY id ASC
+        """
+        
+        cursor.execute(query, (f'%{relation_type}%',))
+        
+        # Get column names from cursor description
+        columns = [col[0] for col in cursor.description]
+        
+        # Convert results to list of dictionaries
+        relations = []
+        for row in cursor.fetchall():
+            relations.append(dict(zip(columns, row)))
+            
+        return relations
+        
+    except sqlite3.Error as e:
+        error_msg = f"❌ Database error in get_relation_by_relation: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"❌ Unexpected error in get_relation_by_relation: {str(e)}"
+        log.error(error_msg)
+        raise
+    
+def get_relations_by_join_between(from_date: str, to_date: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve relation records that match the given join date range.
+    
+    This function searches the relations table for records where the join_date
+    falls within the specified date range (inclusive).
+    
+    Args:
+        from_date: The start date to search for in the join_date field (YYYY-MM-DD format)
+        to_date: The end date to search for in the join_date field (YYYY-MM-DD format)
+        
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing 
+        the relation records if found, 
+        empty list if no relation exists with matching join date range. 
+        Each dictionary includes all the fields from the 
+        `relations` table.
+            
+    Raises:
+        ValueError: If from_date or to_date is not a valid date string in YYYY-MM-DD format
+        sqlite3.Error: If a database error occurs
+        
+    Example:
+        >>> relations = get_relations_by_join_between("2020-01-01", "2020-12-31")
+        >>> if relations:
+        ...     for relation in relations:
+        ...         print(f"Found relation between member {relation['member_id']} and {relation['partner_id']}")
+        ... else:
+        ...     print("No matching relations found")
+    """
+    # Validate input parameters
+    if not isinstance(from_date, str) or not isinstance(to_date, str):
+        raise ValueError("Both from_date and to_date must be strings")
+        
+    # Ensure dates are in YYYY-MM-DD format
+    date_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+    if not date_pattern.match(from_date) or not date_pattern.match(to_date):
+        raise ValueError("Dates must be in YYYY-MM-DD format")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Query to find relations with join_date between from_date and to_date (inclusive)
+        query = f"""
+            SELECT * FROM {db_tables['relations']}
+            WHERE join_date >= ? AND join_date <= ?
+            ORDER BY join_date, id
+        """
+        
+        cursor.execute(query, (from_date, to_date))
+        
+        # Get column names from cursor description
+        columns = [col[0] for col in cursor.description]
+        
+        # Convert results to list of dictionaries
+        relations = []
+        for row in cursor.fetchall():
+            relations.append(dict(zip(columns, row)))
+            
+        return relations
+        
+    except sqlite3.Error as e:
+        error_msg = f"❌ Database error in get_relations_by_join_between: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"❌ Unexpected error in get_relations_by_join_between: {str(e)}"
+        log.error(error_msg)
+        raise
+    
 def update_member(member_id: int, update_data: Dict[str, Any]) -> bool:
     """
     Update an existing member's information in the database.
@@ -1672,7 +2009,7 @@ def update_member(member_id: int, update_data: Dict[str, Any]) -> bool:
             conn.commit()
             
             if rows_affected > 0:
-                log.info(f"Successfully updated member ID {member_id}. Fields updated: {', '.join(filtered_updates.keys())}")
+                log.debug(f"Successfully updated member ID {member_id}. Fields updated: {', '.join(filtered_updates.keys())}")
                 return True
             else:
                 log.warning(f"No member found with ID {member_id} to update")
@@ -1749,7 +2086,7 @@ def delete_member(member_id: int) -> bool:
             conn.commit()
             
             if rows_affected > 0:
-                log.info(f"Successfully deleted member ID {member_id} (Name: {member_name})")
+                log.debug(f"Successfully deleted member ID {member_id} (Name: {member_name})")
                 return True
             else:
                 log.warning(f"No member found with ID {member_id} to delete")
@@ -1981,7 +2318,7 @@ def search_members(
             
             # Convert results to list of dictionaries
             results = [dict(row) for row in cursor.fetchall()]
-            log.info(f"Found {len(results)} members matching search criteria")
+            log.debug(f"Found {len(results)} members matching search criteria")
             
             return results
             
@@ -2161,7 +2498,7 @@ def update_member_when_joined(
         # Add the new member to the members table
         try:
             spouse_id = add_or_update_member(spouse_data)
-            log.info(f"Added new member with ID {spouse_id} for relationship with member {member_id}")
+            log.debug(f"Added new member with ID {spouse_id} for relationship with member {member_id}")
             
             # Create relationship in the relations table
             cursor.execute(f"""
@@ -2185,7 +2522,7 @@ def update_member_when_joined(
             ))
             
             relation_id = cursor.lastrowid
-            log.info(f"Created relationship {relation_id} between member {member_id} and {spouse_id}")
+            log.debug(f"Created relationship {relation_id} between member {member_id} and {spouse_id}")
             
             # Commit the transaction
             conn.commit()
@@ -2313,7 +2650,7 @@ def update_member_when_ended(
         if updated_count == 0:
             log.warning(f"No active relationship found between member {member1_id} and {member2_id}")
         else:
-            log.info(f"Updated relationship between member {member1_id} and {member2_id} with end date {end_date}")
+            log.debug(f"Updated relationship between member {member1_id} and {member2_id} with end date {end_date}")
         
         # Commit the transaction
         conn.commit()
@@ -2410,7 +2747,7 @@ def update_member_when_died(
         
         # Commit the transaction
         conn.commit()
-        log.info(f"Marked member {member_id} as deceased on {died_date}. "
+        log.debug(f"Marked member {member_id} as deceased on {died_date}. "
                 f"Updated {updated_relations} relationships.")
         
         return updated_members, updated_relations
@@ -2585,7 +2922,7 @@ def add_or_update_relation(
                         params.append(relation_data[field])
                 
                 if not update_fields:
-                    log.info("No fields to update")
+                    log.debug("No fields to update")
                     return relation_id
                 
                 # Add updated_at timestamp
@@ -2690,7 +3027,7 @@ def get_families() -> List[Dict[str, Any]]:
             cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT * FROM {db_tables['families']}
-                ORDER BY name, id
+                ORDER BY id
             """)
             
             # Get column names from cursor description
@@ -2718,7 +3055,7 @@ def add_or_update_family(
     update: bool = False
 ) -> int:
     """
-    Add or update family data to the database.
+    Add or update family data to the `families` table.
     
     This function will insert a new family record into the families table.
     If update is True and a family with the same name already exists, it will update the existing record.
@@ -2740,8 +3077,8 @@ def add_or_update_family(
         
     Example:
         >>> family_data = {
-        ...     'name': '張家',
-        ...     'background': '來自台灣的張氏家族',
+        ...     'name': 'Zhang Family',
+        ...     'background': 'Zhang family from Taiwan',
         ...     'url': 'http://example.com/zhang-family'
         ... }
         >>> family_id = add_or_update_family(family_data, True)
@@ -2763,28 +3100,27 @@ def add_or_update_family(
             existing_family = cursor.fetchone()
             
             if existing_family and update:
-                # 更新現有家族
+                # Update existing family
                 family_id = existing_family['id']
                 update_fields = []
                 params = []
                 
-                # 建立更新欄位清單 - 包含所有提供的欄位
+                # Create update field list - include all provided fields
                 for field, value in family_data.items():
-                    if field != 'name' and value is not None:  # 跳過 name 欄位，因為我們用它來識別
-                        update_fields.append(f"{field} = ?")
-                        params.append(value)
+                    update_fields.append(f"{field} = ?")
+                    params.append(value)
                 
                 if not update_fields:
-                    log.info("沒有需要更新的欄位")
+                    log.debug("No fields need to be updated")
                     return family_id
                 
-                # 加入 updated_at 時間戳記
+                # Add updated_at timestamp
                 update_fields.append("updated_at = datetime('now')")
                 
-                # 加入 family_id 到參數中給 WHERE 子句使用
+                # Add family_id to parameters for WHERE clause
                 params.append(family_id)
                 
-                # 建立並執行更新查詢
+                # Create and execute update query
                 update_sql = f"""
                     UPDATE {db_tables['families']}
                     SET {', '.join(update_fields)}
@@ -2794,7 +3130,7 @@ def add_or_update_family(
                 cursor.execute(update_sql, params)
                 conn.commit()
                 
-                log.debug(f"已更新現有家族 ID {family_id}: {family_data.get('name')}")
+                log.debug(f"Updated family ID {family_id}: {family_data.get('name')}")
                 return family_id
             
             elif existing_family and not update:

@@ -4,6 +4,7 @@ Family Management Page
 This module provides a Streamlit interface for managing family members including
 searching, adding, updating, and deleting member information.
 """
+import os
 import context_utils as cu
 import auth_utils as au
 import streamlit as st
@@ -22,6 +23,7 @@ import pandas as pd
 from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 import funcUtils as fu
+from email_utils import Config, EmailPublisher
 
 # Constants for UI text
 UI_TEXTS = {
@@ -31,6 +33,10 @@ UI_TEXTS = {
         "name": "Name",
         "alias": "Alias",
         "family_id": "Family ID",
+        "family_id_prompt": "Family ID",
+        "family_name_prompt": "Family Name",
+        "background_prompt": "Background contains",
+        "url_prompt": "Website URL",
         "generation": "Generation",
         "birth_date": "Birth Date",
         "birth_date_placeholder": "YYYY or YYYY-MM or YYYY-MM-DD",
@@ -40,7 +46,8 @@ UI_TEXTS = {
         "searching": "Searching...",
         "results_title": "Search Results",
         "no_results": "No matching members found",
-        "results_count": "Found {count} records"
+        "results_count": "Found {count} records",
+        "error_required": "Please enter at least one search criteria"
     },
     "add": {
         "title": "Add Family Member",
@@ -65,23 +72,50 @@ UI_TEXTS = {
     "update": {
         "title": "Update Family Member",
         "member_id_prompt": "Enter Member ID to update",
-        "not_found": "Member not found",
+        "family_id_prompt": "Enter Family ID to update",
+        "family_name_prompt": "Enter Family Name to update",
+        "url_prompt": "Enter Website URL to update",
+        "background_prompt": "Enter Background to update",
+        "relation_id_prompt": "Enter Relation ID to update",
+        "relation_type_prompt": "Relation Type",
+        "join_date_prompt": "Start Date",
+        "partner_id_prompt": "Partner ID",
+        "original_family_id_prompt": "Original Family ID",
+        "end_date_prompt": "End Date (optional)",
+        "original_name_prompt": "Original Name (if different)",
+        "dad_name_prompt": "Father's Name (if applicable)",
+        "mom_name_prompt": "Mother's Name (if applicable)",
+        "not_found": "Record not found",
         "form_title": "Update Member: {name} (ID: {id})",
         "submit_button": "Update Information",
         "success": "Member information updated successfully!",
         "no_changes": "No changes were made (data was not modified)",
-        "nothing_to_update": "No changes to update"
+        "nothing_to_update": "No changes to update",
+        "error": "Error updating member: {error}",
+        "error_required": "Please fill in all required fields (marked with *)",
+        "error_generic": "Error updating member: {error}"
     },
     "delete": {
         "title": "Delete Family Member",
         "member_id_prompt": "Enter Member ID to delete",
-        "not_found": "Member not found",
+        "not_found": "Record not found",
         "warning": "This action cannot be undone!",
         "confirm_title": "The following member will be deleted:",
         "confirm_checkbox": "I confirm that I want to delete this member",
         "confirm_button": "Confirm Deletion",
         "success": "Successfully deleted member: {name}",
-        "error": "Error deleting member"
+        "error": "Error deleting member",
+        "error_required": "Please fill in all required fields (marked with *)",
+        "error_generic": "Error deleting member: {error}"
+    },
+    "birthday": {
+        "not_found": "No members found for the selected month",
+        "saved": "Birthday list saved successfully!",
+        "error": "Error saving birthday list",
+        "downloaded": "Birthday list downloaded successfully!",
+        "error_download": "Error downloading birthday list",
+        "published": "Birthday list published successfully!",
+        "error_publish": "Error publishing birthday list"
     }
 }
 
@@ -104,63 +138,65 @@ def search_families_page() -> None:
         row2_col1, row2_col2 = st.columns(2)
         
         with row1_col1:
-            name = st.text_input("Family Name")
+            name = st.text_input(UI_TEXTS["search"]["family_name_prompt"])
         
         with row1_col2:
             family_id = st.number_input(
-                "Family ID",
-                min_value=1,
-                value=1,
-                step=1
+                UI_TEXTS["search"]["family_id_prompt"],
+                min_value=0,
+                value=0,
+                step=1,
+                key="search_family_id"
             )
             
         with row2_col1:
-            background = st.text_area("background contains")
+            background = st.text_area(UI_TEXTS["search"]["background_prompt"])
             
         with row2_col2:
-            url = st.text_input("website url")
+            url = st.text_input(UI_TEXTS["search"]["url_prompt"])
         
         # add a search button
         submitted = st.form_submit_button("search")
     
     # process search when form is submitted
     if submitted:
-        with st.spinner("searching..."):
-            # get all families (since we don't have a search_families function yet)
-            all_families = dbm.get_families()
+        # Validate required fields
+        name = name.strip()
+        background = background.strip()
+        if not name and not family_id and not background and not url:
+            st.error(f"❌ {UI_TEXTS['search']['error_required']}")
+            return
             
-            # filter based on search criteria
-            results = []
-            for family in all_families:
-                # skip if name doesn't match
-                if name and name.lower() not in family.get('name', '').lower():
-                    continue
-                    
-                # skip if family_id doesn't match
-                if family_id and str(family_id) != str(family.get('id', '')):
-                    continue
-                    
-                # skip if background doesn't contain the search term
-                if (background and 
-                    background.lower() not in family.get('background', '').lower()):
-                    continue
-                    
-                # skip if url doesn't contain the search term
-                if (url and 
-                    url.lower() not in family.get('url', '').lower()):
-                    continue
-                    
-                results.append(family)
+        with st.spinner(UI_TEXTS["search"]["searching"]):
+            # if family_id is not 0, search by family_id
+            if family_id > 0:
+                # Get family by ID
+                family = dbm.get_familiy(family_id)
+                if family:
+                    st.session_state.family_search_results = [family]
+                else:
+                    st.session_state.family_search_results = []
+            elif name:
+                # Get families by name-like
+                results = dbm.get_families_by_name(name)
+                if results:
+                    st.session_state.family_search_results = results
+                else:
+                    st.session_state.family_search_results = []
+            else:
+                # Get families by background
+                results = dbm.get_families_by_background(background)
+                if results:
+                    st.session_state.family_search_results = results
+                else:
+                    st.session_state.family_search_results = []
             
-            # store results in session state
-            st.session_state.family_search_results = results
-    
     # display search results if available
     if st.session_state.family_search_results:
         st.subheader("search results")
         
         # convert results to dataframe for better display
-        df = pd.dataframe(st.session_state.family_search_results)
+        df = pd.DataFrame(st.session_state.family_search_results)
         
         # rename columns for better display
         if not df.empty:
@@ -176,11 +212,11 @@ def search_families_page() -> None:
                 df,
                 column_config={
                     'id': 'ID',
-                    'name': '家族名稱',
-                    'background': '背景',
-                    'url': '網站',
-                    'created_at': '建立時間',
-                    'updated_at': '更新時間'
+                    'name': 'Family Name',
+                    'background': 'Background',
+                    'url': 'Website',
+                    'created_at': 'Created At',
+                    'updated_at': 'Updated At'
                 },
                 hide_index=True,
                 use_container_width=True,
@@ -223,7 +259,7 @@ def add_family_page() -> None:
         if submitted:
             # Validate required fields
             if not name:
-                st.error("Family name is required")
+                st.error(f"{UI_TEXTS["add"]["error_required"]} {UI_TEXTS["add"]["name"]}")
                 return
                 
             try:
@@ -236,30 +272,32 @@ def add_family_page() -> None:
                 
                 # Add family to database
                 family_id = dbm.add_or_update_family(
-                    family_data, update=False)
+                    family_data, 
+                    update=False)
                 
                 if family_id:
-                    st.success(f"✅ Successfully added family: {name} (ID: {family_id})")
+                    st.success(f"✅ {UI_TEXTS["add"]["success"]} {name} (ID: {family_id})")
                     
                     # Clear form
                     st.rerun()
                 else:
-                    st.error(f"❌Failed to add family. Please try again.")
+                    st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str("Failed to add family. Please try again.")}")
                 
             except ValueError as ve:
-                st.error(f"❌ Validation error: {str(ve)}")
+                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(ve)}")
             except Exception as e:
-                st.error(f"❌ An error occurred: {str(e)}")
+                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(e)}")
 
 def update_family_page() -> None:
     """Display the form to update an existing family."""
-    st.subheader("Update Family")
+    st.subheader(UI_TEXTS["update"]["title"])
     
     # Get family ID to update
     family_id = st.number_input(
-        "Enter Family ID to update",
+        UI_TEXTS["update"]["family_id_prompt"],
         min_value=1,
-        step=1
+        step=1,
+        key="update_family_id"
     )
     
     if family_id:
@@ -267,16 +305,22 @@ def update_family_page() -> None:
         family = dbm.get_family(family_id)
         
         if not family:
-            st.warning(f"⚠️ {UI_TEXTS["update"]["not_found"]}")
+            st.warning(f"⚠️ {UI_TEXTS['update']['not_found']}")
             return
             
         with st.form(f"update_family_form_{family_id}"):
-            st.subheader(f"Update Family: {family.get('name', '')}")
+            st.subheader(UI_TEXTS["update"]["form_title"].format(
+                name=family.get('name', ''),
+                id=family_id
+            ))
             
             col1, col2 = st.columns(2)
             
             with col1:
-                name = st.text_input("Family Name*", family.get('name', ''))
+                name = st.text_input(
+                    UI_TEXTS['update']['family_name_prompt'],
+                    family.get('name', '')
+                )
                 
                 # Display creation/update timestamps as read-only
                 created_at = family.get('created_at', 'N/A')
@@ -287,32 +331,31 @@ def update_family_page() -> None:
                 
             with col2:
                 url = st.text_input(
-                    "Family Website",
+                    UI_TEXTS["update"]["url_prompt"],
                     family.get('url', ''),
                     placeholder="https://example.com"
                 )
             
             background = st.text_area(
-                "Family Background/History",
+                UI_TEXTS["update"]["background_prompt"],
                 family.get('background', ''),
                 height=150,
                 help="Enter any relevant family history or background information"
             )
             
-            submitted = st.form_submit_button("Update Family")
+            submitted = st.form_submit_button(UI_TEXTS["update"]["submit_button"])
             
             if submitted:
                 # Validate required fields
-                if not name:
-                    st.error(f"❌Family name is required")
+                if not name.strip():
+                    st.error(f"❌ {UI_TEXTS['update']['error_required']}")
                     return
                     
                 try:
                     # Prepare update data with only changed fields
                     update_data = {}
                     
-                    if name != family.get('name'):
-                        update_data['name'] = name.strip()
+                    update_data['name'] = name.strip()
                     if background != family.get('background'):
                         update_data['background'] = background.strip() if background else None
                     if url != family.get('url'):
@@ -323,20 +366,21 @@ def update_family_page() -> None:
                         update_data['id'] = family_id
                         
                         # Update family in database
-                        updated_id = dbm.add_or_update_family(update_data, update=True)
+                        updated_id = dbm.add_or_update_family(
+                            update_data, 
+                            update=True)
                         
                         if updated_id:
-                            st.success(f"✅ {UI_TEXTS["update"]["success"]} {name} (ID: {family_id})")
-                            st.rerun()
+                            st.success(f"✅ {UI_TEXTS['update']['success']} {name} (ID: {family_id})")
                         else:
-                            st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str("Failed to update family. Please try again.")}")
+                            st.error(f"❌ {UI_TEXTS['update']['error_generic']} {str('Failed to update family. Please try again.')}")
                     else:
-                        st.info(f"No changes detected.")
+                        st.info(UI_TEXTS["update"]["nothing_to_update"])
                         
                 except ValueError as ve:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(ve)}")
+                    st.error(f"❌ {UI_TEXTS['update']['error_required']} {str(ve)}")
                 except Exception as e:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(e)}")
+                    st.error(f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}")
 
 def search_relations_page() -> None:
     """
@@ -357,25 +401,19 @@ def search_relations_page() -> None:
         row2_col1, row2_col2 = st.columns(2)
         
         with row1_col1:
-            member_id = st.text_input("Member ID")
-            relation_type = st.selectbox(
-                "Relation Type",
-                ["", "spouse", "parent", "child", "sibling"],
-                index=0
+            some_id = st.number_input(
+                "ID of either member or partner",
+                min_value=0,
+                step=1,
+                value=0,
+                key="search_some_id"
             )
         
         with row1_col2:
-            partner_id = st.number_input(
-                "Partner ID",
-                min_value=0,
-                step=1,
-                value=0
-            )
-            original_family_id = st.number_input(
-                "Original Family ID",
-                min_value=1,
-                value=1,
-                step=1
+            relation_type = st.text_input(
+                "Relation Type that Member relates to Partner",
+                value="",
+                placeholder="e.g. spouse, parent, child, sibling"
             )
             
         with row2_col1:
@@ -399,45 +437,20 @@ def search_relations_page() -> None:
     if submitted:
         with st.spinner("Searching..."):
             try:
-                # Get all relations
-                all_relations = dbm.get_relations()
-                
-                # Filter based on search criteria
-                results = []
-                for relation in all_relations:
-                    # Skip if member_id doesn't match
-                    if member_id and str(relation.get('member_id', '')) != str(member_id):
-                        continue
+                if some_id > 0:
+                    relations = dbm.get_relations_by_id(some_id)
                         
-                    # Skip if partner_id doesn't match (ensure both are compared as integers)
-                    if partner_id and int(relation.get('partner_id', 0)) != int(partner_id):
-                        continue
+                elif relation_type:
+                    relations = dbm.get_relations_by_relation(relation_type)
                         
-                    # Skip if relation type doesn't match
-                    if relation_type and relation.get('relation', '').lower() != relation_type.lower():
-                        continue
+                elif join_date_from or join_date_to:
+                    relations = dbm.get_relations_by_join_between(join_date_from, join_date_to)
                         
-                    # Skip if original_family_id doesn't match
-                    if (original_family_id and 
-                        str(relation.get('original_family_id', '')) != str(original_family_id)):
-                        continue
-                    
-                    # Filter by join date range if provided
-                    if join_date_from or join_date_to:
-                        try:
-                            join_date = datetime.strptime(relation.get('join_date', ''), '%Y-%m-%d').date()
-                            if join_date_from and join_date < join_date_from:
-                                continue
-                            if join_date_to and join_date > join_date_to:
-                                continue
-                        except (ValueError, TypeError):
-                            # Skip if date parsing fails
-                            continue
-                    
-                    results.append(relation)
+                else:
+                    relations = dbm.get_relations()
                 
                 # Store results in session state
-                st.session_state.relation_search_results = results
+                st.session_state.relation_search_results = relations
                 
             except Exception as e:
                 st.error(f"Error searching relations: {str(e)}")
@@ -504,7 +517,8 @@ def add_relation_page() -> None:
                 "Member ID*",
                 min_value=1,
                 step=1,
-                help="ID of the first member in the relationship"
+                help="ID of the first member in the relationship",
+                key="add_relation_member_id"
             )
             
             relation_type = st.selectbox(
@@ -525,7 +539,8 @@ def add_relation_page() -> None:
                 min_value=1,
                 step=1,
                 value=1,
-                help="ID of the second member in the relationship"
+                help="ID of the second member in the relationship",
+                key="add_relation_partner_id"
             )
             
             original_family_id = st.number_input(
@@ -533,7 +548,8 @@ def add_relation_page() -> None:
                 min_value=0,
                 step=1,
                 value=0,
-                help="Original family ID if applicable"
+                help="Original family ID if applicable",
+                key="add_relation_original_family_id"
             )
             
             end_date = st.date_input(
@@ -573,7 +589,8 @@ def add_relation_page() -> None:
                     relation_data['end_date'] = end_date.isoformat()
                 
                 # Add relation to database
-                relation_id = dbm.add_or_update_relation(relation_data, update=False)
+                relation_id = dbm.add_or_update_relation(
+                    relation_data, update=False)
                 
                 if relation_id:
                     st.success(f"✅ {UI_TEXTS["add"]["success"]} {relation_id}")
@@ -597,9 +614,10 @@ def update_relation_page() -> None:
     
     # Get relation ID to update
     relation_id = st.number_input(
-        "Enter Relation ID to update",
+        UI_TEXTS["update"]["relation_id_prompt"],
         min_value=1,
-        step=1
+        step=1,
+        key="update_relation_id"
     )
     
     if relation_id:
@@ -617,15 +635,16 @@ def update_relation_page() -> None:
             
             with col1:
                 member_id = st.number_input(
-                    "Member ID*",
+                    UI_TEXTS["update"]["member_id_prompt"],
                     min_value=1,
                     step=1,
                     value=relation.get('member_id', 1),
-                    help="ID of the first member in the relationship"
+                    help="ID of the first member in the relationship",
+                    key="update_relation_member_id"
                 )
                 
                 relation_type = st.selectbox(
-                    "Relation Type*",
+                    UI_TEXTS["update"]["relation_type_prompt"],
                     ['spouse', 'parent', 'child', 'sibling', 'other'],
                     index=['spouse', 'parent', 'child', 'sibling', 'other'].index(relation.get('relation', 'spouse')),
                     help="Type of relationship between the members"
@@ -646,46 +665,48 @@ def update_relation_page() -> None:
                     default_date = date.today()
                 
                 join_date = st.date_input(
-                    "Start Date",
+                    UI_TEXTS["update"]["join_date_prompt"],
                     value=default_date,
                     help="When this relationship began"
                 )
                 
             with col2:
                 partner_id = st.number_input(
-                    "Partner ID*",
+                    UI_TEXTS["update"]["partner_id_prompt"],
                     min_value=1,
                     step=1,
                     value=relation.get('partner_id', 1),
-                    help="ID of the second member in the relationship"
+                    help="ID of the second member in the relationship",
+                    key="update_relation_partner_id"
                 )
                 
                 original_family_id = st.number_input(
-                    "Original Family ID",
+                    UI_TEXTS["update"]["original_family_id_prompt"],
                     min_value=0,
                     step=1,
                     value=relation.get('original_family_id', 0),
-                    help="Original family ID if applicable"
+                    help="Original family ID if applicable",
+                    key="update_relation_original_family_id"
                 )
                 
                 end_date_value = relation.get('end_date')
                 end_date = st.date_input(
-                    "End Date (optional)",
+                    UI_TEXTS["update"]["end_date_prompt"],
                     value=datetime.strptime(end_date_value, '%Y-%m-%d').date() if end_date_value else None,
                     help="If this relationship has ended, when it ended"
                 )
             
             # Additional fields
             original_name = st.text_input(
-                "Original Name (if different)",
+                UI_TEXTS["update"]["original_name_prompt"],
                 relation.get('original_name', '')
             )
             dad_name = st.text_input(
-                "Father's Name (if applicable)",
+                UI_TEXTS["update"]["dad_name_prompt"],
                 relation.get('dad_name', '')
             )
             mom_name = st.text_input(
-                "Mother's Name (if applicable)",
+                UI_TEXTS["update"]["mom_name_prompt"],
                 relation.get('mom_name', '')
             )
             
@@ -742,7 +763,8 @@ def update_relation_page() -> None:
                         update_data['id'] = relation_id
                         
                         # Update relation in database
-                        updated_id = dbm.add_or_update_relation(update_data, update=True)
+                        updated_id = dbm.add_or_update_relation(
+                            update_data, update=True)
                         
                         if updated_id:
                             st.success(f"✅ {UI_TEXTS["update"]["success"]} {relation_id}")
@@ -782,13 +804,15 @@ def add_member_page() -> None:
                 UI_TEXTS["add"]["family_id"],
                 min_value=0,
                 step=1,
-                value=0
+                value=0,
+                key="add_member_family_id"
             )
             gen_order = st.number_input(
                 UI_TEXTS["add"]["generation"],
                 min_value=0,
                 step=1,
-                value=0
+                value=0,
+                key="add_member_gen_order"
             )
         with col2:
             alias = st.text_input(UI_TEXTS["add"]["alias"], "")
@@ -822,7 +846,9 @@ def add_member_page() -> None:
                 }
                 
                 # Add new or update existing family member
-                member_id = dbm.add_or_update_member(member_data, False)
+                member_id = dbm.add_or_update_member(
+                    member_data, 
+                    update=False)
                 if member_id:
                     if email and password:
                         # Create user in users table
@@ -832,6 +858,7 @@ def add_member_page() -> None:
                         if user_id:
                             st.success(f"✅ {UI_TEXTS["add"]["success"]} {member_id}")
                     else:
+                        st.success(f"✅ {UI_TEXTS["add"]["success"]} {member_id}")
                         st.info(UI_TEXTS["add"]["no_update_user_table"])
                 else:
                     error = "Failed to add member"
@@ -848,7 +875,8 @@ def update_member_page() -> None:
     member_id = st.number_input(
         UI_TEXTS["update"]["member_id_prompt"],
         min_value=1,
-        step=1
+        step=1,
+        key="update_member_id"
     )
     
     if member_id:
@@ -922,7 +950,8 @@ def update_member_page() -> None:
                     "Family ID",
                     min_value=0,
                     step=1,
-                    value=member.get('family_id', '')
+                    value=member.get('family_id', ''),
+                    key="update_member_family_id"
                 )
                 
                 # Ensure gen_order is an integer
@@ -932,10 +961,11 @@ def update_member_page() -> None:
                     gen_order_value = 0
                     
                 gen_order = st.number_input(
-                    "Generation",
+                    "Generation Order",
                     min_value=0,
                     step=1,
-                    value=gen_order_value
+                    value=gen_order_value,
+                    key="update_member_gen_order"
                 )
                 
             with col3:
@@ -955,14 +985,16 @@ def update_member_page() -> None:
                     "Father ID",
                     min_value=0,
                     step=1,
-                    value=member.get('dad_id', 0)
+                    value=member.get('dad_id', 0),
+                    key="update_member_dad_id"
                 )
                 
                 mom_id = st.number_input(
                     "Mother ID",
                     min_value=0,
                     step=1,
-                    value=member.get('mom_id', 0)
+                    value=member.get('mom_id', 0),
+                    key="update_member_mom_id"
                 )
             
             submitted = st.form_submit_button(UI_TEXTS["update"]["submit_button"])
@@ -1094,6 +1126,14 @@ def birthday_of_the_month_page():
             'Email': m.get('email', '')
         } for m in members])
         
+        # save to csv, created in the dir_path, specified in the context fss
+        csv_file = f"{st.session_state.app_context['fss']['dir_path']}/birthday_list_{selected_month.lower()}_{datetime.now().year}.csv"
+        try:
+            df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+            st.info(f"✅ {UI_TEXTS['birthday']['saved']}")
+        except Exception as e:
+            st.error(f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}")
+            
         # Display the results
         st.dataframe(
             df,
@@ -1108,35 +1148,176 @@ def birthday_of_the_month_page():
             }
         )
         
-        # Add export button with improved error handling
-        if st.button("💾 Export Birthday List"):
+        # Add publish button to send csv file to all the subscribers
+        # via EmailPublisher
+        if st.button("📧 Publish Birthday List"):
             try:
                 # Ensure we have data to export
                 if df.empty:
-                    st.warning("No data available to export.")
+                    st.warning(f"⚠️ {UI_TEXTS['birthday']['not_found']}")
                     return
                     
-                # Generate CSV with proper encoding for Chinese characters
-                csv = df.to_csv(index=False, encoding='utf-8-sig')
+                # Create email publisher object
+                publisher = EmailPublisher(Config.MAIL_USERNAME, Config.MAIL_PASSWORD)
                 
+                # Filter out None or empty email addresses
+                recipients = [m.get('email') for m in members if m.get('email')]
+                
+                if not recipients:
+                    st.warning("⚠️ No valid email addresses found to send to")
+                    return
+                
+                text_content = f"""Wishing you a wonderful birthday celebration!\n
+                May this special day bring you joy and happiness!\n
+                Best regards,\n
+                Your Family Team"""
+                
+                # Create HTML content with animated birthday card
+                html_content = r""" 
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+                    .birthday-card {
+                    font-family: 'Arial', sans-serif;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #fff6f6 0%, #f8e8ff 100%);
+                    border-radius: 15px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                    text-align: center;
+                }
+                .birthday-title {
+                    font-family: 'Dancing Script', cursive;
+                    font-size: 36px;
+                    color: #e91e63;
+                    margin: 20px 0;
+                    animation: bounce 2s infinite;
+                }
+                .birthday-message {
+                    font-size: 16px;
+                    color: #333;
+                    line-height: 1.6;
+                    margin: 20px 0;
+                }
+                .balloon {
+                    display: inline-block;
+                    width: 40px;
+                    height: 50px;
+                    background: #ff4081;
+                    border-radius: 50%;
+                    position: relative;
+                    margin: 0 5px;
+                    animation: float 3s ease-in-out infinite;
+                }
+                .balloon:before {
+                    content: '';
+                    position: absolute;
+                    width: 2px;
+                    height: 50px;
+                    background: #999;
+                    top: 50px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .balloon:nth-child(2n) {
+                    background: #3f51b5;
+                    animation-delay: 0.3s;
+                }
+                .balloon:nth-child(3n) {
+                    background: #4caf50;
+                    animation-delay: 0.6s;
+                }
+                .balloon:nth-child(4n) {
+                    background: #ff9800;
+                    animation-delay: 0.9s;
+                }
+                @keyframes float {
+                    0%, 100% {
+                        transform: translateY(0) rotate(-2deg);
+                    }
+                    50% {
+                        transform: translateY(-20px) rotate(2deg);
+                    }
+                }
+                @keyframes bounce {
+                    0%, 20%, 50%, 80%, 100% {
+                        transform: translateY(0);
+                    }
+                    40% {
+                        transform: translateY(-20px);
+                    }
+                    60% {
+                        transform: translateY(-10px);
+                    }
+                }
+                .signature {
+                    margin-top: 30px;
+                    font-style: italic;
+                    color: #666;
+                }
+            </style>
+            <div class="birthday-card">
+            <div class="balloon"></div>
+            <div class="balloon"></div>
+            <div class="balloon"></div>
+            <div class="balloon"></div>
+            
+            <h1 class="birthday-title">Happy Birthday!</h1>
+            
+            <div class="birthday-message">
+                <p>Wishing you a wonderful birthday celebration!</p>
+                <p>May this special day bring you joy and happiness!</p>
+            </div>
+            
+            <div class="signature">
+                <p>Best regards,<br>Your Family Team</p>
+            </div>
+            </div>
+            """
+
+                # Check if the attached b'day card file exists
+                card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
+                if not os.path.exists(card_file):
+                    st.error(f"❌ {UI_TEXTS['birthday']['error_publish']}: bday.html file not found")
+                    return
+                
+                # Send email with the animated birthday card
+                publisher.publish_email(
+                    subject=f"🎉 Happy Birthday Celebrations - {selected_month} {datetime.now().year}",
+                    text=text_content,
+                    html=html_content,
+                    attached_file=card_file,
+                    recipients=recipients
+                )
+                
+                st.success(f"✅ {UI_TEXTS['birthday']['published']} to {recipients}")
+            except Exception as e:
+                st.error(f"❌ {UI_TEXTS['birthday']['error_publish']}: {str(e)}")
+        
+        # Add download button with improved error handling
+        if st.button("💾 Download Birthday List"):
+            try:
+                # Ensure we have data to export
+                if df.empty:
+                    st.warning(f"⚠️ {UI_TEXTS['birthday']['not_found']}")
+                    return
+                    
                 # Create download button with proper file naming
                 st.download_button(
                     label="⬇️ Download CSV",
                     data=csv,
-                    file_name=f"birthday_list_{selected_month.lower()}_{datetime.now().year}.csv",
+                    file_name=csv_file,
                     mime="text/csv",
                     help=f"Download birthday list for {selected_month} {datetime.now().year}"
                 )
                 
                 # Show success message
-                st.success(f"✅ Successfully exported {len(df)} records for {selected_month}")
+                st.success(f"✅ {UI_TEXTS['birthday']['downloaded']} {len(df)} records for {selected_month}")
                 
             except Exception as e:
-                st.error(f"❌ Error generating CSV: {str(e)}")
-                st.exception(e)  # For debugging
+                st.error(f"❌ {UI_TEXTS['birthday']['error_download']} generating CSV: {str(e)}")
     except Exception as e:
-        st.error(f"❌ Error exporting birthday list: {str(e)}")
-        st.exception(e)  # For debugging
+        st.error(f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}")
 
 def main() -> None:
     """Main application entry point."""
@@ -1145,7 +1326,8 @@ def main() -> None:
         show_login_form()
         return
         
-    # Sidebar with login button, page links, and logout button
+    # Sidebar --- frome here
+    # login button, page links, and logout button
     with st.sidebar:
         if st.session_state.user_state != dbm.User_State['p_admin']:
             # Hide the default navigation for non-padmin users
@@ -1170,7 +1352,6 @@ def main() -> None:
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
-        st.divider()
             
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
@@ -1178,7 +1359,7 @@ def main() -> None:
             st.session_state.user_email = None
             st.rerun()
     
-    # Main content area
+    # Main content area --- frome here
     st.title("Family Tree Management")
     
     # Main tab groups
