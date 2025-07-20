@@ -47,7 +47,7 @@ FT_SVR=os.getenv("FT_SVR", "")
 # File System Settings
 FILE_SYSTEM_SETTINGS = {
     'dir_path': os.getenv("FSS_DIR_PATH", "./data"),
-    'file_name': os.getenv("FSS_FILE_NAME", "users"),
+    'file_name': os.getenv("FSS_FILE_NAME", "backup"),
     'file_type': os.getenv("FSS_FILE_TYPE", "CSV"),
     'db_table': os.getenv("TBL_MEMBERS", "members"),
     'db_tables': [os.getenv("TBL_MEMBERS", "members"),

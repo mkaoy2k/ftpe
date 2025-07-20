@@ -413,7 +413,8 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
 
 def main():
     """Main function to render the Streamlit app."""
-    # Sidebar with login button, page links, and logout button
+    # Sidebar --- from here
+    # login button, page links, and logout button
     with st.sidebar:
         if st.session_state.user_state != dbm.User_State['p_admin']:
             # Hide the default navigation for non-padmin users
@@ -442,8 +443,6 @@ def main():
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
-            
-        st.divider()
             
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):

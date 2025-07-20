@@ -2,12 +2,14 @@ import os
 import re
 import secrets
 import smtplib
-from dotenv import load_dotenv
+import ssl
 import logging
-from typing import List
+from typing import List, Optional
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import ssl
+from email import encoders
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -55,7 +57,13 @@ class EmailPublisher:
         self.email_sender = email_sender
         self.email_password = email_password
         
-    def _create_email(self, subject: str, text: str, html: str, recipients: List[str]) -> MIMEMultipart:
+    def _create_email(self, 
+        subject: str, 
+        text: str, 
+        html: str, 
+        recipients: List[str],
+        attached_file: Optional[str] = None
+    ) -> MIMEMultipart:
         """
         Create an email message with both plain text 
         and HTML formats
@@ -69,20 +77,48 @@ class EmailPublisher:
         Returns:
             MIMEMultipart: The created email message object.
         """
-        msg = MIMEMultipart("alternative")
+        # Create the root message
+        msg = MIMEMultipart('mixed')
         msg['From'] = self.email_sender
         msg['To'] = ", ".join(recipients)
         msg['Subject'] = subject
+        msg.preamble = 'This is a multi-part message in MIME format.'
 
-        # Add both plain text and HTML parts
-        if text:
-            msg.attach(MIMEText(text, "plain"))
-        if html:
-            msg.attach(MIMEText(html, "html"))
+        # Create the alternative part for text and HTML
+        msg_alternative = MIMEMultipart('alternative')
+        
+        # Add text part
+        part1 = MIMEText(text, 'plain')
+        msg_alternative.attach(part1)
+        
+        # Add HTML part
+        part2 = MIMEText(html, 'html')
+        msg_alternative.attach(part2)
+        
+        # Attach the alternative part to the root message
+        msg.attach(msg_alternative)
+        
+        # Add attached file if provided
+        if attached_file and os.path.exists(attached_file):
+            log.debug(f"Attached file: {attached_file}")
+            try:
+                with open(attached_file, "rb") as f:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(f.read())
+                    encoders.encode_base64(part)
+                    # Use only the base name of the file in the attachment
+                    filename = os.path.basename(attached_file)
+                    part.add_header("Content-Disposition", 
+                                 f"attachment; filename=\"{filename}\"")
+                    msg.attach(part)
+            except Exception as e:
+                log.error(f"Error attaching file: {str(e)}")
         
         return msg
 
-    def publish_email(self, subject: str, text: str, html: str, recipients: List[str]):
+    def publish_email(self, subject: str, text: str, html: str,
+                      recipients: List[str] = [],
+                      attached_file: Optional[str] = None):
         """
         Send email to multiple recipients
         
@@ -97,7 +133,8 @@ class EmailPublisher:
         """
         try:
             # Create email message object
-            msg = self._create_email(subject, text, html, recipients)
+            msg = self._create_email(subject, text, html, 
+                            recipients, attached_file)
             
             # Create secure SSL connection
             context = ssl.create_default_context()
@@ -108,7 +145,9 @@ class EmailPublisher:
             with smtplib.SMTP_SSL(Config.MAIL_SERVER, Config.MAIL_PORT, context=context) as smtp:
                 try:
                     smtp.login(self.email_sender, self.email_password)
-                    smtp.sendmail(self.email_sender, recipients, msg.as_string())
+                    smtp.sendmail(self.email_sender, 
+                        recipients, 
+                        msg.as_string())
                     return True
                 except smtplib.SMTPAuthenticationError as e:
                     log.error(f'publish_email(): Login failed: {str(e)}')
@@ -144,7 +183,6 @@ def generate_verification_token():
         str: A secure random token
     """
     return secrets.token_urlsafe(32)
-
 
 if __name__ == "__main__":
     # Initialize EmailPublisher
