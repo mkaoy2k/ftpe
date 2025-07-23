@@ -6,11 +6,13 @@ managing database operations for the family tree system.
 """
 
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Union
 import csv
 import json
+from datetime import datetime
 from dotenv import load_dotenv
 import logging
 
@@ -22,6 +24,13 @@ log = logging.getLogger(__name__)
 # Set log level from environment variable or default to WARNING
 log_level = os.getenv('LOGGING', 'WARNING').upper()
 log.setLevel(getattr(logging, log_level, logging.WARNING))
+
+# Configure console handler for debug output
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
 
 # Database configuration
 database_name = os.getenv("DB_NAME", "data/family.db")
@@ -37,7 +46,7 @@ db_tables = {
 
 # Subscriber states ~is_active
 # Subscription status values for users
-# Used in the 'is_active' field of the users table
+# Used in the 'is_active' field of the mirdb_table['users'] table
 Subscriber_State = {
     'active': 1,    # User is active and can access the system
     'pending': 0,   # User is pending approval/activation
@@ -45,7 +54,7 @@ Subscriber_State = {
 }
 
 # User role values
-# Used in the 'is_admin' field of the users table
+# Used in the 'is_admin' field of the mirdb_table['users'] table
 User_State = {
     'p_admin': 2,    # Platform Administrator with full access
     'f_admin': 1,     # Family Administrator with full access
@@ -53,25 +62,44 @@ User_State = {
 }
 
 # Member codes in mirrors table
-# Used in the 'status' field of the mirrors table
+# Used in the 'status' field of the mirdb_table['mirrors'] table
 Member_Status = {
     'single': 0,    # single
     'married': 1,   # married
     'together': 2   # live-together
 }
-# Used in the 'relation' vs parents of the mirrors table
+# Used in the 'relation' vs parents of the mirdb_table['mirrors'] table
 Member_Relation = {
     'bio': 0,    # biological
     'adopt': 1,   # adopted
     'step': 2   # step
 }
-# Used in the 'sex' field of the mirrors table
+# Used in the 'sex' field of the mirdb_table['mirrors'] table
 Member_Sex = {
     'male': 0,    # male
     'female': 1,   # female
     'inlaw-male': 2,   # inlaw-male
     'inlaw-female': 3   # inlaw-female
 }
+
+# Used in the 'relation_type' field of the mirdb_table['relations'] table
+Relation_Type = {
+    'spouse': 'spouse',    # spouse
+    'parent adopted within the family': 'parent aw',   # parent adopted within the family
+    'parent adopted from another family': 'parent af',   # parent adopted from another family
+    'parent': 'parent',   # biological parent
+    'child adopted within the family': 'child aw',   # child adopted within the family
+    'child adopted from another family': 'child af',   # child adopted from another family
+    'child': 'child',   # biological child
+    'sibling': 'sibling',   # sibling
+    'other': 'other'   # other
+}
+# Log database configuration
+log.debug(f"Database configuration:")
+log.debug(f"- Database path: {db_path}")
+log.debug(f"- Log level: {log_level}")
+log.debug(f"- Database tables: {db_tables}")
+log.debug("Database module initialized")
 
 def get_db_connection() -> sqlite3.Connection:
     """
@@ -245,6 +273,34 @@ def init_db() -> None:
             Href TEXT,
             Status INTEGER DEFAULT 0
         )    
+        """)
+        
+        # Create password_reset_tokens table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            token TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used INTEGER DEFAULT 0,
+            FOREIGN KEY (email) REFERENCES users(email) ON DELETE CASCADE
+        )
+        """)
+        
+        # Create index on token for faster lookups
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reset_token ON password_reset_tokens(token)
+        """)
+        
+        # Create index on email for faster lookups
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reset_email ON password_reset_tokens(email)
+        """)
+        
+        # Create index on expires_at for cleanup operations
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reset_expires ON password_reset_tokens(expires_at)
         """)
         
         # Create index on name for faster lookups
@@ -1479,9 +1535,10 @@ def get_family(family_id: int) -> Optional[Dict[str, Any]]:
         (must be a positive integer)
         
     Returns:
-        Optional[Dict[str, Any]]: A dictionary containing the family's data if found, 
-        None if no family exists with the given ID. 
-        The dictionary includes all the fields from the families table.
+        Optional[Dict[str, Any]]: A dictionary containing the 
+        family's data if found, None if no family exists with the 
+        given ID. The dictionary includes all the fields from the 
+        db_tables['families'] table.
             
     Raises:
         ValueError: If family_id is not a positive integer
@@ -1536,18 +1593,18 @@ def get_families_by_name(name):
     Retrieve a family record given by name-like family records.
     
     This function fetches all available information for a specific 
-    family record from the `families` table.
+    family record from the db_tables['families'] table.
     
     Args:
         name: The name-like string to search for 
-        in the `families` table.
+        in the db_tables['families'] table.
         
     Returns:
         List[Dict[str, Any]]: A list of dictionaries containing 
         the family's records if found, 
         empty list if no family exists with the similar name-like string. 
         Each dictionary includes all the fields from the 
-        `families` table.
+        db_tables['families'] table.
             
     Raises:
         ValueError: If name is not a string
@@ -1604,7 +1661,7 @@ def get_families_by_background(background: str) -> List[Dict[str, Any]]:
     Retrieve family records that match the given background search text.
     
     This function performs a case-insensitive partial match search on the 
-    background field of the families table.
+    background field of the db_tables['families'] table.
     
     Args:
         background: The text to search for in the background field
@@ -1614,7 +1671,7 @@ def get_families_by_background(background: str) -> List[Dict[str, Any]]:
         the family records if found, 
         empty list if no family exists with matching background text. 
         Each dictionary includes all the fields from the 
-        `families` table.
+        db_tables['families'] table.
             
     Raises:
         ValueError: If background is not a string
@@ -1732,7 +1789,8 @@ def get_relation(relation_id: int) -> Optional[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
-def get_relations_by_id(member_id: int
+def get_relations_by_id(member_id: int,
+                        relation: str = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Retrieve a relation record given by ID that either member_id 
@@ -1744,6 +1802,9 @@ def get_relations_by_id(member_id: int
     Args:
         member_id: The unique identifier of the relation to retrieve 
         (must be a positive integer)
+
+        relation: The relation type to search for in the relation field.
+        get all relations if relation is None
         
     Returns:
         Optional[Dict[str, Any]]: A dictionary containing the relation's data if found, 
@@ -1771,12 +1832,19 @@ def get_relations_by_id(member_id: int
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            # Query the database for the relation
-            cursor.execute(f"""
-                SELECT * FROM {db_tables['relations']}
-                WHERE member_id = ? or partner_id = ?
-            """, (member_id, member_id))
+            if relation:
+                # Query the database for the relation
+                cursor.execute(f"""
+                    SELECT * FROM {db_tables['relations']}
+                    WHERE member_id = ? or partner_id = ?
+                    AND relation = ?
+                """, (member_id, member_id, relation))
+            else:
+                # Query the database for the relation
+                cursor.execute(f"""
+                    SELECT * FROM {db_tables['relations']}
+                    WHERE member_id = ? or partner_id = ?
+                """, (member_id, member_id))
             
             # Get column names from cursor description
             columns = [col[0] for col in cursor.description]
@@ -1822,7 +1890,7 @@ def get_relations_by_relation(relation_type: str) -> List[Dict[str, Any]]:
         sqlite3.Error: If a database error occurs
         
     Example:
-        >>> relations = get_relation_by_relation("spouse")
+        >>> relations = get_relations_by_relation("spouse")
         >>> if relations:
         ...     for relation in relations:
         ...         print(f"Found relation between member {relation['member_id']} and {relation['partner_id']}")
@@ -2137,37 +2205,35 @@ def get_members_when_born_in(month: int) -> List[Dict[str, Any]]:
             # Format month as two digits (01-12)
             month_str = f"{month:02d}"
             
-            # Query to find members with valid full birth dates (YYYY-MM-DD) matching the specified month
+            # Query to find living members with valid full birth dates (YYYY-MM-DD) matching the specified month
             query = f"""
-                SELECT * FROM {db_tables['members']}
+                SELECT *
+                FROM {db_tables['members']}
                 WHERE 
-                -- living souls
-                (died IS NULL OR died NOT IN ('0000-01-01', '0', ''))
                 -- Must be exactly 10 characters (YYYY-MM-DD)
-                AND LENGTH(TRIM(born)) = 10
+                LENGTH(TRIM(born)) = 10
                 -- Exclude placeholder and invalid dates
                 AND born NOT IN ('0000-01-01', '0', '')
                 AND born IS NOT NULL
-                    -- Check month part matches (positions 6-7 in YYYY-MM-DD)
-                    AND substr(born, 6, 2) = ?
-                    -- Ensure year is valid (not '0000')
-                    AND substr(born, 1, 4) != '0000'
-                    -- Ensure month is valid (01-12)
-                    AND substr(born, 6, 2) BETWEEN '01' AND '12'
-                ORDER BY name, born
-            """
-            
+                -- Check month part matches (positions 6-7 in YYYY-MM-DD)
+                AND substr(born, 6, 2) = ?
+                ORDER BY born ASC
+            """            
             cursor.execute(query, (month_str,))
             
             # Get column names
-            columns = [column[0] for column in cursor.description]
+            columns = get_table_columns(db_tables['members'])
             
             # Convert results to list of dictionaries
+            rows = cursor.fetchall()
             members = []
-            for row in cursor.fetchall():
-                members.append(dict(zip(columns, row)))
+            for row in rows:
+                member = dict(zip(columns, row))
+                if member_is_alive(member):
+                    members.append(member)
+                    log.debug(f"member: {member}")
+            log.debug(f"Found {len(members)} members with birthdays in month of {month:02d}")
             
-            log.debug(f"Found {len(members)} members with valid full birth dates in month {month:02d}")
             return members
             
     except sqlite3.Error as e:
@@ -2178,6 +2244,68 @@ def get_members_when_born_in(month: int) -> List[Dict[str, Any]]:
         error_msg = f"Querying members born in month {month} failed: {str(e)}"
         log.error(error_msg)
         raise
+
+def member_is_alive(member_data: Dict[str, Any]) -> bool:
+    """
+    Check if a member is alive based on the 'died' field.
+    
+    A member is considered alive if:
+    - 'died' field is None or empty string
+    - 'died' field contains invalid or placeholder values
+    
+    A member is considered deceased if:
+    - 'died' field contains a valid year (as int or str)
+    - 'died' field contains a valid date string
+    
+    Args:
+        member_data (Dict[str, Any]): Dictionary containing member data with 'died' field
+        
+    Returns:
+        bool: True if the member is alive, False if deceased
+    """
+    if not member_data:
+        log.debug("Member record is required")
+        return False
+        
+    member_id = member_data.get('id', 'unknown')
+    died = member_data.get('died')
+    
+    # Handle None or empty string
+    if died is None or died == '':
+        log.debug(f"Member {member_id} is alive: no death date")
+        return True
+    
+    # Convert to string for consistent processing
+    died_str = str(died).strip()
+    
+    # Check for placeholder values that indicate alive
+    if died_str in ('0', '0000-01-01'):
+        log.debug(f"Member {member_id} is alive: placeholder death date: {died}")
+        return True
+    
+    # Check for invalid/placeholder values that indicate deceased
+    if died_str in ('YYYY', 'YYYY-MM', 'YYYY-MM-DD'):
+        log.debug(f"Member {member_id} is deceased: invalid/placeholder death date: {died}")
+        return False
+        
+    # Check if it's a valid year (4 digits)
+    if (isinstance(died, int) and 1000 <= died <= 9999) or \
+       (isinstance(died, str) and died.isdigit() and len(died) == 4):
+        log.debug(f"Member {member_id} is deceased: died in year {died}")
+        return False
+        
+    # Check for valid date format (YYYY-MM-DD or YYYY-MM)
+    try:
+        if isinstance(died, str) and (len(died) == 10 or len(died) == 7):
+            datetime.strptime(died, '%Y-%m-%d' if len(died) == 10 else '%Y-%m')
+            log.debug(f"Member {member_id} is deceased: died on {died}")
+            return False
+    except ValueError:
+        pass
+    
+    # If we get here, it's some other format we'll consider as alive
+    log.debug(f"Member {member_id} is alive: unrecognized death date format: {died}")
+    return True
 
 def search_members(
     name: str = "",
@@ -2337,8 +2465,9 @@ def get_member_relations(member_id: int
     Retrieve all relationships for a given member.
     
     This function fetches all relationship records where the specified member
-    is either the 'member_id' or 'partner_id' in the relationship. This provides a complete
-    view of all relationships (e.g., spouse, parent, child) for the given member.
+    is either the 'member_id' or 'partner_id' in the db_tables['relations'] table.
+    This provides a complete view of all relationships (e.g., spouse, parent, child)
+    for the given member.
     
     Args:
         member_id: The unique identifier of the member to retrieve relationships for.
@@ -2346,19 +2475,12 @@ def get_member_relations(member_id: int
                  
     Returns:
         List[Dict[str, Any]]: A list of relationship records where each record is a dictionary
-        containing the relationship details. Returns an empty list if no relationships are found.
+        containing the relationship details. 
+        Returns an empty list if no relationships are found.
         
-        Each relationship dictionary contains the following keys:
-            - id: Relationship record ID
-            - member_id: ID of the first member in the relationship
-            - partner_id: ID of the second member in the relationship
-            - relation: Type of relationship (e.g., 'spouse', 'parent', 'child')
-              e.g. child: means the partner is the child of the member
-            - join_date: Date when the relationship started (YYYY-MM-DD format)
-            - end_date: Optional date when the relationship ended (YYYY-MM-DD format)
-            - created_at: Timestamp when the relationship was created
-            - updated_at: Timestamp when the relationship was last updated
-            
+        Each relationship dictionary contains all fields from the 
+        db_tables['relations'] table.
+        
     Raises:
         ValueError: If member_id is not a positive integer.
         sqlite3.Error: If a database error occurs during the query.
@@ -2383,12 +2505,7 @@ def get_member_relations(member_id: int
                 SELECT * 
                 FROM {db_tables["relations"]}
                 WHERE member_id = ? OR partner_id = ?
-                ORDER BY 
-                    CASE 
-                        WHEN end_date IS NULL OR end_date = '' THEN 0  -- Active relationships first
-                        ELSE 1  -- Then inactive relationships
-                    END,
-                    join_date DESC  -- Most recent first within each group
+                ORDER BY join_date DESC  -- Most recent first within each group
             """
             
             cursor.execute(query, (member_id, member_id))
@@ -2803,12 +2920,13 @@ def get_members_when_alive() -> List[Dict[str, Any]]:
 
 def get_relations() -> List[Dict[str, Any]]:
     """
-    Retrieve all the records from the relations table.
+    Retrieve all the records from the db_tables['relations'] table.
     
     Returns:
-        List[Dict[str, Any]]: A list of relation dictionaries, where each dictionary contains
-        all fields from the relations table including id, original_family_id, original_name,
-        partner_id, member_id, relation, join_date, end_date, created_at, and updated_at.
+        List[Dict[str, Any]]: A list of relation dictionaries, 
+        where each dictionary contains all fields from the 
+        db_tables['relations'] table.
+        The list is sorted by member_id in ascending order.
         
     Raises:
         sqlite3.Error: If there's a database error while fetching relations
@@ -2818,7 +2936,7 @@ def get_relations() -> List[Dict[str, Any]]:
             cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT * FROM {db_tables['relations']}
-                ORDER BY created_at DESC, id
+                ORDER BY member_id ASC
             """)
             
             # Get column names from cursor description
@@ -2846,32 +2964,26 @@ def add_or_update_relation(
     update: bool = False
 ) -> int:
     """
-    Add or update a relationship record in the relations table.
+    Add or update a relationship record in db_tables['relations'] table.
     
-    This function is used to add or update a relationship record in the relations table.
-    If update is True and a duplicate relationship record exists, it will update the existing record.
+    This function is used to add or update a relationship record.
     
     Args:
-        relation_data: A dictionary containing relationship information, should include the following keys:
-            - member_id (int): Member ID (required)
-            - partner_id (int): Related member ID (required)
-            - relation (str): Relationship type (required, e.g. 'spouse', 'parent', 'child', etc.)
-            - original_family_id (int, optional): Original family ID
-            - original_name (str, optional): Original name
-            - dad_name (str, optional): Father's name
-            - mom_name (str, optional): Mother's name
-            - join_date (str, optional): Relationship start date (YYYY-MM-DD)
-            - end_date (str, optional): Relationship end date (YYYY-MM-DD)
+        relation_data: A dictionary containing relationship 
+        information, see db_tables['relations'] table for details.
         update (bool): If True, when the relationship already exists, update the existing record
-        
+    
     Returns:
-        int: The ID of the added or updated relationship record
-        
+        int: The ID of the added or updated relationship record.
+        If update is True and a duplicate relationship record exists, 
+        it will update the existing record. 
+        Return error if update is False and a duplicate relationship record exists.
+    
     Raises:
         ValueError: If missing required fields or data is invalid
         sqlite3.IntegrityError: If database integrity constraint is violated
         sqlite3.Error: Other database related errors
-        
+    
     Example:
         >>> relation_data = {
         ...     'member_id': 1,
@@ -3650,6 +3762,27 @@ def export_to_file(file_path: Union[str, Path], table: str) -> Dict[str, Any]:
             'message': f"Error exporting records: {str(e)}"
         }
 
+def get_table_columns(table: str) -> List[str]:
+    """
+    Get the column names of a table.
+    
+    Args:
+        table: Name of the table to query
+        
+    Returns:
+        List[str]: List of column names in the table.
+        None if table does not exist or an error occurs.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = [column[1] for column in cursor.fetchall()]
+            return columns
+    except sqlite3.Error as e:
+        log.error(f"Database error fetching table columns: {str(e)}")
+        raise sqlite3.Error(f"Failed to fetch table columns: {str(e)}")
+
 def get_total_records(table: str) -> int:
     """
     Get the total number of records in a table.
@@ -3658,7 +3791,8 @@ def get_total_records(table: str) -> int:
         table: Name of the table to query
         
     Returns:
-        int: Total number of records in the table
+        int: Total number of records in the table.
+        None if table does not exist or an error occurs.
     """
     try:
         with get_db_connection() as conn:

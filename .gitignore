@@ -12,6 +12,10 @@
 # FamilyTrees Data files
 data/*
 !data/template.csv
+# Database files
+*.db
+*.sqlite3
+*.db-journal
 
 # FamilyTrees Tools or Examples
 test_*
