@@ -30,13 +30,245 @@ st.set_page_config(
     menu_items=None  # This will be updated after login
 )
 
+def show_reset_password_page():
+    """Display the password reset page"""
+    st.title("Reset Password")
+    
+    # Initialize reset state if not exists
+    if 'reset_token' not in st.session_state:
+        st.session_state.reset_token = None
+    if 'reset_email' not in st.session_state:
+        st.session_state.reset_email = None
+    if 'reset_error' not in st.session_state:
+        st.session_state.reset_error = None
+    if 'reset_success' not in st.session_state:
+        st.session_state.reset_success = None
+    
+    # Center the form
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        # Show back to login link
+        if st.button("← Back to Login"):
+            st.session_state.show_reset_password = False
+            st.rerun()
+            
+        st.markdown("<h2 style='text-align: center;'>Reset Password</h2>", unsafe_allow_html=True)
+        
+        # Display error message if exists
+        if st.session_state.reset_error:
+            st.error(st.session_state.reset_error)
+            
+        # Display success message if exists
+        if st.session_state.reset_success:
+            st.success(st.session_state.reset_success)
+        
+        # If token is provided in URL or session state, show password reset form
+        token = st.query_params.get("token", [None])[0] or st.session_state.reset_token
+        
+        if token:
+            st.session_state.reset_token = token
+            
+            # Get email from token or session state
+            email = st.session_state.reset_email
+            
+            # If email is not in session state, get it from the token
+            if not email and token:
+                try:
+                    with dbm.get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT email FROM password_reset_tokens 
+                            WHERE token = ? AND expires_at > datetime('now')
+                        """, (token,))
+                        result = cursor.fetchone()
+                        if result:
+                            email = result[0]
+                            st.session_state.reset_email = email
+                except Exception as e:
+                    st.error(f"Error verifying token: {str(e)}")
+            
+            if email:
+                with st.form("reset_password_form"):
+                    st.info(f"Resetting password for: {email}")
+                    new_password = st.text_input("New Password", type="password", key="new_password")
+                    confirm_password = st.text_input("Confirm New Password", type="password", key="confirm_password")
+                    reset_button = st.form_submit_button("Reset Password")
+                    
+                    if reset_button:
+                        # Validate input
+                        if not new_password or not confirm_password:
+                            st.session_state.reset_error = "Please enter and confirm your new password"
+                        elif new_password != confirm_password:
+                            st.session_state.reset_error = "Passwords do not match"
+                        elif len(new_password) < 8:
+                            st.session_state.reset_error = "Password must be at least 8 characters long"
+                        else:
+                            try:
+                                with dbm.get_db_connection() as conn:
+                                    cursor = conn.cursor()
+                                    # Verify token is still valid
+                                    cursor.execute("""
+                                        SELECT email FROM password_reset_tokens 
+                                        WHERE token = ? AND email = ? AND expires_at > datetime('now')
+                                    """, (token, email))
+                                    if cursor.fetchone():
+                                        # Update password
+                                        password_hash, salt = au.hash_password(new_password)
+                                        cursor.execute("""
+                                            UPDATE users 
+                                            SET password_hash = ?, salt = ?, updated_at = datetime('now')
+                                            WHERE email = ?
+                                        """, (password_hash, salt, email))
+                                        
+                                        # Delete used token
+                                        cursor.execute("""
+                                            DELETE FROM password_reset_tokens 
+                                            WHERE token = ?
+                                        """, (token,))
+                                        
+                                        conn.commit()
+                                        
+                                        st.session_state.reset_success = "Password has been reset successfully. You can now login with your new password."
+                                        st.session_state.reset_error = None
+                                        st.session_state.reset_token = None
+                                        st.session_state.reset_email = None
+                                        
+                                        # Clear form
+                                        st.session_state.new_password = ""
+                                        st.session_state.confirm_password = ""
+                                        
+                                        st.rerun()
+                                    else:
+                                        st.session_state.reset_error = "Invalid or expired token. Please request a new password reset."
+                                        st.session_state.reset_token = None
+                                        st.session_state.reset_email = None
+                            except Exception as e:
+                                st.session_state.reset_error = f"Error resetting password: {str(e)}"
+                        
+                        st.rerun()
+            else:
+                st.error("Invalid or expired token. Please request a new password reset.")
+                st.session_state.reset_token = None
+                st.session_state.reset_email = None
+                
+                # Add a small delay before showing the reset form
+                st.rerun()
+        
+        # If no token, show email input form
+        else:
+            with st.form("request_reset_form"):
+                email = st.text_input("Email Address", key="reset_email")
+                request_button = st.form_submit_button("Send Reset Link")
+                
+                if request_button:
+                    st.session_state.reset_error = None
+                    
+                    if not email:
+                        st.session_state.reset_error = "Please enter your email address"
+                    else:
+                        try:
+                            with dbm.get_db_connection() as conn:
+                                cursor = conn.cursor()
+                                # Check if email exists
+                                cursor.execute("""
+                                    SELECT id FROM users 
+                                    WHERE email = ?
+                                """, (email,))
+                                if cursor.fetchone():
+                                    # Generate token
+                                    token = eu.generate_verification_token()
+                                    
+                                    # Store token in database
+                                    cursor.execute("""
+                                        INSERT OR REPLACE INTO password_reset_tokens 
+                                        (email, token, created_at, expires_at)
+                                        VALUES (?, ?, datetime('now'), datetime('now', '+1 hour'))
+                                    """, (email, token))
+                                    
+                                    # Send reset email
+                                    reset_link = f"{os.getenv('BASE_URL', 'http://localhost:5566')}/?token={token}"
+                                    
+                                    # Create email content
+                                    subject = "Password Reset Request"
+                                    text = f"""
+                                    Hello,
+                                    
+                                    You have requested to reset your password. Please click the link below to reset your password:
+                                    
+                                    {reset_link}
+                                    
+                                    This link will expire in 1 hour.
+                                    
+                                    If you did not request this, please ignore this email.
+                                    
+                                    Regards,
+                                    {os.getenv('APP_NAME', 'FamilyTreePE')} Team
+                                    """
+                                    
+                                    html = f"""
+                                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                                        <h2>Password Reset Request</h2>
+                                        <p>Hello,</p>
+                                        <p>You have requested to reset your password. Please click the button below to reset your password:</p>
+                                        <p style="text-align: center; margin: 30px 0;">
+                                            <a href="{reset_link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                                                Reset Password
+                                            </a>
+                                        </p>
+                                        <p>Or copy and paste this link into your browser:</p>
+                                        <p><code>{reset_link}</code></p>
+                                        <p>This link will expire in 1 hour.</p>
+                                        <p>If you did not request this, please ignore this email.</p>
+                                        <p>Regards,<br>{os.getenv('APP_NAME', 'FamilyTreePE')} Team</p>
+                                    </div>
+                                    """
+                                    
+                                    # Send email
+                                    publisher = eu.EmailPublisher(
+                                        email_sender=eu.Config.MAIL_USERNAME,
+                                        email_password=eu.Config.MAIL_PASSWORD
+                                    )
+                                    
+                                    if publisher.publish_email(subject, text, html, [email]):
+                                        st.session_state.reset_success = f"Password reset link has been sent to {email}. Please check your email."
+                                        st.session_state.reset_error = None
+                                    else:
+                                        st.session_state.reset_error = "Failed to send password reset email. Please try again later."
+                                else:
+                                    # Don't reveal if email exists or not for security
+                                    st.session_state.reset_success = "If your email exists in our system, you will receive a password reset link."
+                                    st.session_state.reset_error = None
+                                    
+                                conn.commit()
+                        except Exception as e:
+                            st.session_state.reset_error = f"Error processing your request: {str(e)}"
+                        
+                    st.rerun()
+
 def show_login_page():
     """Display the login page"""
     # Clear any existing content
     st.empty()
     
+    # Check if we should show reset password page
+    if hasattr(st.session_state, 'show_reset_password') and st.session_state.show_reset_password:
+        show_reset_password_page()
+        return
+    
     # Set page title and header
     st.title(os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""))
+    
+    # Initialize login error message in session state if not exists
+    if 'login_error' not in st.session_state:
+        st.session_state.login_error = None
+    
+    # Check for password reset token in URL
+    token = st.query_params.get("token", [None])[0]
+    if token:
+        st.session_state.show_reset_password = True
+        st.session_state.reset_token = token
+        st.rerun()
     
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -45,6 +277,10 @@ def show_login_page():
         with st.container():
             st.markdown("<h2 style='text-align: center;'>Admin Login</h2>", unsafe_allow_html=True)
             
+            # Display error message if exists
+            if st.session_state.login_error:
+                st.error(st.session_state.login_error)
+            
             # Login form
             with st.form("login_form"):
                 email = st.text_input("Email Address", key="login_email")
@@ -52,27 +288,49 @@ def show_login_page():
                 submit_button = st.form_submit_button("Login")
                 
                 if submit_button:
+                    # Reset previous error
+                    st.session_state.login_error = None
+                    
+                    # Validate input
                     if not email or not password:
-                        st.error("Please enter both email and password")
+                        st.session_state.login_error = "Please enter both email and password"
                     else:
+                        # Verify credentials
                         if au.verify_padmin(email, password):
                             st.session_state.authenticated = True
                             st.session_state.user_email = email
                             st.session_state.user_state = dbm.User_State['p_admin']
+                            # Clear error on successful login
+                            st.session_state.login_error = None
                             st.rerun()
                         elif au.verify_fadmin(email, password):
                             st.session_state.authenticated = True
                             st.session_state.user_email = email
                             st.session_state.user_state = dbm.User_State['f_admin']
+                            st.session_state.login_error = None
                             st.rerun()
                         elif au.verify_fmember(email, password):
                             st.session_state.authenticated = True
                             st.session_state.user_email = email
                             st.session_state.user_state = dbm.User_State['f_member']
+                            st.session_state.login_error = None
                             st.rerun()
                         else:
-                            st.error("Invalid email or password")
-                            st.rerun()
+                            st.session_state.login_error = "Invalid email or password"
+                    
+                    # Rerun to show error message
+                    st.rerun()
+            
+            # Add Forgot Password button above the form
+            col1, col2 = st.columns([2, 1])
+            with col2:
+                if st.button("Forgot Password?", key="forgot_password_btn", 
+                          type="secondary",
+                          icon="🔑",
+                          use_container_width=False,
+                          help="Click to reset your password"):
+                    st.session_state.show_reset_password = True
+                    st.rerun()
 
 def show_fmember_sidebar():
     """Display the family member sidebar with 
@@ -354,8 +612,6 @@ def reset_password_page():
                 if user_id:
                     st.success("✅ Password has been reset successfully")
                     st.session_state.reset_form_submitted = False
-                    # Clear the form
-                    st.rerun()
                 else:
                     st.error("❌ Failed to reset password. Please try again.")
             except Exception as e:
@@ -418,10 +674,9 @@ def search_members_page() -> None:
         with row3_col3:
             sex = st.selectbox(
                 "Gender",
-                ["Male", "Female", "Other"]
+                ["", "Male", "Female", "Other"]
             )
 
-        
         # Search button
         submitted = st.form_submit_button("Search")
         
@@ -437,59 +692,58 @@ def search_members_page() -> None:
                     died=died if died else "",
                     id=member_id if member_id > 0 else None,
                     email=email if email else "",
-                    sex={"男": "M", "女": "F", "其他": "O"}.get(sex, "") if sex else ""
+                    sex={"Male": "M", "Female": "F", "Other": "O"}.get(sex, "") if sex else ""
                 )
-                st.session_state.search_results = results
+                if results: 
+                    st.session_state.search_results = results
+                else:
+                    st.session_state.search_results = []
     
-    # Display search results
-    if st.session_state.search_results:
-        st.subheader("Search Results")
+            # Display search results
+            if st.session_state.search_results:
+                st.subheader("Search Results")
+                
+                # Prepare data for display
+                df = pd.DataFrame(st.session_state.search_results)
         
-        # Prepare data for display
-        df = pd.DataFrame(st.session_state.search_results)
+                # Define all fields from dbm.db_tables['members'] table
+                all_fields = dbm.get_table_columns(dbm.db_tables['members'])
         
-        # Define all fields from members table
-        all_fields = [
-            'id', 'name', 'family_id', 'alias', 'email', 'url', 
-            'born', 'died', 'sex', 'gen_order', 'dad_id', 'mom_id', 
-            'created_at', 'updated_at'
-        ]
+                # Ensure all columns exist in the dataframe
+                for field in all_fields:
+                    if field not in df.columns:
+                        df[field] = None
         
-        # Ensure all columns exist in the dataframe
-        for field in all_fields:
-            if field not in df.columns:
-                df[field] = None
+                # Display data table with all fields
+                st.dataframe(
+                    df[all_fields],
+                    column_config={
+                        'id': 'ID',
+                        'name': 'Name',
+                        'family_id': 'Family ID',
+                        'alias': 'Alias',
+                        'email': 'Email',
+                        'url': 'Website',
+                        'born': 'Birth Date',
+                        'died': 'Death Date',
+                        'sex': 'Gender',
+                        'gen_order': 'Generation',
+                        'dad_id': 'Father ID',
+                        'mom_id': 'Mother ID',
+                        'created_at': 'Created At',
+                        'updated_at': 'Updated At'
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    column_order=all_fields
+                )
         
-        # Display data table with all fields
-        st.dataframe(
-            df[all_fields],
-            column_config={
-                'id': 'ID',
-                'name': 'Name',
-                'family_id': 'Family ID',
-                'alias': 'Alias',
-                'email': 'Email',
-                'url': 'Website',
-                'born': 'Birth Date',
-                'died': 'Death Date',
-                'sex': 'Gender',
-                'gen_order': 'Generation',
-                'dad_id': 'Father ID',
-                'mom_id': 'Mother ID',
-                'created_at': 'Created At',
-                'updated_at': 'Updated At'
-            },
-            hide_index=True,
-            use_container_width=True,
-            column_order=all_fields
-        )
-        
-        # Show result count
-        st.markdown(f"### Total: {len(df)} records")
+                # Show result count
+                st.markdown(f"### Total: {len(df)} records")
     
-    # No results message
-    elif submitted:
-        st.info("No matching members found")
+            # No results message
+            elif submitted:
+                st.info("No matching members found")
 
 def show_fadmin_content():
     """Display the family admin content area"""
@@ -552,15 +806,25 @@ def show_fadmin_content():
                 <h4 class="blink">Are you the only family admin?</h4>
                 """, unsafe_allow_html=True)
                 st.markdown("To create **another Family Admin** for backup is always a good idea!")
-                if st.form_submit_button("Create Family Admin"):
+                
+                # Store form state
+                form_submitted = st.form_submit_button("Create Family Admin")
+                
+                if form_submitted:
+                    error_messages = []
+                    
                     if not email or not eu.validate_email(email):
-                        st.error(f"❌ Please enter a valid email address")
-                    elif not new_password:
-                        st.error(f"❌ Please enter a password")
+                        error_messages.append("Please enter a valid email address")
+                    if not new_password:
+                        error_messages.append("Please enter a password")
                     elif new_password != confirm_password:
-                        st.error(f"❌ Passwords do not match")
+                        error_messages.append("Passwords do not match")
                     elif len(new_password) < 8:
-                        st.error(f"❌ Password must be at least 8 characters long")
+                        error_messages.append("Password must be at least 8 characters long")
+                    
+                    if error_messages:
+                        for msg in error_messages:
+                            st.error(f"❌ {msg}")
                     else:
                         results = dbm.search_members(email=email)
                         if len(results) > 1:
@@ -574,6 +838,10 @@ def show_fadmin_content():
                                 success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                 if success:
                                     st.success(f"✅ Family Admin & Subscriber created successfully")
+                                    # Clear form on success
+                                    st.session_state.new_password = ""
+                                    st.session_state.confirm_password = ""
+                                    st.session_state.family_admin_email = ""
                                 else:
                                     st.error(f"❌ {message}")
                             else:
@@ -586,40 +854,55 @@ def show_fadmin_content():
             with st.form("subscriber_form"):
                 st.markdown("### Family Member Subscription")
                 action = st.radio("Select Action", ["Subscribe", "Unsubscribe"])
-                if st.form_submit_button("Submit"):
+                
+                # Store form state
+                form_submitted = st.form_submit_button("Submit")
+                
+                if form_submitted:
+                    error_messages = []
+                    
                     if not email or not eu.validate_email(email):
-                        st.error(f"❌ Please enter a valid email address")
-                    elif not new_password:
-                        st.error(f"❌ Please enter a password")
-                    elif new_password != confirm_password:
-                        st.error(f"❌ Passwords do not match")
-                    elif len(new_password) < 8:
-                        st.error(f"❌ Password must be at least 8 characters long")
+                        error_messages.append("Please enter a valid email address")
+                    
+                    if action == "Unsubscribe":
+                        # Remove subscriber if Unsubscribe is selected
+                        if dbm.remove_subscriber(email):
+                            st.success(f"✅ Family member {email} unsubscribed successfully")
+                        else:
+                            st.error(f"❌ Failed to unsubscribe {email}")
                     else:
-                        results = dbm.search_members(email=email)
-                        if len(results) > 1:
-                            st.error(f"❌ Multiple users found with the same email {email}")
-                        elif len(results) == 1:
-                            user_id = au.create_user(
-                                email, new_password, 
-                                role=dbm.User_State['f_member'])
-                            if user_id:
-                                if action == "Subscribe":
+                        if not new_password:
+                            error_messages.append("Please enter a password")
+                        elif new_password != confirm_password:
+                            error_messages.append("Passwords do not match")
+                        elif len(new_password) < 8:
+                            error_messages.append("Password must be at least 8 characters long")
+                        
+                        if error_messages:
+                            for msg in error_messages:
+                                st.error(f"❌ {msg}")
+                        else:
+                            results = dbm.search_members(email=email)
+                            if len(results) > 1:
+                                st.error(f"❌ Multiple users found with the same email {email}")
+                            elif len(results) == 1:
+                                user_id = au.create_user(
+                                    email, new_password, 
+                                    role=dbm.User_State['f_member'])
+                                if user_id and action == "Subscribe":
                                     success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                     if success:
                                         st.success(f"✅ Family member {email} subscribed successfully")
+                                        # Clear form on success
+                                        st.session_state.new_password = ""
+                                        st.session_state.confirm_password = ""
+                                        st.session_state.family_admin_email = ""
                                     else:
                                         st.error(f"❌ {message}")
-                                elif action == "Unsubscribe":
-                                    success, message = dbm.remove_subscriber(email)
-                                    if success:
-                                        st.success(f"✅ Family member {email} unsubscribed successfully")
-                                    else:
-                                        st.error(f"❌ {message}")
+                                else:
+                                    st.error(f"❌ Failed to create family member {email}")
                             else:
-                                st.error(f"❌ Failed to create family member {email}")
-                        else:
-                            st.error(f"❌ To become a family subscriber, you must join this family first")
+                                st.error(f"❌ To become a family subscriber, you must join this family first")
     
     available_tables =  [os.getenv("TBL_MEMBERS", "members"),
                  os.getenv("TBL_RELATIONS", "relations"),

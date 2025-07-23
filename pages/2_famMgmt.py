@@ -137,10 +137,10 @@ def search_families_page() -> None:
         row1_col1, row1_col2 = st.columns(2)
         row2_col1, row2_col2 = st.columns(2)
         
-        with row1_col1:
-            name = st.text_input(UI_TEXTS["search"]["family_name_prompt"])
-        
         with row1_col2:
+            name = st.text_input(UI_TEXTS["search"]["family_name_prompt"], key="search_family_name")
+        
+        with row1_col1:
             family_id = st.number_input(
                 UI_TEXTS["search"]["family_id_prompt"],
                 min_value=0,
@@ -149,86 +149,94 @@ def search_families_page() -> None:
                 key="search_family_id"
             )
             
-        with row2_col1:
+        with row2_col2:
             background = st.text_area(UI_TEXTS["search"]["background_prompt"])
             
-        with row2_col2:
-            url = st.text_input(UI_TEXTS["search"]["url_prompt"])
+        with row2_col1:
+            url = st.text_input(UI_TEXTS["search"]["url_prompt"], key="search_url")
         
         # add a search button
         submitted = st.form_submit_button("search")
     
-    # process search when form is submitted
-    if submitted:
-        # Validate required fields
-        name = name.strip()
-        background = background.strip()
-        if not name and not family_id and not background and not url:
-            st.error(f"❌ {UI_TEXTS['search']['error_required']}")
-            return
+        # process search when form is submitted
+        if submitted:
+            # Validate required fields
+            name = name.strip()
+            background = background.strip()
             
-        with st.spinner(UI_TEXTS["search"]["searching"]):
-            # if family_id is not 0, search by family_id
-            if family_id > 0:
-                # Get family by ID
-                family = dbm.get_familiy(family_id)
-                if family:
-                    st.session_state.family_search_results = [family]
+            with st.spinner(UI_TEXTS["search"]["searching"]):
+                if family_id > 0:
+                    # Get family by ID
+                    family = dbm.get_family(family_id)
+                    if family:
+                        st.session_state.family_search_results = [family]
+                    else:
+                        st.session_state.family_search_results = []
+                elif name:
+                    # Get families by name-like
+                    results = dbm.get_families_by_name(name)
+                    if results:
+                        st.session_state.family_search_results = results
+                    else:
+                        st.session_state.family_search_results = []
+                elif background:
+                    # Get families by background
+                    results = dbm.get_families_by_background(background)
+                    if results:
+                        st.session_state.family_search_results = results
+                    else:
+                        st.session_state.family_search_results = []
+                elif url:
+                    # Get families by url-like
+                    results = dbm.get_families_by_url(url)
+                    if results:
+                        st.session_state.family_search_results = results
+                    else:
+                        st.session_state.family_search_results = []
                 else:
-                    st.session_state.family_search_results = []
-            elif name:
-                # Get families by name-like
-                results = dbm.get_families_by_name(name)
-                if results:
-                    st.session_state.family_search_results = results
-                else:
-                    st.session_state.family_search_results = []
-            else:
-                # Get families by background
-                results = dbm.get_families_by_background(background)
-                if results:
-                    st.session_state.family_search_results = results
-                else:
-                    st.session_state.family_search_results = []
+                    # Get all families
+                    st.session_state.family_search_results = dbm.get_families()
             
-    # display search results if available
-    if st.session_state.family_search_results:
-        st.subheader("search results")
+            # display search results if available
+            if st.session_state.family_search_results:
+                st.subheader("search results")
         
-        # convert results to dataframe for better display
-        df = pd.DataFrame(st.session_state.family_search_results)
+                # convert results to dataframe for better display
+                df = pd.DataFrame(st.session_state.family_search_results)
         
-        # rename columns for better display
-        if not df.empty:
-            # select and reorder columns
-            all_fields = ['id', 'name', 'background', 'url', 'created_at', 'updated_at']
+                # rename columns for better display
+                if not df.empty:
+                    # select and reorder columns
+                    all_fields = ['id', 'name', 'background', 'url', 'created_at', 'updated_at']
             
-            # Filter out columns that don't exist in the results
-            existing_fields = [col for col in all_fields if col in df.columns]
-            df = df[existing_fields]
+                    # Filter out columns that don't exist in the results
+                    existing_fields = [col for col in all_fields if col in df.columns]
+                    df = df[existing_fields]
             
-            # Display the data in a table
-            st.dataframe(
-                df,
-                column_config={
-                    'id': 'ID',
-                    'name': 'Family Name',
-                    'background': 'Background',
-                    'url': 'Website',
-                    'created_at': 'Created At',
-                    'updated_at': 'Updated At'
-                },
-                hide_index=True,
-                use_container_width=True,
-                column_order=all_fields
-            )
+                    # Display the data in a table
+                    st.dataframe(
+                        df,
+                        column_config={
+                            'id': 'ID',
+                            'name': 'Family Name',
+                            'background': 'Background',
+                            'url': 'Website',
+                            'created_at': 'Created At',
+                            'updated_at': 'Updated At'
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        column_order=all_fields
+                    )
             
-            # Show result count with bigger and bolder text
-            st.markdown(f"<p style='font-size: 1.2em; font-weight: bold;'>Found {len(df)} records</p>", unsafe_allow_html=True)
+                    # Show result count with bigger and bolder text
+                    st.markdown(f"### Found {len(df)} records")
+                else:
+                    st.info("No matching families found")
     
-    # No results message
-    elif submitted:
-        st.info("No matching families found")
+            # No results message
+            elif submitted:
+                st.info("No matching families found")
 
 def add_family_page() -> None:
     """Display the form to add a new family."""
@@ -238,11 +246,12 @@ def add_family_page() -> None:
         col1, col2 = st.columns(2)
         
         with col1:
-            name = st.text_input("Family Name*", "")
+            name = st.text_input("Family Name*", "", key="family_name_2")
             url = st.text_input(
                 "Family Website",
                 "",
-                placeholder="https://example.com"
+                placeholder="https://example.com",
+                key="family_url_2"
             )
         
         with col2:
@@ -250,7 +259,8 @@ def add_family_page() -> None:
                 "Family Background/History",
                 "",
                 height=100,
-                help="Enter any relevant family history or background information"
+                help="Enter any relevant family history or background information",
+                key="family_background_2"
             )
         
         # Form submission button
@@ -278,8 +288,6 @@ def add_family_page() -> None:
                 if family_id:
                     st.success(f"✅ {UI_TEXTS["add"]["success"]} {name} (ID: {family_id})")
                     
-                    # Clear form
-                    st.rerun()
                 else:
                     st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str("Failed to add family. Please try again.")}")
                 
@@ -297,7 +305,7 @@ def update_family_page() -> None:
         UI_TEXTS["update"]["family_id_prompt"],
         min_value=1,
         step=1,
-        key="update_family_id"
+        key="update_family_id_2"
     )
     
     if family_id:
@@ -319,7 +327,8 @@ def update_family_page() -> None:
             with col1:
                 name = st.text_input(
                     UI_TEXTS['update']['family_name_prompt'],
-                    family.get('name', '')
+                    family.get('name', ''),
+                    key=f"update_name_{family_id}"
                 )
                 
                 # Display creation/update timestamps as read-only
@@ -333,14 +342,16 @@ def update_family_page() -> None:
                 url = st.text_input(
                     UI_TEXTS["update"]["url_prompt"],
                     family.get('url', ''),
-                    placeholder="https://example.com"
+                    placeholder="https://example.com",
+                    key=f"update_url_{family_id}"
                 )
             
             background = st.text_area(
                 UI_TEXTS["update"]["background_prompt"],
                 family.get('background', ''),
                 height=150,
-                help="Enter any relevant family history or background information"
+                help="Enter any relevant family history or background information",
+                key=f"update_background_{family_id}"
             )
             
             submitted = st.form_submit_button(UI_TEXTS["update"]["submit_button"])
@@ -406,102 +417,111 @@ def search_relations_page() -> None:
                 min_value=0,
                 step=1,
                 value=0,
-                key="search_some_id"
+                key="search_some_id_2"
             )
         
-        with row1_col2:
+        with row2_col1:
             relation_type = st.text_input(
                 "Relation Type that Member relates to Partner",
                 value="",
-                placeholder="e.g. spouse, parent, child, sibling"
+                placeholder="e.g. spouse, parent, child, sibling",
+                key="relation_type_2"
             )
             
-        with row2_col1:
-            join_date_from = st.date_input(
-                "Join Date From",
-                value=None,
-                format="YYYY-MM-DD"
+        with row1_col2:
+            join_date_from = st.text_input(
+                "Join Date From (YYYY-MM-DD)",
+                value="",
+                help="Enter the join date in the format YYYY-MM-DD",
+                key="join_date_from_2"
             )
         
         with row2_col2:
-            join_date_to = st.date_input(
-                "Join Date To",
-                value=None,
-                format="YYYY-MM-DD"
+            join_date_to = st.text_input(
+                "Join Date To (YYYY-MM-DD)",
+                value="",
+                help="Enter the join date in the format YYYY-MM-DD",
+                key="join_date_to_2"
             )
         
         # Add a search button
         submitted = st.form_submit_button("Search")
     
-    # Process search when form is submitted
-    if submitted:
-        with st.spinner("Searching..."):
-            try:
-                if some_id > 0:
-                    relations = dbm.get_relations_by_id(some_id)
+        # Process search when form is submitted
+        if submitted:
+            with st.spinner("Searching..."):
+                try:
+                    if some_id > 0:
+                        relations = dbm.get_relations_by_id(some_id)
                         
-                elif relation_type:
-                    relations = dbm.get_relations_by_relation(relation_type)
+                    elif relation_type:
+                        relations = dbm.get_relations_by_relation(relation_type)
                         
-                elif join_date_from or join_date_to:
-                    relations = dbm.get_relations_by_join_between(join_date_from, join_date_to)
+                    elif join_date_from and join_date_to:
+                        relations = dbm.get_relations_by_join_between(join_date_from, join_date_to)
                         
+                    else:
+                        relations = dbm.get_relations()
+                
+                    if relations:
+                        # Store results in session state
+                        st.session_state.relation_search_results = relations
+                    else:
+                        st.session_state.relation_search_results = []
+                        st.info("No matching relations found")
+                
+                except Exception as e:
+                    st.session_state.relation_search_results = []
+                    st.error(f"Error searching relations: {str(e)}")
+    
+            # Display search results if available
+            if st.session_state.relation_search_results:
+                st.subheader("Search Results")
+        
+                # Convert results to DataFrame for better display
+                df = pd.DataFrame(st.session_state.relation_search_results)
+        
+                # Rename columns for better display
+                if not df.empty:
+                    # Select and reorder columns
+                    all_fields = [
+                        'id', 'member_id', 'partner_id', 'relation', 
+                        'original_family_id', 'original_name', 'join_date', 'end_date',
+                        'created_at', 'updated_at'
+                    ]
+            
+                    # Filter out columns that don't exist in the results
+                    existing_fields = [col for col in all_fields if col in df.columns]
+                    df = df[existing_fields]
+            
+                    # Display the data in a table
+                    st.dataframe(
+                        df,
+                        column_config={
+                            'id': 'ID',
+                            'member_id': 'Member ID',
+                            'partner_id': 'Related Member ID',
+                            'relation': 'Relation Type',
+                            'original_family_id': 'Original Family ID',
+                            'original_name': 'Original Name',
+                            'join_date': 'Start Date',
+                            'end_date': 'End Date',
+                            'created_at': 'Created At',
+                            'updated_at': 'Updated At'
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        column_order=all_fields
+                    )
+            
+                    # Show result count with bigger and bolder text
+                    st.markdown(f"### Found {len(df)} records")
                 else:
-                    relations = dbm.get_relations()
-                
-                # Store results in session state
-                st.session_state.relation_search_results = relations
-                
-            except Exception as e:
-                st.error(f"Error searching relations: {str(e)}")
-                st.session_state.relation_search_results = []
+                    st.info("No matching relation records found")
     
-    # Display search results if available
-    if st.session_state.relation_search_results:
-        st.subheader("Search Results")
-        
-        # Convert results to DataFrame for better display
-        df = pd.DataFrame(st.session_state.relation_search_results)
-        
-        # Rename columns for better display
-        if not df.empty:
-            # Select and reorder columns
-            all_fields = [
-                'id', 'member_id', 'partner_id', 'relation', 
-                'original_family_id', 'original_name', 'join_date', 'end_date',
-                'created_at', 'updated_at'
-            ]
-            
-            # Filter out columns that don't exist in the results
-            existing_fields = [col for col in all_fields if col in df.columns]
-            df = df[existing_fields]
-            
-            # Display the data in a table
-            st.dataframe(
-                df,
-                column_config={
-                    'id': 'ID',
-                    'member_id': 'Member ID',
-                    'partner_id': 'Related Member ID',
-                    'relation': 'Relation Type',
-                    'original_family_id': 'Original Family ID',
-                    'original_name': 'Original Name',
-                    'join_date': 'Start Date',
-                    'end_date': 'End Date',
-                    'created_at': 'Created At',
-                    'updated_at': 'Updated At'
-                },
-                hide_index=True,
-                use_container_width=True,
-                column_order=all_fields
-            )
-            
-            # Show result count with bigger and bolder text
-            st.markdown(f"<p style='font-size: 1.2em; font-weight: bold;'>Found {len(df)} records</p>", unsafe_allow_html=True)
-    
-    # No results message
-    elif submitted:
-        st.info("No matching relation records found")
+            # No results message
+            elif submitted:
+                st.info("No matching relation records found")
 
 def add_relation_page() -> None:
     """
@@ -510,6 +530,7 @@ def add_relation_page() -> None:
     st.subheader("Add New Relation")
     
     with st.form("add_relation_form"):
+
         col1, col2 = st.columns(2)
         
         with col1:
@@ -518,19 +539,21 @@ def add_relation_page() -> None:
                 min_value=1,
                 step=1,
                 help="ID of the first member in the relationship",
-                key="add_relation_member_id"
+                key="add_relation_member_id_2"
             )
-            
+            rel_list = dbm.Relation_Type.keys()
             relation_type = st.selectbox(
                 "Relation Type*",
-                ['spouse', 'parent', 'child', 'sibling', 'other'],
-                help="Type of relationship between the members"
+                rel_list,
+                help="Type of relationship between the members",
+                key="add_relation_type_2"
             )
             
-            join_date = st.date_input(
-                "Start Date",
-                value=date.today(),
-                help="When this relationship began"
+            join_date = st.text_input(
+                "Start Date*",
+                value=date.today().strftime("%Y-%m-%d"),
+                help="When this relationship began",
+                key="add_join_date_2"
             )
             
         with col2:
@@ -540,7 +563,7 @@ def add_relation_page() -> None:
                 step=1,
                 value=1,
                 help="ID of the second member in the relationship",
-                key="add_relation_partner_id"
+                key="add_relation_partner_id_2"
             )
             
             original_family_id = st.number_input(
@@ -549,19 +572,25 @@ def add_relation_page() -> None:
                 step=1,
                 value=0,
                 help="Original family ID if applicable",
-                key="add_relation_original_family_id"
+                key="add_relation_original_family_id_2"
             )
             
-            end_date = st.date_input(
+            end_date = st.text_input(
                 "End Date (optional)",
                 value=None,
-                help="If this relationship has ended, when it ended"
+                help="If this relationship has ended, when it ended",
+                key="add_end_date_2"
             )
+            
+            # Validate date range if end date is provided
+            if end_date and end_date < join_date:
+                st.error("End date cannot be before start date")
+                st.stop()
         
         # Additional fields
-        original_name = st.text_input("Original Name (if different)", "")
-        dad_name = st.text_input("Father's Name (if applicable)", "")
-        mom_name = st.text_input("Mother's Name (if applicable)", "")
+        original_name = st.text_input("Original Name (if different)", "", key="add_original_name_2")
+        dad_name = st.text_input("Father's Name (if applicable)", "", key="add_dad_name_2")
+        mom_name = st.text_input("Mother's Name (if applicable)", "", key="add_mom_name_2")
         
         submitted = st.form_submit_button("Add Relation")
         
@@ -577,7 +606,7 @@ def add_relation_page() -> None:
                     'member_id': member_id,
                     'partner_id': partner_id,
                     'relation': relation_type,
-                    'join_date': join_date.isoformat(),
+                    'join_date': join_date,
                     'original_family_id': original_family_id if original_family_id > 0 else None,
                     'original_name': original_name if original_name else None,
                     'dad_name': dad_name if dad_name else None,
@@ -586,7 +615,7 @@ def add_relation_page() -> None:
                 
                 # Add end date if provided
                 if end_date:
-                    relation_data['end_date'] = end_date.isoformat()
+                    relation_data['end_date'] = end_date
                 
                 # Add relation to database
                 relation_id = dbm.add_or_update_relation(
@@ -594,15 +623,11 @@ def add_relation_page() -> None:
                 
                 if relation_id:
                     st.success(f"✅ {UI_TEXTS["add"]["success"]} {relation_id}")
-                    # Clear form
-                    st.rerun()
                 else:
                     st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str("Failed to add relation. Please check the member IDs and try again.")}")
                 
             except ValueError as ve:
                 st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(ve)}")
-            except sqlite3.Error as se:
-                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(se)}")
             except Exception as e:
                 st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(e)}")
 
@@ -617,7 +642,7 @@ def update_relation_page() -> None:
         UI_TEXTS["update"]["relation_id_prompt"],
         min_value=1,
         step=1,
-        key="update_relation_id"
+        key="update_relation_id_2"
     )
     
     if relation_id:
@@ -640,14 +665,21 @@ def update_relation_page() -> None:
                     step=1,
                     value=relation.get('member_id', 1),
                     help="ID of the first member in the relationship",
-                    key="update_relation_member_id"
+                    key="update_relation_member_id_2"
                 )
-                
+                rel_list = list(dbm.Relation_Type.keys())  # Convert dict_keys to list
+                current_relation = relation.get('relation', 'spouse')
+                try:
+                    default_index = rel_list.index(current_relation)
+                except ValueError:
+                    default_index = 0  # Default to first item if relation not found
+                    
                 relation_type = st.selectbox(
                     UI_TEXTS["update"]["relation_type_prompt"],
-                    ['spouse', 'parent', 'child', 'sibling', 'other'],
-                    index=['spouse', 'parent', 'child', 'sibling', 'other'].index(relation.get('relation', 'spouse')),
-                    help="Type of relationship between the members"
+                    rel_list,
+                    index=default_index,
+                    help="Type of relationship between the members",
+                    key="update_relation_type_2"
                 )
                 
                 # Safely handle different date input types
@@ -664,11 +696,48 @@ def update_relation_page() -> None:
                 else:
                     default_date = date.today()
                 
-                join_date = st.date_input(
-                    UI_TEXTS["update"]["join_date_prompt"],
-                    value=default_date,
-                    help="When this relationship began"
+                join_date = st.text_input(
+                    UI_TEXTS["update"]["join_date_prompt"] + "*",
+                    value=datetime.strptime(relation.get('join_date', str(date.today())), '%Y-%m-%d').date(),
+                    help="When this relationship began",
+                    key=f"update_join_date_{relation_id}"
                 )
+                
+                # Get and parse dates with proper error handling
+                try:
+                    # Parse join date
+                    join_date_value = relation.get('join_date')
+                    if isinstance(join_date_value, str):
+                        join_date = datetime.strptime(join_date_value, '%Y-%m-%d').date()
+                    else:
+                        join_date = join_date_value or date.today()
+                    
+                    # Parse end date if it exists
+                    end_date_value = relation.get('end_date')
+                    if end_date_value:
+                        if isinstance(end_date_value, str):
+                            end_date = datetime.strptime(end_date_value, '%Y-%m-%d').date()
+                        else:
+                            end_date = end_date_value
+                    else:
+                        end_date = None
+                    
+                    # Display end date input
+                    end_date = st.text_input(
+                        UI_TEXTS["update"]["end_date_prompt"],
+                        value=end_date,
+                        help="If this relationship has ended, when it ended",
+                        key=f"update_end_date_{relation_id}"
+                    )
+                    
+                    # Validate date range if end date is provided
+                    if end_date and end_date < join_date:
+                        st.error("End date cannot be before start date")
+                        st.stop()
+                        
+                except (ValueError, TypeError) as e:
+                    st.error(f"Error parsing dates: {str(e)}")
+                    st.stop()
                 
             with col2:
                 partner_id = st.number_input(
@@ -677,7 +746,7 @@ def update_relation_page() -> None:
                     step=1,
                     value=relation.get('partner_id', 1),
                     help="ID of the second member in the relationship",
-                    key="update_relation_partner_id"
+                    key="update_relation_partner_id_2"
                 )
                 
                 original_family_id = st.number_input(
@@ -686,28 +755,24 @@ def update_relation_page() -> None:
                     step=1,
                     value=relation.get('original_family_id', 0),
                     help="Original family ID if applicable",
-                    key="update_relation_original_family_id"
+                    key="update_relation_original_family_id_2"
                 )
-                
-                end_date_value = relation.get('end_date')
-                end_date = st.date_input(
-                    UI_TEXTS["update"]["end_date_prompt"],
-                    value=datetime.strptime(end_date_value, '%Y-%m-%d').date() if end_date_value else None,
-                    help="If this relationship has ended, when it ended"
-                )
-            
+                      
             # Additional fields
             original_name = st.text_input(
-                UI_TEXTS["update"]["original_name_prompt"],
-                relation.get('original_name', '')
+                "Original Name (if different)",
+                relation.get('original_name', ''),
+                key=f"update_original_name_{relation_id}"
             )
             dad_name = st.text_input(
-                UI_TEXTS["update"]["dad_name_prompt"],
-                relation.get('dad_name', '')
+                "Father's Name (if applicable)",
+                relation.get('dad_name', ''),
+                key=f"update_dad_name_{relation_id}"
             )
             mom_name = st.text_input(
-                UI_TEXTS["update"]["mom_name_prompt"],
-                relation.get('mom_name', '')
+                "Mother's Name (if applicable)",
+                relation.get('mom_name', ''),
+                key=f"update_mom_name_{relation_id}"
             )
             
             # Display timestamps
@@ -789,41 +854,43 @@ def add_member_page() -> None:
         col1, col2 = st.columns(2)
         
         with col1:
-            name = st.text_input(UI_TEXTS["add"]["name"], "")
+            name = st.text_input(UI_TEXTS["add"]["name"], "", key="add_member_name_2")
             sex = st.selectbox(
                 UI_TEXTS["add"]["sex"],
                 UI_TEXTS["add"]["sex_options"],
-                index=0
+                index=0,
+                key="add_member_sex_2"
             )
             born = st.text_input(
                 UI_TEXTS["add"]["birth_date"],
-                "",
-                placeholder=UI_TEXTS["add"]["birth_date_placeholder"]
+                value=date.today().strftime("%Y-%m-%d"),
+                help=UI_TEXTS["add"]["birth_date_placeholder"],
+                key="add_born_date_2"
             )
             family_id = st.number_input(
                 UI_TEXTS["add"]["family_id"],
                 min_value=0,
                 step=1,
                 value=0,
-                key="add_member_family_id"
+                key="add_member_family_id_2"
             )
             gen_order = st.number_input(
                 UI_TEXTS["add"]["generation"],
                 min_value=0,
                 step=1,
                 value=0,
-                key="add_member_gen_order"
+                key="add_member_gen_order_2"
             )
         with col2:
-            alias = st.text_input(UI_TEXTS["add"]["alias"], "")
+            alias = st.text_input(UI_TEXTS["add"]["alias"], "", key="add_alias_2")
             
-            email = st.text_input(UI_TEXTS["add"]["email"], "")
-            password = st.text_input(UI_TEXTS["add"]["password"], "", type="password")
-            confirm_password = st.text_input(UI_TEXTS["add"]["confirm_password"], "", type="password")
+            email = st.text_input(UI_TEXTS["add"]["email"], "", key="add_email_2")
+            password = st.text_input(UI_TEXTS["add"]["password"], "", type="password", key="add_password_2")
+            confirm_password = st.text_input(UI_TEXTS["add"]["confirm_password"], "", type="password", key="confirm_password_2")
             if password != confirm_password:
                 st.error(UI_TEXTS["add"]["error_password_match"])
                 return
-            url = st.text_input(UI_TEXTS["add"]["url"], "")
+            url = st.text_input(UI_TEXTS["add"]["url"], "", key="add_url_2")
         
         submitted = st.form_submit_button(UI_TEXTS["add"]["submit_button"])
         
@@ -876,7 +943,7 @@ def update_member_page() -> None:
         UI_TEXTS["update"]["member_id_prompt"],
         min_value=1,
         step=1,
-        key="update_member_id"
+        key="update_member_id_2"
     )
     
     if member_id:
@@ -901,12 +968,14 @@ def update_member_page() -> None:
                 st.subheader("Basic Information")
                 name = st.text_input(
                     "Name*",
-                    member.get('name', '')
+                    member.get('name', ''),
+                    key=f"update_name_{member_id}_2"
                 )
                 
                 alias = st.text_input(
                     "Alias",
-                    member.get('alias', '')
+                    member.get('alias', ''),
+                    key=f"update_alias_{member_id}_2"
                 )
                 
                 # Gender selection with proper value mapping
@@ -936,14 +1005,38 @@ def update_member_page() -> None:
             with col2:
                 # Dates and Family
                 st.subheader("Dates & Family")
+                # Convert empty string to None for date input
+                born_value = member.get('born')
+                if born_value == '':
+                    born_value = None
+                elif isinstance(born_value, str):
+                    try:
+                        born_value = datetime.strptime(born_value, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        born_value = None
+                
                 born = st.text_input(
                     "Birth Date* (YYYY-MM-DD)",
-                    member.get('born', '')
+                    value=born_value,
+                    help="Enter the birth date in the format YYYY-MM-DD",
+                    key=f"update_born_{member_id}"
                 )
                 
+                # Convert empty string to None for date input
+                died_value = member.get('died')
+                if died_value == '':
+                    died_value = None
+                elif isinstance(died_value, str):
+                    try:
+                        died_value = datetime.strptime(died_value, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        died_value = None
+                        
                 died = st.text_input(
                     "Death Date (YYYY-MM-DD)",
-                    member.get('died', '')
+                    value=died_value,
+                    help="Enter the death date in the format YYYY-MM-DD",
+                    key=f"update_died_{member_id}"
                 )
                 
                 family_id = st.number_input(
@@ -951,7 +1044,7 @@ def update_member_page() -> None:
                     min_value=0,
                     step=1,
                     value=member.get('family_id', ''),
-                    key="update_member_family_id"
+                    key="update_member_family_id_2"
                 )
                 
                 # Ensure gen_order is an integer
@@ -1010,7 +1103,7 @@ def update_member_page() -> None:
                         'name': name,
                         'sex': sex if sex else None,
                         'born': born,
-                        'died': died if died else '0000-01-01',
+                        'died': died if died else '0000-00-00',
                         'family_id': int(family_id) if int(family_id) >= 0 else 0,
                         'alias': alias if alias else None,
                         'email': email if email else None,
@@ -1117,14 +1210,28 @@ def birthday_of_the_month_page():
             st.info(f"⚠️ {UI_TEXTS["birthday"]["not_found"]}")
             return
             
-        # Create a DataFrame for display
-        df = pd.DataFrame([{
-            'ID': m.get('id', ''),
-            'Name': m.get('name', ''),
-            'Gender': 'Male' if m.get('gender') == 'M' else 'Female',
-            'Birthday': fu.format_timestamp(m.get('born')),
-            'Email': m.get('email', '')
-        } for m in members])
+        # Create a list to hold all member data
+        member_data = []
+        
+        # Process each member and collect their data
+        for m in members:
+            if m.get('sex') == 'M':
+                gender = 'Male'
+            elif m.get('sex') == 'F':
+                gender = 'Female'
+            else:
+                gender = 'Unknown'
+                
+            member_data.append({
+                'ID': m.get('id', ''),
+                'Name': m.get('name', ''),
+                'Gender': gender,
+                'Birthday': fu.format_timestamp(m.get('born')),
+                'Email': m.get('email', '')
+            })
+        
+        # Create DataFrame from the collected data
+        df = pd.DataFrame(member_data)
         
         # save to csv, created in the dir_path, specified in the context fss
         csv_file = f"{st.session_state.app_context['fss']['dir_path']}/birthday_list_{selected_month.lower()}_{datetime.now().year}.csv"

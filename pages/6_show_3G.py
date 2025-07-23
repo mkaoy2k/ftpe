@@ -37,6 +37,7 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
     Returns:
         Dict containing:
             - center: The center member
+            - spouse: List of spouses
             - parents: List of parents
             - children: List of children
             - grandparents: List of grandparents
@@ -52,12 +53,22 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         # Initialize result dictionary
         result = {
             'center': center,
+            'spouse': [],
             'parents': [],
             'children': [],
             'grandparents': [],
             'grandchildren': []
         }
-        
+        # Find spouse(s)
+        spouse_relations = dbm.get_relations_by_id(member_id, relation='spouse')
+        if spouse_relations:
+            # Get the spouse's member information
+            for rel in spouse_relations:
+                spouse_id = rel['partner_id'] if rel['member_id'] == member_id else rel['member_id']
+                spouse = dbm.get_member(spouse_id)
+                if spouse:
+                    result['spouse'].append(spouse)
+                    
         # Find parents
         result['parents'] = dbm.get_parents(member_id)
         
@@ -153,7 +164,12 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         logger.exception("Error in get_family_members")
         return {}
 
-def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: int = 15, engine: str = 'dot') -> gv.Digraph:
+def create_family_graph(
+    family_data: Dict[str, Any],
+    height: int = 15,
+    width: int = 5,
+    engine: str = 'dot'
+) -> gv.Digraph:
     """
     Create a Graphviz diagram of the family tree.
     
@@ -166,60 +182,21 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
     Returns:
         graphviz.Digraph: The generated family tree graph
     """
-    # Base graph attributes
+    # Base graph attributes for top-to-bottom layout
     graph_attrs = {
-        'size': f'{width},{height}!',
-        'center': 'true',
-        'margin': '0.2',
-        'pad': '0.5',
-        'dpi': '150',
+        'rankdir': 'TB',        # Top to bottom direction
+        'size': f'{width},{height}',
         'ratio': 'auto',
-        'splines': 'ortho' if engine in ['dot', 'neato'] else 'spline',
-        'overlap': 'false',
-        'splines': 'true',
         'nodesep': '0.5',
-        'ranksep': '0.8',
+        'ranksep': '1.0',
+        'splines': 'ortho',
         'newrank': 'true',
-        'fontname': 'Arial'
+        'fontname': 'Arial',
+        'center': 'true',
+        'rank': 'source',
+        'concentrate': 'true',
+        'dpi': '96'
     }
-    
-    # Engine-specific adjustments
-    if engine == 'dot':
-        graph_attrs.update({
-            'rankdir': 'TB',
-            'nodesep': '0.6',
-            'ranksep': '1.0',
-            'concentrate': 'true'
-        })
-    elif engine == 'neato':
-        graph_attrs.update({
-            'mode': 'major',
-            'model': 'subset',
-            'start': '1',
-            'epsilon': '0.0001',
-            'maxiter': '1000',
-            'damping': '0.99'
-        })
-    elif engine in ['fdp', 'sfdp']:
-        graph_attrs.update({
-            'K': '1.0',
-            'maxiter': '1000',
-            'start': '1',
-            'overlap_scaling': '4',
-            'repulsiveforce': '1.0'
-        })
-    elif engine == 'twopi':
-        graph_attrs.update({
-            'ranksep': '2.0',
-            'rank': 'same',
-            'root': 'center'
-        })
-    elif engine == 'circo':
-        graph_attrs.update({
-            'mindist': '1.0',
-            'nodesep': '0.75',
-            'ranksep': '1.5'
-        })
 
     # Create the graph with the specified engine and attributes
     graph = gv.Digraph(
@@ -232,7 +209,7 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
             'fontsize': '14',
             'margin': '0.15,0.2',
             'width': '2.5',
-            'height': '0.8',
+            'height': '1.5',
             'penwidth': '1.0',
             'color': 'black',
             'fixedsize': 'true'
@@ -328,6 +305,19 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
     if 'center' in family_data and family_data['center']:
         add_member_node(family_data['center'])
     
+    # Add center's spouse(s) and connect to center
+    for spouse in family_data.get('spouse', []):
+        add_member_node(spouse)
+        if 'center' in family_data and family_data['center']:
+            # Add a non-directional edge between center and spouse
+            graph.edge(
+                str(family_data['center']['id']),
+                str(spouse['id']),
+                dir='none',  # Makes the edge non-directional
+                style='dashed',  # Optional: make spouse connections dashed
+                color='gray'  # Optional: use a different color for spouse connections
+            )
+    
     # Add parents
     parent_nodes = []
     for parent in family_data.get('parents', []):
@@ -374,31 +364,76 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
                 if rel['relation'] == 'child' and rel['partner_id'] == grandchild['id']:
                     graph.edge(str(child['id']), str(grandchild['id']))
     
-    # Organize nodes into ranks for proper layout
-    with graph.subgraph() as s:
+    # Organize nodes into 5 distinct ranks from top to bottom
+    # Using rank constraints to enforce the hierarchy
+    
+    # Create subgraphs for each rank with proper rank constraints
+    # 1. Grandparents (top rank)
+    with graph.subgraph(name='grandparents') as s:
         s.attr(rank='same')
         for node in grandparent_nodes:
             s.node(node)
     
-    with graph.subgraph() as s:
+    # 2. Parents (second rank)
+    with graph.subgraph(name='parents') as s:
         s.attr(rank='same')
         for node in parent_nodes:
             s.node(node)
     
-    with graph.subgraph() as s:
+    # 3. Center member and spouses (middle rank)
+    with graph.subgraph(name='center') as s:
         s.attr(rank='same')
         if 'center' in family_data and family_data['center']:
-            s.node(str(family_data['center']['id']))
+            center_id = str(family_data['center']['id'])
+            s.node(center_id)
+            # Add all spouses to the same rank as the center member
+            for spouse in family_data.get('spouse', []):
+                spouse_id = str(spouse['id'])
+                s.node(spouse_id)
     
-    with graph.subgraph() as s:
+    # 4. Children (fourth rank)
+    with graph.subgraph(name='children') as s:
         s.attr(rank='same')
         for node in child_nodes:
             s.node(node)
     
-    with graph.subgraph() as s:
+    # 5. Grandchildren (bottom rank)
+    with graph.subgraph(name='grandchildren') as s:
         s.attr(rank='same')
         for node in grandchild_nodes:
             s.node(node)
+    
+    # Add rank constraints to ensure proper vertical ordering
+    with graph.subgraph() as s:
+        s.attr(rank='min')  # Force grandparents to be at the top
+        if grandparent_nodes:
+            s.node(grandparent_nodes[0])
+    
+    with graph.subgraph() as s:
+        s.attr(rank='max')  # Force grandchildren to be at the bottom
+        if grandchild_nodes:
+            s.node(grandchild_nodes[0])
+    
+    # Add edges to enforce the hierarchy
+    if grandparent_nodes and parent_nodes:
+        for parent in parent_nodes:
+            for grandparent in grandparent_nodes:
+                graph.edge(grandparent, parent, style='invis')
+    
+    if parent_nodes and 'center' in family_data and family_data['center']:
+        center_id = str(family_data['center']['id'])
+        for parent in parent_nodes:
+            graph.edge(parent, center_id, style='invis')
+    
+    if 'center' in family_data and family_data['center'] and child_nodes:
+        center_id = str(family_data['center']['id'])
+        for child in child_nodes:
+            graph.edge(center_id, child, style='invis')
+    
+    if child_nodes and grandchild_nodes:
+        for child in child_nodes:
+            for grandchild in grandchild_nodes:
+                graph.edge(child, grandchild, style='invis')
     
     # Add invisible edges to help with layout
     if len(parent_nodes) > 1:
@@ -472,7 +507,7 @@ def main():
             graph_height = st.slider(
                 "Graph Height (inches):",
                 min_value=1,
-                max_value=30,
+                max_value=100,
                 value=12,
                 step=1,
                 help="Adjust the height of the family tree graph"
@@ -481,8 +516,8 @@ def main():
             graph_width = st.slider(
                 "Graph Width (inches):",
                 min_value=1,
-                max_value=30,
-                value=15,
+                max_value=100,
+                value=5,
                 step=1,
                 help="Adjust the width of the family tree graph"
             )
@@ -519,9 +554,21 @@ def main():
                     
                     # Create and display the graph with user-specified settings
                     try:
+                        # Calculate dynamic height based on number of generations
+                        num_generations = sum([
+                            bool(family_data.get('grandparents')),
+                            bool(family_data.get('parents')),
+                            bool(family_data.get('center')),
+                            bool(family_data.get('children')),
+                            bool(family_data.get('grandchildren'))
+                        ])
+                        
+                        # Set dynamic height (minimum 12, maximum 100 inches)
+                        dynamic_height = min(12 + (num_generations * 4), 100)
+                        
                         graph = create_family_graph(
                             family_data, 
-                            height=graph_height, 
+                            height=dynamic_height,  # Use dynamic height
                             width=graph_width,
                             engine=graph_engine
                         )
@@ -529,39 +576,42 @@ def main():
                         # Create a scrollable container for the graph
                         graph_svg = graph.pipe(format='svg').decode('utf-8')
                         
-                        # Add CSS for the scrollable container
-                        st.markdown("""
+                        # Add CSS for the scrollable container with smooth scrolling
+                        st.markdown(f"""
                         <style>
-                        .graph-container {
+                        .graph-container {{
                             width: 100%;
-                            max-height: 800px;
+                            height: 80vh;  /* 80% of viewport height */
                             overflow: auto;
                             border: 1px solid #e0e0e0;
                             border-radius: 0.5rem;
                             padding: 1rem;
                             background-color: white;
                             margin: 1rem 0;
-                        }
-                        .graph-container svg {
+                            scroll-behavior: smooth;
+                        }}
+                        .graph-container svg {{
                             min-width: 100%;
-                            min-height: 100%;
-                        }
+                            min-height: {dynamic_height * 80}px;  /* Scale based on height */
+                            display: block;
+                            margin: 0 auto;
+                        }}
                         /* Custom scrollbar */
-                        .graph-container::-webkit-scrollbar {
+                        .graph-container::-webkit-scrollbar {{
                             width: 10px;
                             height: 10px;
-                        }
-                        .graph-container::-webkit-scrollbar-track {
+                        }}
+                        .graph-container::-webkit-scrollbar-track {{
                             background: #f1f1f1;
                             border-radius: 5px;
-                        }
-                        .graph-container::-webkit-scrollbar-thumb {
+                        }}
+                        .graph-container::-webkit-scrollbar-thumb {{
                             background: #888;
                             border-radius: 5px;
-                        }
-                        .graph-container::-webkit-scrollbar-thumb:hover {
+                        }}
+                        .graph-container::-webkit-scrollbar-thumb:hover {{
                             background: #555;
-                        }
+                        }}
                         </style>
                         """, unsafe_allow_html=True)
                         

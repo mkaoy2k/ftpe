@@ -166,6 +166,114 @@ def verify_fadmin(email, password):
         st.error(f"Error verifying admin: {e}")
         return False
 
+def create_password_reset_token(email: str, expires_hours: int = 24) -> str:
+    """Create a password reset token for the given email
+    
+    Args:
+        email: The email address to create a token for
+        expires_hours: Number of hours until the token expires (default: 24)
+        
+    Returns:
+        str: The generated token if successful, None otherwise
+    """
+    try:
+        # Generate a secure random token
+        token = secrets.token_urlsafe(32)
+        
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Insert the token into the database
+            cursor.execute("""
+                INSERT INTO password_reset_tokens (
+                    email, 
+                    token, 
+                    expires_at
+                ) VALUES (?, ?, datetime('now', ? || ' hours'))
+            """, (email, token, str(expires_hours)))
+            
+            conn.commit()
+            return token
+            
+    except Exception as e:
+        st.error(f"Error creating password reset token: {e}")
+        return None
+
+
+def validate_password_reset_token(token: str) -> tuple:
+    """Validate a password reset token
+    
+    Args:
+        token: The token to validate
+        
+    Returns:
+        tuple: (is_valid, email) where is_valid is a boolean indicating if the token is valid,
+               and email is the associated email address if valid, None otherwise
+    """
+    try:
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if token exists and is not expired or used
+            cursor.execute("""
+                SELECT email 
+                FROM password_reset_tokens 
+                WHERE token = ? 
+                AND used = 0 
+                AND expires_at > datetime('now')
+            """, (token,))
+            
+            result = cursor.fetchone()
+            if result:
+                return True, result[0]
+            return False, None
+            
+    except Exception as e:
+        st.error(f"Error validating password reset token: {e}")
+        return False, None
+
+
+def reset_password(email: str, new_password: str) -> bool:
+    """Reset a user's password
+    
+    Args:
+        email: The email address of the user
+        new_password: The new password to set
+        
+    Returns:
+        bool: True if the password was successfully reset, False otherwise
+    """
+    try:
+        # Hash the new password
+        password_hash, salt = hash_password(new_password)
+        
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Update the user's password
+            cursor.execute(f"""
+                UPDATE {dbm.db_tables['users']}
+                SET password_hash = ?,
+                    salt = ?,
+                    updated_at = datetime('now')
+                WHERE email = ?
+            """, (password_hash, salt, email))
+            
+            # Mark all tokens for this email as used
+            cursor.execute("""
+                UPDATE password_reset_tokens
+                SET used = 1
+                WHERE email = ?
+            """, (email,))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+    except Exception as e:
+        st.error(f"Error resetting password: {e}")
+        return False
+
+
 def create_user(email, password, role, family_id=0, member_id=0):
     """Create a new user
     
