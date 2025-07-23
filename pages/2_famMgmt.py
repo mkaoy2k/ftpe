@@ -10,15 +10,6 @@ import auth_utils as au
 import streamlit as st
 import db_utils as dbm
 from ftpe_ui import search_members_page
-
-# Hide the default navigation for members
-st.markdown("""
-    <style>
-        [data-testid="stSidebarNav"] {
-            display: none !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 import pandas as pd
 from datetime import datetime, date
 from typing import List, Dict, Any, Optional
@@ -1428,15 +1419,29 @@ def birthday_of_the_month_page():
 
 def main() -> None:
     """Main application entry point."""
-    # Check authentication
-    if not st.session_state.get('authenticated', False):
-        show_login_form()
-        return
-        
-    # Sidebar --- frome here
-    # login button, page links, and logout button
+    st.title("Family Tree Management")
+
+    # Sidebar --- from here
     with st.sidebar:
-        if st.session_state.user_state != dbm.User_State['p_admin']:
+        if st.session_state.user_state == dbm.User_State['p_admin']:
+            # Show default navigation for padmin users
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                st.markdown(
+                    f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin: 1rem 0;'>"
+                    f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                    "</div>",
+                    unsafe_allow_html=True)
+                cu.update_context({
+                    'email_user': st.session_state.user_email
+                })
+                
+                # Add logout button at the bottom for admin
+                if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
+                    st.session_state.authenticated = False
+                    st.session_state.user_email = None
+                    st.rerun()
+        else:
+            # For non-admin users
             # Hide the default navigation for non-padmin users
             st.markdown("""
             <style>
@@ -1444,31 +1449,31 @@ def main() -> None:
                     display: none !important;
                 }
             </style>""", unsafe_allow_html=True)
-        
-        if 'user_email' in st.session_state and st.session_state.user_email:
-            st.markdown(
-                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
-                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
-                "</div>",
-                unsafe_allow_html=True
-            )
-        
-        st.subheader("Navigation")
-        st.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-        st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
             
-        # Add logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user_email = None
-            st.rerun()
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                st.markdown(
+                    f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                    f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                    "</div>",
+                    unsafe_allow_html=True)
+                cu.update_context({
+                    'email_user': st.session_state.user_email
+                })
+            
+            st.subheader("Navigation")
+            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+            st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+            st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            
+            # Add logout button at the bottom for non-admin users
+            if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
+                st.session_state.authenticated = False
+                st.session_state.user_email = None
+                st.rerun()
     
-    # Main content area --- frome here
-    st.title("Family Tree Management")
-    
+    # Main content area --- frome here 
     # Main tab groups
     tab1, tab2, tab3 = st.tabs(["👥 Member Management", "🏠 Family Management", "🔗 Relations Management"])
     
@@ -1530,8 +1535,9 @@ def main() -> None:
             update_relation_page()
 
 # Initialize session state and app context
+cu.init_session_state()
+
 if 'app_context' not in st.session_state:
-    cu.init_session_state()
     st.session_state.app_context = cu.init_context()
 
 # Check authentication

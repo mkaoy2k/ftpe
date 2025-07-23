@@ -1730,16 +1730,7 @@ else:
     logger.debug(f"{g_loc['SX_L10N']}: {g_loc_key}")
 
     # ---- SIDEBAR ---- from here
-    
-    # Define the title of sidebar widget
-    g_SBAR_TITLE = (
-        f"{g_fullname}{g_loc['FAMILY_TREE']}\n## {g_loc['WELCOME']} {g_fullname}"
-    )
-    
-    # Sidebar with page links, functions and logout button
     with st.sidebar:
-        st.sidebar.title(g_SBAR_TITLE)
-        
         if st.session_state.user_state != dbm.User_State['p_admin']:
             # Hide the default navigation for non-padmin users
             st.markdown("""
@@ -1749,17 +1740,40 @@ else:
                 }
             </style>""", unsafe_allow_html=True)
         
+        if 'user_email' in st.session_state and st.session_state.user_email:
+            st.markdown(
+                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                "</div>",
+                unsafe_allow_html=True)
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
+        
+        if st.session_state.user_state != dbm.User_State['p_admin']:
             # Page Navigation Links
-            st.sidebar.subheader("Navigation")
-            st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
-            st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
-            st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🌲")
-            st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🌲")
+            st.subheader("Navigation")
+            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+            st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
+        
+        # Add logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True, key="ftpe_logout"):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
             
-            st.sidebar.divider()
-            
+        # Define the title of sidebar widget
+        g_SBAR_TITLE = (
+            f"{g_fullname}{g_loc['FAMILY_TREE']}\n## {g_loc['WELCOME']} {g_fullname}"
+        )
+        st.title(g_SBAR_TITLE)
+        
         # Show side-bar 9 functions
-        nav = st.sidebar.radio(
+        nav = st.radio(
             g_loc["MENU_TITLE"],
             [
                 g_loc["MENU_DISP_GRAPH_BY_MALE"],
@@ -1775,12 +1789,7 @@ else:
                 ],
             )
                                     
-        # Add logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user_email = None
-            st.rerun()
-    # ---- SIDEBAR ---- end here
+   # ---- SIDEBAR ---- end here
 
     # Define global repository settings
     g_path_dir = Path(__file__).parent.parent.resolve() / "data"

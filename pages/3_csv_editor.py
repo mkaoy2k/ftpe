@@ -15,7 +15,7 @@ It includes features for:
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from context_utils import init_session_state
+import context_utils as cu
 import db_utils as dbm
 import os
 import time
@@ -56,128 +56,157 @@ def save_csv(file_path, df):
         st.error(f"Error saving file: {e}")
         return False
 
+def load_file_content(file_path=None):
+    """
+    Load file content into a DataFrame.
+
+    Args:
+        file_path (Path, optional): Path to the file to load. Defaults to None.
+
+    Returns:
+        DataFrame: Loaded data as a pandas DataFrame, 
+            or an empty DataFrame if the file is empty or does not exist.
+    """
+    try:
+        if file_path and file_path.exists():
+            # Read CSV with error handling for empty files
+            try:
+                df = pd.read_csv(file_path)
+                if df.empty:
+                    st.warning("The file is empty. Starting with an empty table.")
+                    return pd.DataFrame(columns=['Column 1'])
+                return df
+            except pd.errors.EmptyDataError:
+                st.warning("The file is empty. Starting with an empty table.")
+                return pd.DataFrame(columns=['Column 1'])
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+                return pd.DataFrame(columns=['Column 1'])
+        else:
+            # For new files, start with one empty column
+            return pd.DataFrame(columns=['Column 1'])
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+        return pd.DataFrame(columns=['Column 1'])
+
 def main():
     st.title("CSV Editor")
     # --- Sidebar --- from here
-    if st.session_state.user_state != dbm.User_State['p_admin']:
-        # Hide the default navigation for non-padmin users
-        st.markdown("""
-        <style>
-            [data-testid="stSidebarNav"] {
+    with st.sidebar:
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            # Hide the default navigation for non-padmin users
+            st.markdown("""
+            <style>
+                [data-testid="stSidebarNav"] {
                 display: none !important;
             }
-        </style>""", unsafe_allow_html=True)
+            </style>""", unsafe_allow_html=True)
         
-        st.sidebar.subheader("Navigation")
-        st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.sidebar.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
-        st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-        st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-        st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-        st.sidebar.divider()
+        if 'user_email' in st.session_state and st.session_state.user_email:
+            st.markdown(
+                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                "</div>",
+                unsafe_allow_html=True
+            )
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
         
-    # Directory selection
-    dirs = {
-        'Data': Path(__file__).parent.parent / "data",  # Data directory
-        'Project Root': Path(__file__).parent.parent   # Project root
-    }
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            st.subheader("Navigation")
+            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+            st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+            st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="👨‍👩‍👧‍👦")
+        
+        # Add logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True, key="csv_editor_logout"):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
+        # Directory selection
+        dirs = {
+            'Data': Path(__file__).parent.parent / "data",  # Data directory
+            'Project Root': Path(__file__).parent.parent   # Project root
+        }
     
-    selected_dir_name = st.sidebar.selectbox(
-        "Select a directory",
-        list(dirs.keys()),
-        index=0
-    )
+        selected_dir_name = st.sidebar.selectbox(
+            "Select a directory",
+            list(dirs.keys()),
+            index=0
+        )
     
-    # Get the selected directory path
-    selected_dir = dirs[selected_dir_name]
+        # Get the selected directory path
+        selected_dir = dirs[selected_dir_name]
     
-    # File selection
-    csv_files = list(selected_dir.glob("*.csv"))
-    selected_file = st.sidebar.selectbox(
-        "Select a CSV file",
-        ["Create New..."] + [f.name for f in csv_files],
-        index=0
-    )
+        # File selection
+        csv_files = list(selected_dir.glob("*.csv"))
+        selected_file = st.sidebar.selectbox(
+            "Select a CSV file",
+            ["Create New..."] + [f.name for f in csv_files],
+            index=0
+        )
     
-    # Handle new file creation
-    if selected_file == "Create New...":
-        new_file = st.sidebar.text_input("New filename (e.g., me.csv)")
-        if new_file and not new_file.endswith('.csv'):
-            new_file += '.csv'
-        file_path = selected_dir / new_file if new_file else None
-    else:
-        file_path = selected_dir / selected_file if selected_file != "Create New..." else None
+        # Initialize file_path to None
+        file_path = None
+        
+        # Handle new file creation
+        if selected_file == "Create New...":
+            new_file = st.sidebar.text_input("New filename (e.g., me.csv)")
+            if new_file:
+                if not new_file.endswith('.csv'):
+                    new_file += '.csv'
+                file_path = selected_dir / new_file
+        else:
+            file_path = selected_dir / selected_file
     
-    def load_file_content():
-        """
-        Load file content into a DataFrame.
-
-        Returns:
-            DataFrame: Loaded data as a pandas DataFrame, 
-            or an empty DataFrame if the file is empty or does not exist.
-        """
-        try:
-            if file_path and file_path.exists():
-                # Read CSV with error handling for empty files
-                try:
-                    df = pd.read_csv(file_path)
-                    if df.empty:
-                        st.warning("The file is empty. Starting with an empty table.")
-                        df = pd.DataFrame(columns=['Column 1'])
-                except pd.errors.EmptyDataError:
-                    st.warning("The file is empty. Starting with an empty table.")
-                    df = pd.DataFrame(columns=['Column 1'])
-                except Exception as e:
-                    st.error(f"Error reading file: {e}")
-                    df = pd.DataFrame(columns=['Column 1'])
-            else:
-                # For new files, start with one empty column
-                df = pd.DataFrame(columns=['Column 1'])
-            return df
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            return pd.DataFrame(columns=['Column 1'])
+        # Check if we need to load or reload the file
+        force_reload = st.session_state.get('force_reload', False)
+        reload_path = st.session_state.get('reload_file_path')
+        file_changed = 'current_file' not in st.session_state or st.session_state.current_file != str(file_path)
+        reload_needed = 'reload_file' in st.session_state and st.session_state.reload_file
     
-    # Check if we need to load or reload the file
-    force_reload = st.session_state.get('force_reload', False)
-    reload_path = st.session_state.get('reload_file_path')
-    file_changed = 'current_file' not in st.session_state or st.session_state.current_file != str(file_path)
-    reload_needed = 'reload_file' in st.session_state and st.session_state.reload_file
-    
-    if 'file_content' not in st.session_state or file_changed or reload_needed or (force_reload and reload_path == str(file_path)):
-        try:
-            if force_reload and reload_path and Path(reload_path).exists():
-                # Force reload the file
-                st.session_state.file_content = pd.read_csv(reload_path)
-                st.session_state.current_file = reload_path
-                # Clear the reload flags
-                del st.session_state.force_reload
-                del st.session_state.reload_file
-            else:
-                # Normal load
-                st.session_state.file_content = load_file_content()
-                st.session_state.current_file = str(file_path) if file_path else None
+        if 'file_content' not in st.session_state or file_changed or reload_needed or (force_reload and reload_path == str(file_path)):
+            try:
+                if force_reload and reload_path and Path(reload_path).exists():
+                    # Force reload the file
+                    st.session_state.file_content = pd.read_csv(reload_path)
+                    st.session_state.current_file = reload_path
+                    # Clear the reload flags
+                    del st.session_state.force_reload
+                    del st.session_state.reload_file
+                else:
+                    # Normal load
+                    st.session_state.file_content = load_file_content(file_path)
+                    st.session_state.current_file = str(file_path) if file_path else None
             
-            # Clear reload flag if it was set
-            if 'reload_file' in st.session_state:
-                del st.session_state.reload_file
-        except Exception as e:
-            st.error(f"Error loading file: {e}")
+                # Clear reload flag if it was set
+                if 'reload_file' in st.session_state:
+                    del st.session_state.reload_file
+            except Exception as e:
+                st.error(f"Error loading file: {e}")
+                st.session_state.file_content = pd.DataFrame(columns=['Column 1'])
+    
+        # Display current file path
+        if file_path:
+            st.sidebar.write(f"Editing: `{file_path}`")
+    
+        # Ensure file_content is a DataFrame
+        if not isinstance(st.session_state.file_content, pd.DataFrame):
             st.session_state.file_content = pd.DataFrame(columns=['Column 1'])
-    
-    # Display current file path
-    if file_path:
-        st.sidebar.write(f"Editing: `{file_path}`")
-    
-    # Ensure file_content is a DataFrame
-    if not isinstance(st.session_state.file_content, pd.DataFrame):
-        st.session_state.file_content = pd.DataFrame(columns=['Column 1'])
     
     # --- Main Content --- from here
     st.subheader("Editing Area")
     # Data editor - use a unique key from session state or generate a new one
     if 'editor_key' not in st.session_state:
-        st.session_state.editor_key = f"editor_{file_path.name if file_path else 'new'}_{time.time()}"
+        # Use the file name from session state if available, otherwise use 'new'
+        current_file = st.session_state.get('current_file', '')
+        file_name = Path(current_file).name if current_file else 'new'
+        st.session_state.editor_key = f"editor_{file_name}_{time.time()}"
     
     # Get the current content from session state
     current_content = st.session_state.file_content
@@ -245,7 +274,7 @@ def main():
             st.info("No data to display")
 
 # Initialize session state
-init_session_state()
+cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):

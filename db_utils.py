@@ -10,6 +10,7 @@ import re
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Union
+import funcUtils as fu
 import csv
 import json
 from datetime import datetime
@@ -153,8 +154,8 @@ def init_db() -> None:
             alias TEXT,
             email TEXT,
             url TEXT,
-            born DATE DEFAULT '0000-01-01',
-            died DATE DEFAULT '0000-01-01',
+            born DATE DEFAULT '0000-00-00',
+            died DATE DEFAULT '0000-00-00',
             sex TEXT,
             gen_order INTEGER,
             dad_id INTEGER,
@@ -182,8 +183,8 @@ def init_db() -> None:
             relation TEXT,            -- Type of relationship (e.g., 'spouse', 'parent')
             dad_name TEXT,            -- Father's name
             mom_name TEXT,            -- Mother's name
-            join_date DATE DEFAULT '0000-01-01',           -- Date when relationship started
-            end_date DATE DEFAULT '0000-01-01',           -- Date when relationship ended (if applicable)
+            join_date DATE DEFAULT '0000-00-00', -- Date when relationship started
+            end_date DATE DEFAULT '0000-00-00', -- Date when relationship ended (if applicable)
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (partner_id) REFERENCES members(id) ON DELETE CASCADE,
@@ -228,6 +229,14 @@ def init_db() -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_partner ON relations(partner_id)")
         
         # Create triggers to automatically update timestamps on record updates
+        cursor.execute(f"""
+        CREATE TRIGGER IF NOT EXISTS update_users_timestamp
+        AFTER UPDATE ON {db_tables["users"]}
+        FOR EACH ROW
+        BEGIN
+            UPDATE {db_tables["users"]} SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+        END;
+        """)
         cursor.execute(f"""
         CREATE TRIGGER IF NOT EXISTS update_members_timestamp
         AFTER UPDATE ON {db_tables["members"]}
@@ -361,11 +370,11 @@ def add_subscriber(email: str, token: str, lang: str = None) -> Tuple[bool, str]
             return True, ""
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in add_subscriber: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False, error_msg
     except Exception as e:
-        error_msg = f"Unexpected error in add_subscriber: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False, error_msg
 
@@ -420,11 +429,11 @@ def remove_subscriber(email: str) -> bool:
             return False
             
     except sqlite3.Error as e:
-        error_msg = f"Database error unsubscribing {email}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False
     except Exception as e:
-        error_msg = f"Error unsubscribing {email}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False
 
@@ -462,11 +471,11 @@ def verify_token(email: str, token: str) -> bool:
             return result
             
     except sqlite3.Error as e:
-        error_msg = f"Database error verifying token for {email}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False
     except Exception as e:
-        error_msg = f"Error verifying token for {email}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False
 
@@ -534,11 +543,11 @@ def get_subscribers(state: str = 'active', lang: str = None) -> List[Dict[str, A
             return subscribers
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching subscribers: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching subscribers: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -594,11 +603,11 @@ def get_subscriber(email: str) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching subscriber {email}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching subscriber {email}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -662,17 +671,18 @@ def delete_subscriber(email: str) -> bool:
             return False
             
     except sqlite3.Error as e:
-        error_msg = f"Database error deleting subscriber '{email}': {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error deleting subscriber '{email}': {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
 def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[bool, str]:
     """
-    Add a new user or update an existing user to the database. 
+    Add a new user or update an existing user to the 
+    db_table['users'] table.
     If the user already exists, determine whether to update 
     based on the `update` parameter.
     
@@ -680,16 +690,9 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
         email: The user's email address (required)
         update: If True, update the user when the user already exists; 
         if False, return an error when the user already exists
-        **user_data: Other user data, may include:
-            - password_hash: Password hash value (required for new users)
-            - salt: Password salt (required for new users)
-            - is_admin: Whether the user is an admin (0: regular user, 1: admin)
-            - is_active: Account status (see Subscriber_State enum)
-            - l10n: Language/locale code (e.g., 'en', 'zh-TW')
-            - token: Verification token
-            - created_at: Creation timestamp (str in ISO format)
-            - updated_at: Last update timestamp (str in ISO format)
-            
+        **user_data: Other user data, may include all the fields 
+            in the db_table['users'] table.
+    
     Returns:
         Tuple[bool, str]: (success status, error message if any)
     """
@@ -716,6 +719,7 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 update_fields = []
                 params = []
                 
+                # valid fields allowed to update
                 for field in ['password_hash', 'salt', 
                               'is_admin', 'is_active', 'l10n', 'token',
                               'created_at']:
@@ -758,8 +762,8 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                     INSERT INTO {db_tables['users']} (
                         email, password_hash, salt, 
                         is_admin, is_active, l10n, token,
-                        created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """, (
                     email,
                     user_data['password_hash'],
@@ -779,11 +783,11 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
         log.error(error_msg)
         return False, error_msg
     except sqlite3.Error as e:
-        error_msg = f"Database error: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False, error_msg
     except Exception as e:
-        error_msg = f"Unexpected error while adding user: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         return False, error_msg
 
@@ -827,11 +831,11 @@ def get_users(role: str = 'all') -> List[Dict[str, Any]]:
             return users
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching users: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error while fetching users: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -894,11 +898,11 @@ def delete_user(user_id: int) -> bool:
             return False
             
     except sqlite3.Error as e:
-        error_msg = f"Database error deleting user ID {user_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error deleting user ID {user_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
         
@@ -911,18 +915,8 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
     it will update the existing record instead of creating a new one.
     
     Args:
-        member_data: Dictionary containing member information with the following keys:
-            - name (str): Last name (required)
-            - born (str): Date of birth in YYYY-MM-DD format (required)
-            - gen_order (int, required): Generation order number (required)
-            - sex (str, optional): Gender (typically 'M'/'F'/'O')
-            - family_id (int, optional): Family identifier
-            - alias (str, optional): Nickname or alternative name
-            - email (str, optional): Email address
-            - url (str, optional): Personal website URL
-            - died (str, optional): Date of death in YYYY-MM-DD format
-            - dad_id (int, optional): Father's member ID (must exist in database)
-            - mom_id (int, optional): Mother's member ID (must exist in database)
+        member_data: Dictionary containing member information,
+        see db_tables['members'] for details
         update (bool): If True, update existing member with matching name, born, and gen_order
         
     Returns:
@@ -1008,15 +1002,17 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
             placeholders = []
             values = []
             
+            # valid fields to add
+            valid_fields = ['name', 'born', 'gen_order', 'email', 'alias', 'sex', 'generation', 'family_id', 'url']
             for field, value in member_data.items():
-                if value is not None:
+                if value is not None and field in valid_fields:
                     fields.append(field)
                     placeholders.append('?')
                     values.append(value)
             
-            # Add created_at and updated_at timestamps
-            fields.extend(['created_at', 'updated_at'])
-            placeholders.extend(["datetime('now')", "datetime('now')"])
+            # Add created_at timestamp
+            fields.extend(['created_at'])
+            placeholders.extend(["datetime('now')"])
             
             # Build and execute insert query
             insert_sql = f"""
@@ -1032,7 +1028,7 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
             return member_id
             
     except sqlite3.IntegrityError as e:
-        error_msg = "Database integrity error when adding/updating member"
+        error_msg = "Database integrity error in {fu.get_function_name()}: {str(e)}"
         if "FOREIGN KEY" in str(e):
             error_msg = (
                 "Invalid parent ID provided. The specified father or mother "
@@ -1042,11 +1038,11 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error in add_or_update_member: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in add_or_update_member: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1071,19 +1067,19 @@ def add_related_member(
     
     Args:
         member_data: Dictionary containing the new member's data. See add_or_update_member() for
-                   required and optional fields.
+            required and optional fields.
         partner_id: ID of the existing member to create a relationship with.
-                  Must be a positive integer.
-        relation: Type of relationship to establish. Common values include:
-                - 'spouse': For marital relationships
-                - 'parent': For parent-child relationships
-                - 'child': For child-parent relationships
-                - 'sibling': For sibling relationships
+            Must be a positive integer.
+        relation: Type of relationship to establish. 
+            Common values see Relation_Type.
         join_date: Start date of the relationship in YYYY-MM-DD format.
-        original_family_id: (Optional) Original family ID to set for the new member.
-        original_name: (Optional) Original name to set for the new member.
-        end_date: (Optional) End date of the relationship in YYYY-MM-DD format.
-                 Used for terminated relationships (e.g., divorce).
+        original_family_id: (Optional) Original family ID 
+            to set for the new member.
+        original_name: (Optional) Original name to set for 
+            the new member.
+        end_date: (Optional) End date of the relationship in 
+            YYYY-MM-DD format.
+            Used for terminated relationships (e.g., divorce).
         
     Returns:
         Tuple[int, int]: A tuple containing (new_member_id, relation_id)
@@ -1105,7 +1101,8 @@ def add_related_member(
         ...     partner_id=123,
         ...     relation='spouse',
         ...     join_date='2015-06-20',
-        ...     original_family_id=123
+        ...     original_family_id=123,
+        ...     original_name='John Doe'
         ... )
     """
     # Input validation
@@ -1184,22 +1181,22 @@ def add_related_member(
                 
             except Exception as e:
                 conn.rollback()
-                log.error(f"Transaction rolled back due to error: {str(e)}")
+                log.error(f"Transaction rolled back in {fu.get_function_name()} due to error: {str(e)}")
                 raise
                 
     except sqlite3.IntegrityError as e:
-        error_msg = "Database integrity error when adding related member"
+        error_msg = "Database integrity error in {fu.get_function_name()} when adding related member"
         if "FOREIGN KEY" in str(e):
             error_msg = "The specified partner_id does not exist in the database."
         log.error(f"{error_msg}: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error adding related member: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} adding related member: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error adding related member: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} adding related member: {str(e)}"
         log.error(error_msg)
 
 def update_related_member(
@@ -1334,19 +1331,19 @@ def update_related_member(
     except sqlite3.Error as dbe:
         if conn:
             conn.rollback()
-        log.error(f"Database error in update_related_member: {str(dbe)}")
+        log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
         raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
         
     except ValueError as ve:
         if conn:
             conn.rollback()
-        log.error(f"Validation error in update_related_member: {str(ve)}")
+        log.error(f"Validation error in {fu.get_function_name()}: {str(ve)}")
         raise
         
     except Exception as e:
         if conn:
             conn.rollback()
-        log.error(f"Unexpected error in update_related_member: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
         
     finally:
@@ -1386,11 +1383,11 @@ def get_members() -> List[Dict[str, Any]]:
             return members
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching members: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} while fetching members: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error while fetching members: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} while fetching members: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1447,7 +1444,7 @@ def get_member_by_email(email: str) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching member by email: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} while fetching member by email: {str(e)}"
         log.error(error_msg)
         raise
     except ValueError as ve:
@@ -1455,7 +1452,7 @@ def get_member_by_email(email: str) -> Optional[Dict[str, Any]]:
         log.error(error_msg)
         raise ValueError(error_msg)
     except Exception as e:
-        error_msg = f"Unexpected error while fetching member by email: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} while fetching member by email: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -1515,11 +1512,11 @@ def get_member(member_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} fetching member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} fetching member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1580,11 +1577,11 @@ def get_family(family_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching family ID {family_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} fetching family ID {family_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching family ID {family_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} fetching family ID {family_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1648,11 +1645,11 @@ def get_families_by_name(name):
         return families
         
     except sqlite3.Error as e:
-        error_msg = f"❌ Database error in get_families_by_name: {str(e)}"
+        error_msg = f"❌ Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"❌ Unexpected error in get_families_by_name: {str(e)}"
+        error_msg = f"❌ Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -1715,11 +1712,11 @@ def get_families_by_background(background: str) -> List[Dict[str, Any]]:
         return families
         
     except sqlite3.Error as e:
-        error_msg = f"❌ Database error in get_families_by_background: {str(e)}"
+        error_msg = f"❌ Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"❌ Unexpected error in get_families_by_background: {str(e)}"
+        error_msg = f"❌ Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1781,11 +1778,11 @@ def get_relation(relation_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching relation with relation_id {relation_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching relation with relation_id {relation_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1860,11 +1857,11 @@ def get_relations_by_id(member_id: int,
             return relations
             
     except sqlite3.Error as e:
-        error_msg = f"Database error fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1922,11 +1919,11 @@ def get_relations_by_relation(relation_type: str) -> List[Dict[str, Any]]:
         return relations
         
     except sqlite3.Error as e:
-        error_msg = f"❌ Database error in get_relation_by_relation: {str(e)}"
+        error_msg = f"❌ Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"❌ Unexpected error in get_relation_by_relation: {str(e)}"
+        error_msg = f"❌ Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -1993,11 +1990,11 @@ def get_relations_by_join_between(from_date: str, to_date: str) -> List[Dict[str
         return relations
         
     except sqlite3.Error as e:
-        error_msg = f"❌ Database error in get_relations_by_join_between: {str(e)}"
+        error_msg = f"❌ Database error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"❌ Unexpected error in get_relations_by_join_between: {str(e)}"
+        error_msg = f"❌ Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -2084,18 +2081,18 @@ def update_member(member_id: int, update_data: Dict[str, Any]) -> bool:
                 return False
                 
     except sqlite3.IntegrityError as e:
-        error_msg = "Database integrity error when updating member"
+        error_msg = f"Database integrity error in {fu.get_function_name()} updating member"
         if "FOREIGN KEY" in str(e):
-            error_msg = "Invalid parent ID provided. The specified father or mother does not exist."
+            error_msg = f"Invalid parent ID provided in {fu.get_function_name()}. The specified father or mother does not exist."
         log.error(f"{error_msg}: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error updating member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} updating member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error updating member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} updating member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2161,20 +2158,21 @@ def delete_member(member_id: int) -> bool:
                 return False
                 
     except sqlite3.IntegrityError as e:
-        error_msg = """
-        Cannot delete member due to referential integrity constraint.
-        This member likely has existing relationships that must be resolved first.
-        Consider removing or updating related records before deleting this member.
+        error_msg = f"""
+        Cannot delete member due to referential integrity constraint 
+        in {fu.get_function_name()}. This member likely has existing 
+        relationships that must be resolved first. Consider removing 
+        or updating related records before deleting this member.
         """.strip()
         log.error(f"{error_msg} Member ID: {member_id}, Error: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error deleting member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} deleting member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error deleting member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} deleting member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2237,11 +2235,11 @@ def get_members_when_born_in(month: int) -> List[Dict[str, Any]]:
             return members
             
     except sqlite3.Error as e:
-        error_msg = f"Database error: Querying members born in month {month} failed: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: Querying members born in month {month} failed: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Querying members born in month {month} failed: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: Querying members born in month {month} failed: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2451,11 +2449,11 @@ def search_members(
             return results
             
     except sqlite3.Error as e:
-        error_msg = f"Database error during member search: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} during member search: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error during member search: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} during member search: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2517,11 +2515,11 @@ def get_member_relations(member_id: int
             return results
             
     except sqlite3.Error as e:
-        error_msg = f"Database error retrieving relationships for member {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()} retrieving relationships for member {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error retrieving relationships: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()} retrieving relationships: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2647,18 +2645,18 @@ def update_member_when_joined(
             
         except sqlite3.IntegrityError as ie:
             conn.rollback()
-            log.error(f"Integrity error creating relationship: {str(ie)}")
+            log.error(f"Integrity error in {fu.get_function_name()} creating relationship: {str(ie)}")
             raise sqlite3.IntegrityError(f"Failed to create relationship: {str(ie)}")
             
         except sqlite3.Error as dbe:
             conn.rollback()
-            log.error(f"Database error in update_member_when_joined: {str(dbe)}")
+            log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
             raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
             
     except Exception as e:
         if conn:
             conn.rollback()
-        log.error(f"Unexpected error in update_member_when_joined: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
         
     finally:
@@ -2776,13 +2774,13 @@ def update_member_when_ended(
     except sqlite3.Error as dbe:
         if conn:
             conn.rollback()
-        log.error(f"Database error in update_member_when_ended: {str(dbe)}")
+        log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
         raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
         
     except Exception as e:
         if conn:
             conn.rollback()
-        log.error(f"Unexpected error in update_member_when_ended: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
         
     finally:
@@ -2872,13 +2870,13 @@ def update_member_when_died(
     except sqlite3.Error as dbe:
         if conn:
             conn.rollback()
-        log.error(f"Database error in update_member_when_died: {str(dbe)}")
+        log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
         raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
         
     except Exception as e:
         if conn:
             conn.rollback()
-        log.error(f"Unexpected error in update_member_when_died: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
         
     finally:
@@ -2916,7 +2914,7 @@ def get_members_when_alive() -> List[Dict[str, Any]]:
             return members
             
         except sqlite3.Error as e:
-            raise sqlite3.Error(f"Error querying living members: {str(e)}")
+            raise sqlite3.Error(f"Database error in {fu.get_function_name()}: Error querying living members: {str(e)}")
 
 def get_relations() -> List[Dict[str, Any]]:
     """
@@ -2951,11 +2949,11 @@ def get_relations() -> List[Dict[str, Any]]:
             return relations
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching relations: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: while fetching relations: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error while fetching relations: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: while fetching relations: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -3101,7 +3099,7 @@ def add_or_update_relation(
             return relation_id
             
     except sqlite3.IntegrityError as e:
-        error_msg = "Error adding/updating relationship record"
+        error_msg = f"Error in {fu.get_function_name()}: adding/updating relationship record"
         if "FOREIGN KEY constraint failed" in str(e):
             if "member_id" in str(e):
                 error_msg = f"Invalid member ID: {relation_data.get('member_id')}"
@@ -3114,11 +3112,11 @@ def add_or_update_relation(
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Error in add_or_update_relation: {str(e)}"
+        error_msg = f"Error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in add_or_update_relation: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -3154,11 +3152,11 @@ def get_families() -> List[Dict[str, Any]]:
             return families
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching families: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: while fetching families: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error while fetching families: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: while fetching families: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -3282,16 +3280,16 @@ def add_or_update_family(
             return family_id
             
     except sqlite3.IntegrityError as e:
-        error_msg = "Error adding/updating family"
+        error_msg = f"Error in {fu.get_function_name()}: adding/updating family"
         log.error(f"{error_msg}: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Error in add_or_update_family: {str(e)}"
+        error_msg = f"Error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in add_or_update_family: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -3328,11 +3326,11 @@ def get_mirrors() -> List[Dict[str, Any]]:
             return mirrors
             
     except sqlite3.Error as e:
-        error_msg = f"Database error while fetching mirrors: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: while fetching mirrors: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error while fetching mirrors: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: while fetching mirrors: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -3380,7 +3378,7 @@ def import_users(users: List[Dict[str, Any]]) -> Dict[str, Any]:
                 skipped += 1
             
         except Exception as e:
-            errors.append(f"Error importing user {i} ({user['email']}): {str(e)}")
+            errors.append(f"Error in {fu.get_function_name()}: importing user {i} ({user['email']}): {str(e)}")
             skipped += 1
     
     if imported > 0:
@@ -3464,7 +3462,7 @@ def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
                     skipped += 1
                 
             except Exception as e:
-                errors.append(f"Error importing member {i} ({member.get('name', 'Unknown')}): {str(e)}")
+                errors.append(f"Error in {fu.get_function_name()}: importing member {i} ({member.get('name', 'Unknown')}): {str(e)}")
                 skipped += 1
         
         if imported > 0:
@@ -3557,7 +3555,7 @@ def import_relations(relations: List[Dict[str, Any]]) -> Dict[str, Any]:
                 imported += 1
                 
             except Exception as e:
-                errors.append(f"Error importing relation {i} (members {rel.get('member_id', '?')}-{rel.get('partner_id', '?')}): {str(e)}")
+                errors.append(f"Error in {fu.get_function_name()}: importing relation {i} (members {rel.get('member_id', '?')}-{rel.get('partner_id', '?')}): {str(e)}")
                 skipped += 1
         
         if imported > 0:
@@ -3623,7 +3621,7 @@ def import_families(families: List[Dict[str, Any]]) -> Dict[str, Any]:
                 imported += 1
                 
             except Exception as e:
-                errors.append(f"Error importing family {i} ('{family.get('name', 'Unknown')}'): {str(e)}")
+                errors.append(f"Error in {fu.get_function_name()}: importing family {i} ('{family.get('name', 'Unknown')}'): {str(e)}")
                 skipped += 1
         
         if imported > 0:
@@ -3780,8 +3778,8 @@ def get_table_columns(table: str) -> List[str]:
             columns = [column[1] for column in cursor.fetchall()]
             return columns
     except sqlite3.Error as e:
-        log.error(f"Database error fetching table columns: {str(e)}")
-        raise sqlite3.Error(f"Failed to fetch table columns: {str(e)}")
+        log.error(f"Database error in {fu.get_function_name()}: fetching table columns: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch table columns: {str(e)}")
 
 def get_total_records(table: str) -> int:
     """
@@ -3801,8 +3799,8 @@ def get_total_records(table: str) -> int:
             result = cursor.fetchone()
             return result[0] if result else 0
     except sqlite3.Error as e:
-        log.error(f"Database error fetching total records: {str(e)}")
-        raise sqlite3.Error(f"Failed to fetch total records: {str(e)}")
+        log.error(f"Database error in {fu.get_function_name()}: fetching total records: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch total records: {str(e)}")
 
 def get_children(member_id: int) -> List[Dict[str, Any]]:
     """
@@ -3833,10 +3831,10 @@ def get_children(member_id: int) -> List[Dict[str, Any]]:
             children = [dict(row) for row in cursor.fetchall()]
             return children
     except sqlite3.Error as e:
-        log.error(f"Database error fetching children: {str(e)}")
-        raise sqlite3.Error(f"Failed to fetch children: {str(e)}")
+        log.error(f"Database error in {fu.get_function_name()}: fetching children: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch children: {str(e)}")
     except Exception as e:
-        log.error(f"Unexpected error fetching children: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: fetching children: {str(e)}")
         raise
 
 def get_parents(member_id: int) -> List[Dict[str, Any]]:
@@ -3884,11 +3882,11 @@ def get_parents(member_id: int) -> List[Dict[str, Any]]:
                     parents.append(dict(parent))  # Convert to dict
             return parents
     except sqlite3.Error as e:
-        log.error(f"Database error fetching parents: {str(e)}")
-        raise sqlite3.Error(f"Failed to fetch parents: {str(e)}")
+        log.error(f"Database error in {fu.get_function_name()}: fetching parents: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch parents: {str(e)}")
     except Exception as e:
-        log.error(f"Unexpected error fetching parents: {str(e)}")
-        raise sqlite3.Error(f"Failed to fetch parents: {str(e)}")
+        log.error(f"Unexpected error in {fu.get_function_name()}: fetching parents: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch parents: {str(e)}")
 
 # Initialize database (if not already initialized)
 init_db()
