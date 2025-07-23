@@ -40,14 +40,13 @@ def show_page():
             st.error("You do not have permission to access this page.")
             return
         
-        st.title("User Management")
-        
     except Exception as e:
         logger.error(f"❌ Error initializing page: {str(e)}", exc_info=True)
         st.error(f"❌ An error occurred while initializing the page: {str(e)}")
         return
     
     try:
+        st.title("User Management")
         df = pd.DataFrame()
         
         # Subscriber Management
@@ -108,7 +107,7 @@ def show_page():
             # Create 2 columns for better layout
             col21, col22 = st.columns([2,1])
             with col21:
-                email_value = context.get('mail_user', 'mkaoy2k@gmail.com')
+                email_value = st.session_state.get('user_email', '')
                 logger.debug(f"Setting email input with value: {email_value}")
                 email = st.text_input(':blue[Email:]', value=email_value, key="subscriber_email")
                 email = email.strip()

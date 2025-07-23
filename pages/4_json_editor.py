@@ -60,75 +60,93 @@ def save_json(file_path, data):
 def main():
     st.title("JSON Editor")
     # --- Sidebar --- from here
-    if st.session_state.user_state != dbm.User_State['p_admin']:
-        # Hide the default navigation for non-padmin users
-        st.markdown("""
-        <style>
-            [data-testid="stSidebarNav"] {
+    with st.sidebar:
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            # Hide the default navigation for non-padmin users
+            st.markdown("""
+            <style>
+                [data-testid="stSidebarNav"] {
                 display: none !important;
             }
-        </style>""", unsafe_allow_html=True)
+            </style>""", unsafe_allow_html=True)
         
-        st.sidebar.subheader("Navigation")
-        st.sidebar.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.sidebar.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
-        st.sidebar.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-        st.sidebar.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-        st.sidebar.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-        st.sidebar.divider()
+        if 'user_email' in st.session_state and st.session_state.user_email:
+            st.markdown(
+                f"<div style='background-color: #2e7d32; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 1rem;'>"
+                f"<p style='color: white; margin: 0; font-weight: bold; text-align: center;'>{st.session_state.user_email}</p>"
+                "</div>",
+                unsafe_allow_html=True)
+            cu.update_context({
+                'email_user': st.session_state.user_email
+            })
+        
+        if st.session_state.user_state != dbm.User_State['p_admin']:
+            st.subheader("Navigation")
+            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
+            st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+            st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="👨‍👩‍👧‍👦")
+        
+        # Add logout button at the bottom
+        if st.button("Logout", type="primary", use_container_width=True, key="json_editor_logout"):
+            st.session_state.authenticated = False
+            st.session_state.user_email = None
+            st.rerun()
+        # Directory selection
+        dirs = {
+            'Project Root': Path(__file__).parent.parent,  # Go up one level to the project root where ftpe_ui.py is
+            'Data': Path(__file__).parent.parent / "data"
+        }
     
-    # Directory selection
-    dirs = {
-        'Project Root': Path(__file__).parent.parent,  # Go up one level to the project root where ftpe_ui.py is
-        'Data': Path(__file__).parent.parent / "data"
-    }
+        selected_dir_name = st.sidebar.selectbox(
+            "Select a directory",
+            list(dirs.keys()),
+            index=0
+        )
     
-    selected_dir_name = st.sidebar.selectbox(
-        "Select a directory",
-        list(dirs.keys()),
-        index=0
-    )
+        # Get the selected directory path
+        selected_dir = dirs[selected_dir_name]
     
-    # Get the selected directory path
-    selected_dir = dirs[selected_dir_name]
+        # File selection
+        json_files = list(selected_dir.glob("*.json"))
+        selected_file = st.sidebar.selectbox(
+            "Select a JSON file",
+            ["Create New..."] + [f.name for f in json_files],
+            index=0
+        )
     
-    # File selection
-    json_files = list(selected_dir.glob("*.json"))
-    selected_file = st.sidebar.selectbox(
-        "Select a JSON file",
-        ["Create New..."] + [f.name for f in json_files],
-        index=0
-    )
+        # Handle new file creation
+        if selected_file == "Create New...":
+            new_file = st.sidebar.text_input("New filename (e.g., data.json)")
+            if new_file and not new_file.endswith('.json'):
+                new_file += '.json'
+            file_path = selected_dir / new_file if new_file else None
+        else:
+            file_path = selected_dir / selected_file if selected_file != "Create New..." else None
     
-    # Handle new file creation
-    if selected_file == "Create New...":
-        new_file = st.sidebar.text_input("New filename (e.g., data.json)")
-        if new_file and not new_file.endswith('.json'):
-            new_file += '.json'
-        file_path = selected_dir / new_file if new_file else None
-    else:
-        file_path = selected_dir / selected_file if selected_file != "Create New..." else None
+        # Handle file loading and reloading
+        file_changed = ('current_file' not in st.session_state or 
+                       str(file_path) != st.session_state.get('current_file'))
     
-    # Handle file loading and reloading
-    file_changed = ('current_file' not in st.session_state or 
-                   str(file_path) != st.session_state.get('current_file'))
-    
-    if (file_changed or 'reload_file' in st.session_state) and file_path and file_path.exists():
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                st.session_state.file_content = f.read()
-            st.session_state.current_file = str(file_path)
-            if 'reload_file' in st.session_state:
-                del st.session_state.reload_file
-        except Exception as e:
-            st.error(f"Error loading file: {e}")
+        if (file_changed or 'reload_file' in st.session_state) and file_path and file_path.exists():
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    st.session_state.file_content = f.read()
+                st.session_state.current_file = str(file_path)
+                if 'reload_file' in st.session_state:
+                    del st.session_state.reload_file
+            except Exception as e:
+                st.error(f"Error loading file: {e}")
+                st.session_state.file_content = "{\n    \"key\": \"value\"\n}"
+        elif not file_path or not file_path.exists():
             st.session_state.file_content = "{\n    \"key\": \"value\"\n}"
-    elif not file_path or not file_path.exists():
-        st.session_state.file_content = "{\n    \"key\": \"value\"\n}"
     
-    # Display current file path
-    if file_path:
-        st.sidebar.write(f"Editing: `{file_path}`")
+        # Display current file path
+        if file_path:
+            st.sidebar.write(f"Editing: `{file_path}`")
     # --- Sidebar --- to here
     
     # --- Main Content --- from here
@@ -139,7 +157,7 @@ def main():
     
     # Text area for editing JSON
     edited_json = st.text_area(
-        "",
+        "Edit JSON content:",
         value=st.session_state.file_content,
         height=600,
         key="json_editor"

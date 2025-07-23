@@ -362,6 +362,8 @@ def show_fmember_sidebar():
         
         # Display navigation options
         st.sidebar.subheader("Navigation")
+        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
         
@@ -409,11 +411,11 @@ def show_fadmin_sidebar():
         # Page Navigation Links
         st.subheader("Navigation")
         st.page_link("ftpe_ui.py", label="Home", icon="🏠")
-        st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
         st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
+        st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👨‍👩‍👧‍👦")
  
         # Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
@@ -788,6 +790,12 @@ def show_fadmin_content():
         # Create two separate forms for the buttons
         col1, col2 = st.columns(2)
     
+        # Display success message if it exists in session state
+        if 'success_message' in st.session_state and st.session_state.success_message:
+            st.success(st.session_state.success_message)
+            # Clear the message after displaying it
+            del st.session_state.success_message
+            
         # Form for Family Admin
         with col2:
             with st.form("admin_form"):
@@ -837,11 +845,10 @@ def show_fadmin_content():
                                 # Add as a subscriber by default for family admin
                                 success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                 if success:
-                                    st.success(f"✅ Family Admin & Subscriber created successfully")
-                                    # Clear form on success
-                                    st.session_state.new_password = ""
-                                    st.session_state.confirm_password = ""
-                                    st.session_state.family_admin_email = ""
+                                    # Save success message in session state before rerun
+                                    st.session_state.success_message = "✅ Family Admin & Subscriber created successfully"
+                                    # Clear form on success by rerunning with cleared state
+                                    st.rerun()
                                 else:
                                     st.error(f"❌ {message}")
                             else:

@@ -3,11 +3,15 @@ from dotenv import load_dotenv  # pip install python-dotenv
 import json
 import streamlit as st  # pip install streamlit
 import datetime as dt
+import traceback
 
+def get_function_name():
+    """取得目前函數名稱"""
+    return traceback.extract_stack(None, 2)[0][2]
 
 def get_languages():
     """
-    Get supported languages
+    Get I18N supported languages
     
     Returns:
         list: List of supported languages
@@ -121,8 +125,12 @@ def format_timestamp(ts) -> str:
             return date_time.strftime('%Y-%m-%d %H:%M:%S')
     except (ValueError, TypeError) as e:
         return ts_str  # 解析失敗，返回原始字串
-                    
+
+def test_func():
+    print(f"Function name: {get_function_name()}")
+                        
 if __name__ == '__main__':
     """
     Function test code
     """
+    test_func()
