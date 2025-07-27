@@ -1757,8 +1757,9 @@ else:
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
             if st.session_state.user_state == dbm.User_State['f_admin']:
-                st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👤")
+                st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="🌲")
         
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True, key="ftpe_logout"):

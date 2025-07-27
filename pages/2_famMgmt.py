@@ -15,6 +15,50 @@ from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 import funcUtils as fu
 from email_utils import Config, EmailPublisher
+from pathlib import Path
+from dotenv import load_dotenv
+import logging
+# --- Initialize system environment --- from here
+script_path = Path(__file__).resolve()
+script_dir = script_path.parent
+env_path = script_dir / '.env'
+
+# 載入 .env 文件
+load_dotenv(env_path, override=True)
+
+# --- Set Server logging levels ---
+g_logging = os.getenv("LOGGING", "INFO").strip('\"\'').upper()  # 預設為 INFO，並移除可能的引號
+
+# 創建日誌器
+logger = logging.getLogger(__name__)
+
+# 設置日誌格式
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+
+# 設置控制台處理器
+console_handler = logging.StreamHandler()
+
+# 根據環境變數設置日誌級別
+if g_logging == "DEBUG":
+    logger.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.DEBUG)
+    logger.debug("Debug logging is enabled")
+else:
+    logger.setLevel(logging.INFO)
+    console_handler.setLevel(logging.INFO)
+
+console_handler.setFormatter(formatter)
+
+# 移除所有現有的處理器，避免重複日誌
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+# 添加處理器到日誌器
+logger.addHandler(console_handler)
+
+# 確保根日誌器不會干擾
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger().setLevel(logging.WARNING)
 
 # Constants for UI text
 UI_TEXTS = {
@@ -43,13 +87,13 @@ UI_TEXTS = {
     "add": {
         "title": "Add Family Member",
         "name": "Full Name*",
-        "sex": "Gender*",
+        "sex": "Gender",
         "sex_options": ["Male", "Female", "Other"],
         "birth_date": "Birth Date (YYYY-MM-DD)*",
         "birth_date_placeholder": "e.g., 1990-01-01",
         "family_id": "Family ID",
         "alias": "Alias",
-        "generation": "Generation",
+        "generation": "Generation*",
         "email": "Email",
         "password": "Password",
         "confirm_password": "Confirm Password",
@@ -62,6 +106,7 @@ UI_TEXTS = {
     },
     "update": {
         "title": "Update Family Member",
+        "case": "Update Cases",
         "member_id_prompt": "Enter Member ID to update",
         "family_id_prompt": "Enter Family ID to update",
         "family_name_prompt": "Enter Family Name to update",
@@ -299,13 +344,19 @@ def update_family_page() -> None:
         key="update_family_id_2"
     )
     
-    if family_id:
-        # Get family data
-        family = dbm.get_family(family_id)
-        
-        if not family:
-            st.warning(f"⚠️ {UI_TEXTS['update']['not_found']}")
-            return
+    if 'update_message' in st.session_state:
+        st.info(st.session_state.update_message)
+        del st.session_state.update_message
+    
+    if st.button("Update Family", type="primary"):
+        if family_id:
+            # Get family data
+            family = dbm.get_family(family_id)
+            
+            if not family:
+                message = f"⚠️ {UI_TEXTS['update']['not_found']}"
+                st.session_state.update_message = message
+                st.rerun()
             
         with st.form(f"update_family_form_{family_id}"):
             st.subheader(UI_TEXTS["update"]["form_title"].format(
@@ -350,8 +401,9 @@ def update_family_page() -> None:
             if submitted:
                 # Validate required fields
                 if not name.strip():
-                    st.error(f"❌ {UI_TEXTS['update']['error_required']}")
-                    return
+                    message = f"❌ {UI_TEXTS['update']['error_required']}"
+                    st.session_state.update_message = message
+                    st.rerun()
                     
                 try:
                     # Prepare update data with only changed fields
@@ -373,16 +425,26 @@ def update_family_page() -> None:
                             update=True)
                         
                         if updated_id:
-                            st.success(f"✅ {UI_TEXTS['update']['success']} {name} (ID: {family_id})")
+                            message = f"✅ {UI_TEXTS['update']['success']} {name} (ID: {family_id})"
+                            st.session_state.update_message = message
+                            st.rerun()
                         else:
-                            st.error(f"❌ {UI_TEXTS['update']['error_generic']} {str('Failed to update family. Please try again.')}")
+                            message = f"❌ {UI_TEXTS['update']['error_generic']} {str('Failed to update family. Please try again.')}"
+                            st.session_state.update_message = message
+                            st.rerun()
                     else:
-                        st.info(UI_TEXTS["update"]["nothing_to_update"])
+                        message = UI_TEXTS["update"]["nothing_to_update"]
+                        st.session_state.update_message = message
+                        st.rerun()
                         
                 except ValueError as ve:
-                    st.error(f"❌ {UI_TEXTS['update']['error_required']} {str(ve)}")
+                    message = f"❌ {UI_TEXTS['update']['error_required']} {str(ve)}"
+                    st.session_state.update_message = message
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}")
+                    message = f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}"
+                    st.session_state.update_message = message
+                    st.rerun()
 
 def search_relations_page() -> None:
     """
@@ -474,6 +536,12 @@ def search_relations_page() -> None:
         
                 # Rename columns for better display
                 if not df.empty:
+                    # Ensure date fields are properly formatted as strings
+                    date_columns = ['join_date', 'end_date', 'created_at', 'updated_at']
+                    for col in date_columns:
+                        if col in df.columns:
+                            df[col] = df[col].astype(str)
+                    
                     # Select and reorder columns
                     all_fields = [
                         'id', 'member_id', 'partner_id', 'relation', 
@@ -636,206 +704,232 @@ def update_relation_page() -> None:
         key="update_relation_id_2"
     )
     
-    if relation_id:
-        # Get relation data
-        relation = dbm.get_relation(relation_id)
-        
-        if not relation:
-            st.warning(f"⚠️ {UI_TEXTS["update"]["not_found"]}")
-            return
+    if 'update_message' in st.session_state:
+        st.info(st.session_state.update_message)
+        del st.session_state.update_message
+    
+    if st.button("Update Relation", type="primary"):
+        if relation_id:
+            # Get relation data
+            relation = dbm.get_relation(relation_id)
             
-        with st.form(f"update_relation_form_{relation_id}"):
-            st.subheader(f"Update Relation: {relation_id}")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                member_id = st.number_input(
-                    UI_TEXTS["update"]["member_id_prompt"],
-                    min_value=1,
-                    step=1,
-                    value=relation.get('member_id', 1),
-                    help="ID of the first member in the relationship",
-                    key="update_relation_member_id_2"
-                )
-                rel_list = list(dbm.Relation_Type.keys())  # Convert dict_keys to list
-                current_relation = relation.get('relation', 'spouse')
-                try:
-                    default_index = rel_list.index(current_relation)
-                except ValueError:
-                    default_index = 0  # Default to first item if relation not found
-                    
-                relation_type = st.selectbox(
-                    UI_TEXTS["update"]["relation_type_prompt"],
-                    rel_list,
-                    index=default_index,
-                    help="Type of relationship between the members",
-                    key="update_relation_type_2"
-                )
+            if not relation:
+                message = f"⚠️ {UI_TEXTS["update"]["not_found"]}"
+                st.session_state.update_message = message
+                st.rerun()
+            # Display relation data in a form
+            with st.form(f"update_relation_form_{relation_id}"):
+                st.subheader(f"Update Relation: {relation_id}")
                 
-                # Safely handle different date input types
-                join_date_value = relation.get('join_date')
-                if join_date_value is None:
-                    default_date = date.today()
-                elif isinstance(join_date_value, str):
+                col1, col2 = st.columns(2)
+            
+                with col1:
+                    member_id = st.number_input(
+                        UI_TEXTS["update"]["member_id_prompt"],
+                        min_value=1,
+                        step=1,
+                        value=relation.get('member_id', 1),
+                        help="ID of the first member in the relationship",
+                        key="update_relation_member_id_2"
+                    )
+                    rel_list = list(dbm.Relation_Type.keys())  # Convert dict_keys to list
+                    current_relation = relation.get('relation', 'spouse')
                     try:
-                        default_date = datetime.strptime(join_date_value, '%Y-%m-%d').date()
-                    except (ValueError, TypeError):
-                        default_date = date.today()
-                elif hasattr(join_date_value, 'date'):  # Already a date/datetime object
-                    default_date = join_date_value.date() if hasattr(join_date_value, 'date') else date.today()
-                else:
-                    default_date = date.today()
-                
-                join_date = st.text_input(
-                    UI_TEXTS["update"]["join_date_prompt"] + "*",
-                    value=datetime.strptime(relation.get('join_date', str(date.today())), '%Y-%m-%d').date(),
-                    help="When this relationship began",
-                    key=f"update_join_date_{relation_id}"
-                )
-                
-                # Get and parse dates with proper error handling
-                try:
-                    # Parse join date
-                    join_date_value = relation.get('join_date')
-                    if isinstance(join_date_value, str):
-                        join_date = datetime.strptime(join_date_value, '%Y-%m-%d').date()
-                    else:
-                        join_date = join_date_value or date.today()
+                        default_index = rel_list.index(current_relation)
+                    except ValueError:
+                        default_index = 0  # Default to first item if relation not found
                     
-                    # Parse end date if it exists
-                    end_date_value = relation.get('end_date')
-                    if end_date_value:
-                        if isinstance(end_date_value, str):
-                            end_date = datetime.strptime(end_date_value, '%Y-%m-%d').date()
-                        else:
-                            end_date = end_date_value
-                    else:
-                        end_date = None
-                    
-                    # Display end date input
-                    end_date = st.text_input(
-                        UI_TEXTS["update"]["end_date_prompt"],
-                        value=end_date,
-                        help="If this relationship has ended, when it ended",
-                        key=f"update_end_date_{relation_id}"
+                    relation_type = st.selectbox(
+                        UI_TEXTS["update"]["relation_type_prompt"],
+                        rel_list,
+                        index=default_index,
+                        help="Type of relationship between the members",
+                        key="update_relation_type_2"
+                    )
+                
+                with col2:
+                    partner_id = st.number_input(
+                        UI_TEXTS["update"]["partner_id_prompt"],
+                        min_value=1,
+                        step=1,
+                        value=relation.get('partner_id', 1),
+                        help="ID of the second member in the relationship",
+                        key="update_relation_partner_id_2"
                     )
                     
-                    # Validate date range if end date is provided
-                    if end_date and end_date < join_date:
-                        st.error("End date cannot be before start date")
-                        st.stop()
-                        
-                except (ValueError, TypeError) as e:
-                    st.error(f"Error parsing dates: {str(e)}")
-                    st.stop()
-                
-            with col2:
-                partner_id = st.number_input(
-                    UI_TEXTS["update"]["partner_id_prompt"],
-                    min_value=1,
-                    step=1,
-                    value=relation.get('partner_id', 1),
-                    help="ID of the second member in the relationship",
-                    key="update_relation_partner_id_2"
-                )
-                
-                original_family_id = st.number_input(
-                    UI_TEXTS["update"]["original_family_id_prompt"],
-                    min_value=0,
-                    step=1,
-                    value=relation.get('original_family_id', 0),
-                    help="Original family ID if applicable",
-                    key="update_relation_original_family_id_2"
-                )
-                      
-            # Additional fields
-            original_name = st.text_input(
-                "Original Name (if different)",
-                relation.get('original_name', ''),
-                key=f"update_original_name_{relation_id}"
-            )
-            dad_name = st.text_input(
-                "Father's Name (if applicable)",
-                relation.get('dad_name', ''),
-                key=f"update_dad_name_{relation_id}"
-            )
-            mom_name = st.text_input(
-                "Mother's Name (if applicable)",
-                relation.get('mom_name', ''),
-                key=f"update_mom_name_{relation_id}"
-            )
-            
-            # Display timestamps
-            created_at = relation.get('created_at', 'N/A')
-            updated_at = relation.get('updated_at', 'N/A')
-            st.caption(f"Created: {created_at}")
-            st.caption(f"Last Updated: {updated_at}")
-            
-            submitted = st.form_submit_button("Update Relation")
-            
-            if submitted:
-                # Validate required fields
-                if not member_id or not partner_id or not relation_type:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_required"]}")
-                    return
-                    
-                try:
-                    # Prepare update data with only changed fields
-                    update_data = {}
-                    
-                    # Check which fields have changed
-                    if member_id != relation.get('member_id'):
-                        update_data['member_id'] = member_id
-                    if partner_id != relation.get('partner_id'):
-                        update_data['partner_id'] = partner_id
-                    if relation_type != relation.get('relation'):
-                        update_data['relation'] = relation_type
-                    
-                    # Handle dates
-                    join_date_str = join_date.isoformat()
-                    if join_date_str != relation.get('join_date'):
-                        update_data['join_date'] = join_date_str
-                    
-                    if end_date:
-                        end_date_str = end_date.isoformat()
-                        if end_date_str != relation.get('end_date'):
-                            update_data['end_date'] = end_date_str
-                    
-                    # Handle optional fields
-                    optional_fields = {
-                        'original_family_id': original_family_id if original_family_id > 0 else None,
-                        'original_name': original_name if original_name else None,
-                        'dad_name': dad_name if dad_name else None,
-                        'mom_name': mom_name if mom_name else None
-                    }
-                    
-                    for field, value in optional_fields.items():
-                        if value != relation.get(field):
-                            update_data[field] = value
-                    
-                    if update_data:
-                        # Add the ID for the update
-                        update_data['id'] = relation_id
-                        
-                        # Update relation in database
-                        updated_id = dbm.add_or_update_relation(
-                            update_data, update=True)
-                        
-                        if updated_id:
-                            st.success(f"✅ {UI_TEXTS["update"]["success"]} {relation_id}")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str("Failed to update relation (ID: {relation_id}). Please try again.")}")
+                    original_family_id = st.number_input(
+                        UI_TEXTS["update"]["original_family_id_prompt"],
+                        min_value=0,
+                        step=1,
+                        value=relation.get('original_family_id', 0),
+                        help="Original family ID if applicable",
+                        key="update_relation_original_family_id_2"
+                    )
+
+                    # Safely handle different date input types
+                    join_date_value = relation.get('join_date')
+                    if join_date_value is None:
+                        default_date = date.today()
+                    elif isinstance(join_date_value, str):
+                        try:
+                            default_date = datetime.strptime(join_date_value, '%Y-%m-%d').date()
+                        except (ValueError, TypeError):
+                            default_date = date.today()
+                    elif hasattr(join_date_value, 'date'):  # Already a date/datetime object
+                        default_date = join_date_value.date() if hasattr(join_date_value, 'date') else date.today()
                     else:
-                        st.info(f"No changes detected for relation (ID: {relation_id}).")
+                        default_date = date.today()
+                    
+                    join_date = st.text_input(
+                        UI_TEXTS["update"]["join_date_prompt"] + "*",
+                        value=datetime.strptime(relation.get('join_date', str(date.today())), '%Y-%m-%d').date(),
+                        help="When this relationship began",
+                        key=f"update_join_date_{relation_id}"
+                    )
+                
+                    # Get and parse dates with proper error handling
+                    try:
+                        # Parse join date
+                        join_date_value = relation.get('join_date')
+                        if isinstance(join_date_value, str):
+                            join_date = datetime.strptime(join_date_value, '%Y-%m-%d').date()
+                        else:
+                            join_date = join_date_value or date.today()
+                    
+                        # Parse end date if it exists
+                        end_date_value = relation.get('end_date')
+                        if end_date_value:
+                            if isinstance(end_date_value, str):
+                                end_date = datetime.strptime(end_date_value, '%Y-%m-%d').date()
+                            else:
+                                end_date = end_date_value
+                        else:
+                            end_date = None
+                    
+                        # Display end date input
+                        end_date = st.text_input(
+                            UI_TEXTS["update"]["end_date_prompt"],
+                            value=end_date,
+                            help="If this relationship has ended, when it ended",
+                            key=f"update_end_date_{relation_id}"
+                        )
+                    
+                        # Validate date range if end date is provided
+                        if end_date and end_date < join_date:
+                            st.error("End date cannot be before start date")
+                            st.stop()
                         
-                except ValueError as ve:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(ve)}")
-                except sqlite3.Error as se:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(se)}")
-                except Exception as e:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(e)}")
+                    except (ValueError, TypeError) as e:
+                        st.error(f"Error parsing dates: {str(e)}")
+                        st.stop()
+                      
+                # Additional fields
+                original_name = st.text_input(
+                    "Original Name (if different)",
+                    relation.get('original_name', ''),
+                    key=f"update_original_name_{relation_id}"
+                )
+                
+                dad_name = st.text_input(
+                    "Father's Name (if applicable)",
+                    relation.get('dad_name', ''),
+                    key=f"update_dad_name_{relation_id}"
+                )
+                
+                mom_name = st.text_input(
+                    "Mother's Name (if applicable)",
+                    relation.get('mom_name', ''),
+                    key=f"update_mom_name_{relation_id}"
+                )
+            
+                # Display timestamps
+                created_at = relation.get('created_at', 'N/A')
+                st.caption(f"Created: {created_at}")
+            
+                submitted = st.form_submit_button("Update Relation")
+            
+                if submitted:
+                    # Validate required fields for relation update
+                    if not member_id or not partner_id or not relation_type:
+                        message = f"❌ {UI_TEXTS["update"]["error_required"]}"
+                        st.session_state.update_message = message
+                        st.rerun()
+                    
+                    try:
+                        # Prepare update data with only changed fields
+                        update_data = {}
+                        
+                        # Check which fields have changed
+                        if member_id != relation.get('member_id'):
+                            update_data['member_id'] = member_id
+                        if partner_id != relation.get('partner_id'):
+                            update_data['partner_id'] = partner_id
+                        if relation_type != relation.get('relation'):
+                            update_data['relation'] = relation_type
+                    
+                        # Handle dates - ensure proper string formatting
+                        if isinstance(join_date, (datetime.date, datetime.datetime)):
+                            join_date_str = join_date.strftime('%Y-%m-%d')
+                        else:
+                            join_date_str = str(join_date)
+                            
+                        if join_date_str != relation.get('join_date', ''):
+                            update_data['join_date'] = join_date_str
+                    
+                        if end_date:
+                            if isinstance(end_date, (datetime.date, datetime.datetime)):
+                                end_date_str = end_date.strftime('%Y-%m-%d')
+                            else:
+                                end_date_str = str(end_date)
+                                
+                            if end_date_str != relation.get('end_date', ''):
+                                update_data['end_date'] = end_date_str
+                    
+                        # Handle optional fields
+                        optional_fields = {
+                            'original_family_id': original_family_id if original_family_id > 0 else None,
+                            'original_name': original_name if original_name else None,
+                            'dad_name': dad_name if dad_name else None,
+                            'mom_name': mom_name if mom_name else None
+                        }
+                    
+                        for field, value in optional_fields.items():
+                            if value != relation.get(field):
+                                update_data[field] = value
+                    
+                        if update_data:
+                            # Add the ID for the update
+                            update_data['id'] = relation_id
+                            
+                            # Update relation in database
+                            updated_id = dbm.add_or_update_relation(
+                                update_data, update=True)
+                        
+                            if updated_id:
+                                message = f"✅ {UI_TEXTS["update"]["success"]} {relation_id}"
+                                st.session_state.update_message = message
+                                st.rerun()
+                            else:
+                                message = f"❌ {UI_TEXTS["update"]["error_generic"]} {str("Failed to update relation (ID: {relation_id}). Please try again.")}"
+                                st.session_state.update_message = message
+                                st.rerun()
+                        else:
+                            message = f"No changes detected for relation (ID: {relation_id})."
+                            st.session_state.update_message = message
+                            st.rerun()
+                        
+                    except ValueError as ve:
+                        message = f"❌ {UI_TEXTS["update"]["error_generic"]} {str(ve)}"
+                        st.session_state.update_message = message
+                        st.rerun()
+                    except sqlite3.Error as se:
+                        message = f"❌ {UI_TEXTS["update"]["error_generic"]} {str(se)}"
+                        st.session_state.update_message = message
+                        st.rerun()
+                    except Exception as e:
+                        message = f"❌ {UI_TEXTS["update"]["error_generic"]} {str(e)}"
+                        st.session_state.update_message = message
+                        st.rerun()
 
 def add_member_page() -> None:
     """Display the form to add a new member."""
@@ -869,7 +963,7 @@ def add_member_page() -> None:
                 UI_TEXTS["add"]["generation"],
                 min_value=0,
                 step=1,
-                value=0,
+                value=None,
                 key="add_member_gen_order_2"
             )
         with col2:
@@ -937,14 +1031,30 @@ def update_member_page() -> None:
         key="update_member_id_2"
     )
     
-    if member_id:
-        # Get member data
-        member = dbm.get_member(member_id)
-        
-        if not member:
-            st.warning(f"⚠️ {UI_TEXTS["update"]["not_found"]}")
-            return
-            
+    # save message to session state
+    if 'update_message' in st.session_state:
+        st.info(st.session_state.update_message)
+        del st.session_state.update_message
+    
+    # Initialize member in session state if not exists
+    if 'current_member' not in st.session_state:
+        st.session_state.current_member = None
+    
+    # Handle Get Member button click
+    if st.button("Get Member"):
+        if member_id:
+            # Get member data and store in session state
+            st.session_state.current_member = dbm.get_member(member_id)
+            if not st.session_state.current_member:
+                st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['not_found']}"
+                st.rerun()
+        else:
+            st.session_state.update_message = f"⚠️ Please enter a valid member ID"
+            st.rerun()
+    
+    # Display the form if we have member data
+    if st.session_state.current_member:
+        member = st.session_state.current_member
         with st.form(f"update_form_{member_id}"):
             st.subheader(UI_TEXTS["update"]["form_title"].format(
                 name=member.get('name', ''),
@@ -996,15 +1106,11 @@ def update_member_page() -> None:
             with col2:
                 # Dates and Family
                 st.subheader("Dates & Family")
-                # Convert empty string to None for date input
-                born_value = member.get('born')
-                if born_value == '':
-                    born_value = None
-                elif isinstance(born_value, str):
-                    try:
-                        born_value = datetime.strptime(born_value, '%Y-%m-%d').date()
-                    except (ValueError, TypeError):
-                        born_value = None
+                # Convert empty string to '0000-00-00' for date input
+                born_value = str(member.get('born'))
+                logger.debug(f"Born value: {born_value}")
+                if born_value == '' or born_value is None:
+                    born_value = '0000-00-00'
                 
                 born = st.text_input(
                     "Birth Date* (YYYY-MM-DD)",
@@ -1013,15 +1119,11 @@ def update_member_page() -> None:
                     key=f"update_born_{member_id}"
                 )
                 
-                # Convert empty string to None for date input
-                died_value = member.get('died')
-                if died_value == '':
-                    died_value = None
-                elif isinstance(died_value, str):
-                    try:
-                        died_value = datetime.strptime(died_value, '%Y-%m-%d').date()
-                    except (ValueError, TypeError):
-                        died_value = None
+                # Convert empty string to '0000-00-00' for date input
+                died_value = str(member.get('died'))
+                logger.debug(f"Died value: {died_value}")
+                if died_value == '' or died_value is None:
+                    died_value = '0000-00-00'
                         
                 died = st.text_input(
                     "Death Date (YYYY-MM-DD)",
@@ -1034,7 +1136,7 @@ def update_member_page() -> None:
                     "Family ID",
                     min_value=0,
                     step=1,
-                    value=member.get('family_id', ''),
+                    value=member.get('family_id', 0),
                     key="update_member_family_id_2"
                 )
                 
@@ -1045,7 +1147,7 @@ def update_member_page() -> None:
                     gen_order_value = 0
                     
                 gen_order = st.number_input(
-                    "Generation Order",
+                    "Generation Order*",
                     min_value=0,
                     step=1,
                     value=gen_order_value,
@@ -1069,7 +1171,7 @@ def update_member_page() -> None:
                     "Father ID",
                     min_value=0,
                     step=1,
-                    value=member.get('dad_id', 0),
+                    value=int(member.get('dad_id', 0)),
                     key="update_member_dad_id"
                 )
                 
@@ -1077,7 +1179,7 @@ def update_member_page() -> None:
                     "Mother ID",
                     min_value=0,
                     step=1,
-                    value=member.get('mom_id', 0),
+                    value=int(member.get('mom_id', 0)),
                     key="update_member_mom_id"
                 )
             
@@ -1086,40 +1188,46 @@ def update_member_page() -> None:
             if submitted:
                 # Validate required fields
                 if not name or not gen_order or not born:
-                    st.error(UI_TEXTS["add"]["error_required"])
+                    message = f"❌ {UI_TEXTS["add"]["error_required"]}"
+                    st.session_state.update_message = message
                     return
-                    
-                try:
-                    update_data = {
-                        'name': name,
-                        'sex': sex if sex else None,
-                        'born': born,
-                        'died': died if died else '0000-00-00',
-                        'family_id': int(family_id) if int(family_id) >= 0 else 0,
-                        'alias': alias if alias else None,
-                        'email': email if email else None,
-                        'url': url if url else None,
-                        'gen_order': gen_order if gen_order > 0 else 0,
-                        'dad_id': int(dad_id) if int(dad_id) >= 0 else 0,
-                        'mom_id': int(mom_id) if int(mom_id) >= 0 else 0
-                    }
-                    
-                    # Remove unchanged fields
-                    for key in list(update_data.keys()):
-                        if key in member and update_data[key] == member[key]:
-                            del update_data[key]
-                    
-                    if update_data:
+                
+                update_data = {
+                    'name': name,
+                    'sex': sex if sex else None,
+                    'born': born,
+                    'died': died if died else '0000-00-00',
+                    'family_id': int(family_id) if int(family_id) >= 0 else 0,
+                    'alias': alias if alias else None,
+                    'email': email if email else None,
+                    'url': url if url else None,
+                    'gen_order': gen_order if gen_order > 0 else 0,
+                    'dad_id': int(dad_id) if int(dad_id) >= 0 else 0,
+                    'mom_id': int(mom_id) if int(mom_id) >= 0 else 0
+                }
+                
+                # Remove unchanged fields
+                for key in list(update_data.keys()):
+                    if key in member and update_data[key] == member[key]:
+                        del update_data[key]
+                
+                if update_data:
+                    logger.debug(f"Update data: {update_data}")
+                    try:
                         success = dbm.update_member(member_id, update_data)
                         if success:
-                            st.success(f"✅ {UI_TEXTS["update"]["success"]}")
+                            st.session_state.update_message = f"✅ {UI_TEXTS['update']['success']}"
+                            # Refresh member data after successful update
+                            st.session_state.current_member = dbm.get_member(member_id)
                         else:
-                            st.warning(f"⚠️ {UI_TEXTS["update"]["no_changes"]}")
-                    else:
-                        st.info(f"⚠️ {UI_TEXTS["update"]["nothing_to_update"]}")
-                            
-                except Exception as e:
-                    st.error(f"❌ {UI_TEXTS["update"]["error_generic"]} {str(e)}")
+                            st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['no_changes']}"
+                        st.rerun()
+                    except Exception as e:
+                        st.session_state.update_message = f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}"
+                        st.rerun()
+                else:
+                    st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['nothing_to_update']}"
+                    st.rerun()
 
 def delete_member_page() -> None:
     """Display the interface for deleting a member."""
@@ -1131,37 +1239,49 @@ def delete_member_page() -> None:
         min_value=1,
         step=1
     )
+    if st.session_state.get('delete_message'):
+        st.info(st.session_state.delete_message)
+        del st.session_state.delete_message
     
-    if member_id:
-        # Get member data
-        member = dbm.get_member(member_id)
-        
-        if not member:
-            st.warning(f"⚠️ {UI_TEXTS["delete"]["not_found"]}")
-            return
+    if st.button("Delete Member", type="primary"):
+        if member_id:
+            # Get member data
+            member = dbm.get_member(member_id)
             
-        st.warning(f"⚠️ {UI_TEXTS["delete"]["warning"]}")
+            if not member:
+                message = f"⚠️ {UI_TEXTS["delete"]["not_found"]}"
+                st.session_state.delete_message = message
+                return
+            
+            st.warning(f"⚠️ {UI_TEXTS["delete"]["warning"]}")
+            
+            # Display member data for confirmation
+            st.subheader(UI_TEXTS["delete"]["confirm_title"])
+            st.json(member)
         
-        # Display member data for confirmation
-        st.subheader(UI_TEXTS["delete"]["confirm_title"])
-        st.json(member)
+            # Confirm deletion
+            confirm = st.checkbox(UI_TEXTS["delete"]["confirm_checkbox"])
         
-        # Confirm deletion
-        confirm = st.checkbox(UI_TEXTS["delete"]["confirm_checkbox"])
-        
-        if confirm:
-            if st.button(
-                UI_TEXTS["delete"]["confirm_button"],
-                type="primary"
-            ):
-                try:
-                    success = dbm.delete_member(member_id)
-                    if success:
-                        st.success(f"✅ {UI_TEXTS["delete"]["success"]}")
-                    else:
-                        st.error(f"❌ {UI_TEXTS["delete"]["error"]}")
-                except Exception as e:
-                    st.error(f"Error deleting member: {str(e)}")
+            if confirm:
+                if st.button(
+                    UI_TEXTS["delete"]["confirm_button"],
+                    type="primary"
+                ):
+                    try:
+                        success = dbm.delete_member(member_id)
+                        if success:
+                            message = f"✅ {UI_TEXTS["delete"]["success"]}"
+                            logger.debug(f"Member {member_id} deleted successfully")
+                            st.session_state.delete_message = message
+                        else:
+                            message = f"❌ {UI_TEXTS["delete"]["error"]}"
+                            st.session_state.delete_message = message
+                    except Exception as e:
+                        message = f"❌ {UI_TEXTS["delete"]["error_generic"]} {str(e)}"
+                        st.session_state.delete_message = message
+                    
+                # save message to session state
+                st.session_state.delete_message = message
 
 def birthday_of_the_month_page():
     """Display members born in a specific month."""
@@ -1186,93 +1306,106 @@ def birthday_of_the_month_page():
             format_func=lambda x: f"{x}"
         )
         month_number = months.index(selected_month) + 1
-        
-        # Add a refresh button
-        refresh = st.button("🔃 Refresh")
     
     with col2:
         st.write("")
     
-    try:
-        # Get members born in the selected month
-        members = dbm.get_members_when_born_in(month_number)
-        
-        if not members:
-            st.info(f"⚠️ {UI_TEXTS["birthday"]["not_found"]}")
-            return
-            
-        # Create a list to hold all member data
-        member_data = []
-        
-        # Process each member and collect their data
-        for m in members:
-            if m.get('sex') == 'M':
-                gender = 'Male'
-            elif m.get('sex') == 'F':
-                gender = 'Female'
-            else:
-                gender = 'Unknown'
-                
-            member_data.append({
-                'ID': m.get('id', ''),
-                'Name': m.get('name', ''),
-                'Gender': gender,
-                'Birthday': fu.format_timestamp(m.get('born')),
-                'Email': m.get('email', '')
-            })
-        
-        # Create DataFrame from the collected data
-        df = pd.DataFrame(member_data)
-        
-        # save to csv, created in the dir_path, specified in the context fss
-        csv_file = f"{st.session_state.app_context['fss']['dir_path']}/birthday_list_{selected_month.lower()}_{datetime.now().year}.csv"
+    # save message to session state
+    if 'birthday_message' in st.session_state:
+        st.info(st.session_state.birthday_message)
+        del st.session_state.birthday_message
+    if st.button("Query"):
         try:
-            df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-            st.info(f"✅ {UI_TEXTS['birthday']['saved']}")
-        except Exception as e:
-            st.error(f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}")
+            # Get members born in the selected month
+            members = dbm.get_members_when_born_in(month_number)
             
-        # Display the results
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                'ID': st.column_config.NumberColumn('ID'),
-                'Name': st.column_config.TextColumn('Name'),
-                'Gender': st.column_config.TextColumn('Gender'),
-                'Birthday': st.column_config.TextColumn('Birthday'),
-                'Email': st.column_config.TextColumn('Email')
-            }
-        )
+            if not members:
+                message = f"⚠️ {UI_TEXTS["birthday"]["not_found"]}"
+                st.session_state.birthday_message = message
+                return
+            
+            # Create a list to hold all member data
+            member_data = []
+            
+            # Process each member and collect their data
+            for m in members:
+                if m.get('sex') == 'M':
+                    gender = 'Male'
+                elif m.get('sex') == 'F':
+                    gender = 'Female'
+                else:
+                    gender = 'Unknown'
+                
+                member_data.append({
+                    'ID': m.get('id', ''),
+                    'Name': m.get('name', ''),
+                    'Gender': gender,
+                    'Birthday': fu.format_timestamp(m.get('born')),
+                    'Email': m.get('email', '')
+                })
         
-        # Add publish button to send csv file to all the subscribers
-        # via EmailPublisher
-        if st.button("📧 Publish Birthday List"):
+            # Create DataFrame from the collected data
+            df = pd.DataFrame(member_data)
+            
+            # Ensure all date columns are strings
+            date_columns = ['Birthday']
+            for col in date_columns:
+                if col in df.columns:
+                    df[col] = df[col].astype(str)
+        
+            # save to csv, created in the dir_path, specified in the context fss
+            csv_file = f"{st.session_state.app_context['fss']['dir_path']}/birthday_list_{selected_month.lower()}_{datetime.now().year}.csv"
             try:
-                # Ensure we have data to export
-                if df.empty:
-                    st.warning(f"⚠️ {UI_TEXTS['birthday']['not_found']}")
-                    return
-                    
-                # Create email publisher object
-                publisher = EmailPublisher(Config.MAIL_USERNAME, Config.MAIL_PASSWORD)
+                df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+                message = f"✅ {UI_TEXTS['birthday']['saved']} {csv_file}"
+                st.session_state.birthday_message = message
+            except Exception as e:
+                message = f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}"
+                st.session_state.birthday_message = message
+                return
+            
+            # Display the results
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'ID': st.column_config.NumberColumn('ID'),
+                    'Name': st.column_config.TextColumn('Name'),
+                    'Gender': st.column_config.TextColumn('Gender'),
+                    'Birthday': st.column_config.TextColumn('Birthday'),
+                    'Email': st.column_config.TextColumn('Email')
+                }
+            )
+        
+            # Add publish button to send csv file to all the subscribers
+            # via EmailPublisher
+            if st.button("📧 Publish Birthday List"):
+                try:
+                    # Ensure we have data to export
+                    if df.empty:
+                        message = f"⚠️ {UI_TEXTS['birthday']['not_found']}"
+                        st. session_state.birthday_message = message
+                        return                    
+                    # Create email publisher object
+                    publisher = EmailPublisher(Config.MAIL_USERNAME, Config.MAIL_PASSWORD)
                 
-                # Filter out None or empty email addresses
-                recipients = [m.get('email') for m in members if m.get('email')]
+                    # Filter out None or empty email addresses
+                    recipients = [m.get('email') for m in members if m.get('email')]
                 
-                if not recipients:
-                    st.warning("⚠️ No valid email addresses found to send to")
-                    return
+                    if not recipients:
+                        message = "⚠️ No valid email addresses found to send to"
+                        st.warning(message)
+                        return
                 
-                text_content = f"""Wishing you a wonderful birthday celebration!\n
-                May this special day bring you joy and happiness!\n
-                Best regards,\n
-                Your Family Team"""
+                    text_content = f"""Wishing you a wonderful birthday celebration!\n
+                    May this special day bring you joy and happiness!\n
+                    Best regards,\n
+                    Your Family Team"""
                 
-                # Create HTML content with animated birthday card
-                html_content = r""" 
-                <style>
+                    # Create HTML content with animated birthday card
+                    html_content = r""" 
+                    <style>
                     @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
                     .birthday-card {
                     font-family: 'Arial', sans-serif;
@@ -1283,21 +1416,21 @@ def birthday_of_the_month_page():
                     border-radius: 15px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
                     text-align: center;
-                }
-                .birthday-title {
+                    }
+                    .birthday-title {
                     font-family: 'Dancing Script', cursive;
                     font-size: 36px;
                     color: #e91e63;
                     margin: 20px 0;
                     animation: bounce 2s infinite;
-                }
-                .birthday-message {
+                    }
+                    .birthday-message {
                     font-size: 16px;
                     color: #333;
                     line-height: 1.6;
                     margin: 20px 0;
-                }
-                .balloon {
+                    }
+                    .balloon {
                     display: inline-block;
                     width: 40px;
                     height: 50px;
@@ -1306,8 +1439,8 @@ def birthday_of_the_month_page():
                     position: relative;
                     margin: 0 5px;
                     animation: float 3s ease-in-out infinite;
-                }
-                .balloon:before {
+                    }
+                    .balloon:before {
                     content: '';
                     position: absolute;
                     width: 2px;
@@ -1316,28 +1449,28 @@ def birthday_of_the_month_page():
                     top: 50px;
                     left: 50%;
                     transform: translateX(-50%);
-                }
-                .balloon:nth-child(2n) {
+                    }
+                    .balloon:nth-child(2n) {
                     background: #3f51b5;
                     animation-delay: 0.3s;
-                }
-                .balloon:nth-child(3n) {
+                    }
+                    .balloon:nth-child(3n) {
                     background: #4caf50;
                     animation-delay: 0.6s;
-                }
-                .balloon:nth-child(4n) {
+                    }
+                    .balloon:nth-child(4n) {
                     background: #ff9800;
                     animation-delay: 0.9s;
-                }
-                @keyframes float {
+                    }
+                    @keyframes float {
                     0%, 100% {
                         transform: translateY(0) rotate(-2deg);
                     }
                     50% {
                         transform: translateY(-20px) rotate(2deg);
                     }
-                }
-                @keyframes bounce {
+                    }
+                    @keyframes bounce {
                     0%, 20%, 50%, 80%, 100% {
                         transform: translateY(0);
                     }
@@ -1347,76 +1480,107 @@ def birthday_of_the_month_page():
                     60% {
                         transform: translateY(-10px);
                     }
-                }
-                .signature {
+                    }
+                    .signature {
                     margin-top: 30px;
                     font-style: italic;
                     color: #666;
-                }
-            </style>
-            <div class="birthday-card">
-            <div class="balloon"></div>
-            <div class="balloon"></div>
-            <div class="balloon"></div>
-            <div class="balloon"></div>
+                    }
+                    </style>
+                    <div class="birthday-card">
+                        <div class="balloon"></div>
+                        <div class="balloon"></div>
+                        <div class="balloon"></div>
+                        <div class="balloon"></div>
             
-            <h1 class="birthday-title">Happy Birthday!</h1>
+                        <h1 class="birthday-title">Happy Birthday!</h1>
             
-            <div class="birthday-message">
-                <p>Wishing you a wonderful birthday celebration!</p>
-                <p>May this special day bring you joy and happiness!</p>
-            </div>
+                        <div class="birthday-message">
+                            <p>Wishing you a wonderful birthday celebration!</p>
+                            <p>May this special day bring you joy and happiness!</p>
+                        </div>
             
-            <div class="signature">
-                <p>Best regards,<br>Your Family Team</p>
-            </div>
-            </div>
-            """
+                        <div class="signature">
+                            <p>Best regards,<br>Your Family Team</p>
+                        </div>
+                    </div>
+                    """
 
-                # Check if the attached b'day card file exists
-                card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
-                if not os.path.exists(card_file):
-                    st.error(f"❌ {UI_TEXTS['birthday']['error_publish']}: bday.html file not found")
-                    return
+                    # Check if the attached b'day card file exists
+                    card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
+                    if not os.path.exists(card_file):
+                        message = f"❌ {UI_TEXTS['birthday']['error_publish']}: bday.html file not found"
+                        st.error(message)
+                        return
                 
-                # Send email with the animated birthday card
-                publisher.publish_email(
-                    subject=f"🎉 Happy Birthday Celebrations - {selected_month} {datetime.now().year}",
-                    text=text_content,
-                    html=html_content,
-                    attached_file=card_file,
-                    recipients=recipients
-                )
-                
-                st.success(f"✅ {UI_TEXTS['birthday']['published']} to {recipients}")
-            except Exception as e:
-                st.error(f"❌ {UI_TEXTS['birthday']['error_publish']}: {str(e)}")
+                    # Send email with the animated birthday card
+                    publisher.publish_email(
+                        subject=f"🎉 Happy Birthday Celebrations - {selected_month} {datetime.now().year}",
+                        text=text_content,
+                        html=html_content,
+                        attached_file=card_file,
+                        recipients=recipients
+                    )
+
+                    message = f"✅ {UI_TEXTS['birthday']['published']} to {recipients}"
+                    st.success(message)
+                except Exception as e:
+                    message = f"❌ {UI_TEXTS['birthday']['error_publish']}: {str(e)}"
+                    st.error(message)
         
-        # Add download button with improved error handling
-        if st.button("💾 Download Birthday List"):
-            try:
-                # Ensure we have data to export
-                if df.empty:
-                    st.warning(f"⚠️ {UI_TEXTS['birthday']['not_found']}")
-                    return
+            # Add download button with improved error handling
+            if st.button("💾 Download Birthday List"):
+                try:
+                    # Ensure we have data to export
+                    if df.empty:
+                        message = f"⚠️ {UI_TEXTS['birthday']['not_found']}"
+                        st.warning(message)
+                        return
                     
-                # Create download button with proper file naming
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=csv,
-                    file_name=csv_file,
-                    mime="text/csv",
-                    help=f"Download birthday list for {selected_month} {datetime.now().year}"
-                )
+                    # Create download button with proper file naming
+                    st.download_button(
+                        label="⬇️ Download CSV",
+                        data=csv,
+                        file_name=csv_file,
+                        mime="text/csv",
+                        help=f"Download birthday list for {selected_month} {datetime.now().year}"
+                    )
                 
-                # Show success message
-                st.success(f"✅ {UI_TEXTS['birthday']['downloaded']} {len(df)} records for {selected_month}")
+                    # Show success message
+                    message = f"✅ {UI_TEXTS['birthday']['downloaded']} {len(df)} records for {selected_month}"
+                    st.success(message)
                 
-            except Exception as e:
-                st.error(f"❌ {UI_TEXTS['birthday']['error_download']} generating CSV: {str(e)}")
-    except Exception as e:
-        st.error(f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}")
+                except Exception as e:
+                    message = f"❌ {UI_TEXTS['birthday']['error_download']} generating CSV: {str(e)}"
+                    st.error(message)
+        
+        except Exception as e:
+            message = f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}"
+            st.error(message)
 
+def new_birth_page():
+    """ New birth
+    """
+    pass
+            
+def new_death_page():
+    pass
+
+def adopt_within_family_page():
+    pass
+            
+def adopt_outside_family_page():
+    pass
+            
+def divorce_seperation_page():
+    pass
+            
+def new_marriage_partnership_page():
+    pass
+            
+def step_child_parent_page():
+    pass
+    
 def main() -> None:
     """Main application entry point."""
     st.title("Family Tree Management")
@@ -1466,6 +1630,7 @@ def main() -> None:
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+            st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
             
             # Add logout button at the bottom for non-admin users
             if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
@@ -1473,9 +1638,14 @@ def main() -> None:
                 st.session_state.user_email = None
                 st.rerun()
     
-    # Main content area --- frome here 
+    # Main Page --- frome here
+    
     # Main tab groups
-    tab1, tab2, tab3 = st.tabs(["👥 Member Management", "🏠 Family Management", "🔗 Relations Management"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "👥 Member Management", 
+        "🏠 Family Management", 
+        "🔗 Relation Management",
+        "📋 Case Management"])
     
     with tab1:  # Member Management
         st.header("👥 Member Management")
@@ -1522,8 +1692,11 @@ def main() -> None:
             update_family_page()
     
     with tab3:  # Relations Management
-        st.header("🔗 Relations Management")
-        relation_tab1, relation_tab2, relation_tab3 = st.tabs(["🔍 Search Relations", "➕ Add Relation", "✏️ Update Relation"])
+        st.header("🔗 Relation Management")
+        relation_tab1, relation_tab2, relation_tab3 = st.tabs([
+            "🔍 Search Relations", 
+            "➕ Add Relation", 
+            "✏️ Update Relation"])
         
         with relation_tab1:  # Search Relations
             search_relations_page()
@@ -1533,6 +1706,82 @@ def main() -> None:
             
         with relation_tab3:  # Update Relation
             update_relation_page()
+    
+    with tab4:  # Cases Management
+        st.header("📋 Case Management")
+        case_tab1, case_tab2, case_tab3, case_tab4, case_tab5, case_tab6, case_tab7 = st.tabs([
+            "New Birth", 
+            "New Death", 
+            "Adopt within family",
+            "Adopt outside family",
+            "Divorce/Seperation",
+            "New Marriage/Partnership",
+            "Step Child/Parent"
+            ])
+        
+        with case_tab1:  # New Birth
+            new_birth_page()
+            
+        with case_tab2:  # New Death
+            new_death_page()
+            
+        with case_tab3:  # Adopt within family
+            adopt_within_family_page()
+            
+        with case_tab4:  # Adopt outside family
+            adopt_outside_family_page()
+            
+        with case_tab5:  # Divorce/Seperation
+            divorce_seperation_page()
+            
+        with case_tab6:  # New Marriage/Partnership
+            new_marriage_partnership_page()
+            
+        with case_tab7:  # Step Child/Parent
+            step_child_parent_page()
+            
+    # Initialize session state messages
+    if 'birthday_message' not in st.session_state:
+        st.session_state.birthday_message = None
+    if 'update_message' not in st.session_state:
+        st.session_state.update_message = None
+    if 'add_message' not in st.session_state:
+        st.session_state.add_message = None
+    if 'delete_message' not in st.session_state:
+        st.session_state.delete_message = None
+    if 'search_message' not in st.session_state:
+        st.session_state.search_message = None
+    if 'member_message' not in st.session_state:
+        st.session_state.member_message = None
+    if 'family_message' not in st.session_state:
+        st.session_state.family_message = None
+    if 'relation_message' not in st.session_state:
+        st.session_state.relation_message = None
+    
+    # Display messages if any   
+    if st.session_state.get('birthday_message'):
+        st.info(st.session_state.birthday_message)
+    
+    if st.session_state.get('update_message'):
+        st.info(st.session_state.update_message)
+    
+    if st.session_state.get('add_message'):
+        st.info(st.session_state.add_message)
+    
+    if st.session_state.get('delete_message'):
+        st.info(st.session_state.delete_message)
+    
+    if st.session_state.get('search_message'):
+        st.info(st.session_state.search_message)
+    
+    if st.session_state.get('member_message'):
+        st.info(st.session_state.member_message)
+    
+    if st.session_state.get('family_message'):
+        st.info(st.session_state.family_message)
+    
+    if st.session_state.get('relation_message'):
+        st.info(st.session_state.relation_message)
 
 # Initialize session state and app context
 cu.init_session_state()

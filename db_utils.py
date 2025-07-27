@@ -2254,9 +2254,12 @@ def member_is_alive(member_data: Dict[str, Any]) -> bool:
     A member is considered deceased if:
     - 'died' field contains a valid year (as int or str)
     - 'died' field contains a valid date string
+    - 'died' field contains '0000-01-01', indicating the member is 
+        deceased with unknown date
     
     Args:
-        member_data (Dict[str, Any]): Dictionary containing member data with 'died' field
+        member_data (Dict[str, Any]): Dictionary containing member 
+            data with 'died' field
         
     Returns:
         bool: True if the member is alive, False if deceased
@@ -2276,10 +2279,10 @@ def member_is_alive(member_data: Dict[str, Any]) -> bool:
     # Convert to string for consistent processing
     died_str = str(died).strip()
     
-    # Check for placeholder values that indicate alive
+    # Check for placeholder values that indicate deceased
     if died_str in ('0', '0000-01-01'):
-        log.debug(f"Member {member_id} is alive: placeholder death date: {died}")
-        return True
+        log.debug(f"Member {member_id} is deceased: placeholder death date: {died}")
+        return False
     
     # Check for invalid/placeholder values that indicate deceased
     if died_str in ('YYYY', 'YYYY-MM', 'YYYY-MM-DD'):
@@ -2366,17 +2369,17 @@ def search_members(
         params.append(f"%{alias.strip()}%")
     
     # Add family_id filter if provided
-    if family_id and family_id > 0:
+    if family_id and int(family_id) > 0:
         conditions.append("family_id = ?")
-        params.append(family_id)
+        params.append(int(family_id))
     
     # Add generation order filter if provided and valid
     if gen_order is not None:
-        if not isinstance(gen_order, int) or gen_order <= 0:
+        if not isinstance(gen_order, int) or int(gen_order) <= 0:
             log.warning(f"Invalid generation order: {gen_order}. Must be a positive integer.")
         else:
             conditions.append("gen_order = ?")
-            params.append(gen_order)
+            params.append(int(gen_order))
     
     # Add birth date filter if provided
     if born and born.strip():
@@ -2411,9 +2414,9 @@ def search_members(
             log.warning(f"Invalid date format for 'died' parameter: {died}")
     
     # Add ID filter if provided
-    if id is not None and id > 0:
+    if id is not None and int(id) > 0:
         conditions.append("id = ?")
-        params.append(id)
+        params.append(int(id))
     
     # Add email filter if provided
     if email and email.strip():
@@ -2457,8 +2460,7 @@ def search_members(
         log.error(error_msg)
         raise
 
-def get_member_relations(member_id: int
-) -> List[Dict[str, Any]]:
+def get_member_relations(member_id: int) -> List[Dict[str, Any]]:
     """
     Retrieve all relationships for a given member.
     
@@ -2532,9 +2534,12 @@ def update_member_when_joined(
     original_name: str = None
 ) -> Tuple[int, int]:
     """
-    Create a relationship between an existing member and a new member (e.g., spouse).
+    Create a relationship between an existing member and a new member 
+    via a marriage/partnership. Any step children will be created 
+    automatically in the db_table['relations'] table.
     
-    This function performs the following operations in a single transaction:
+    This function performs the following operations in a single 
+    transaction:
     1. Adds a new member to the database using the provided spouse_data
     2. Creates a relationship record between the existing member and the new member
     3. Returns the IDs of the new member and the created relationship
@@ -2887,7 +2892,7 @@ def update_member_when_died(
 
 def get_members_when_alive() -> List[Dict[str, Any]]:
     """
-    Get a list of all living members
+    Retrieve a list of all living members
     
     Returns:
         List[Dict[str, Any]]: A list of dictionaries containing data of all living members
@@ -2899,17 +2904,18 @@ def get_members_when_alive() -> List[Dict[str, Any]]:
         try:
             cursor = conn.cursor()
             
-            # Query all members without a death date (i.e., still alive)
+            # First, get all members
             cursor.execute(f"""
                 SELECT * FROM {db_tables["members"]} 
-                WHERE (died IS NULL OR died = '')
-                ORDER BY name
+                ORDER BY id
             """)
             
-            # Convert query results to a list of dictionaries
+            # Filter members using member_is_alive function
             members = []
             for row in cursor.fetchall():
-                members.append(dict(row))
+                member = dict(row)
+                if member_is_alive(member):
+                    members.append(member)
                 
             return members
             
@@ -2933,17 +2939,41 @@ def get_relations() -> List[Dict[str, Any]]:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"""
-                SELECT * FROM {db_tables['relations']}
+                SELECT 
+                    id,
+                    member_id,
+                    partner_id,
+                    relation,
+                    join_date,
+                    COALESCE(end_date, '') as end_date,
+                    COALESCE(original_family_id, 0) as original_family_id,
+                    COALESCE(original_name, '') as original_name,
+                    created_at,
+                    updated_at
+                FROM {db_tables['relations']}
                 ORDER BY member_id ASC
             """)
             
             # Get column names from cursor description
             columns = [column[0] for column in cursor.description]
             
-            # Convert each row to a dictionary
+            # Convert each row to a dictionary with proper type handling
             relations = []
             for row in cursor.fetchall():
-                relations.append(dict(zip(columns, row)))
+                row_dict = {}
+                for idx, value in enumerate(row):
+                    col_name = columns[idx]
+                    # Convert None to empty string for string fields
+                    if value is None:
+                        if col_name in ['end_date', 'original_name']:
+                            row_dict[col_name] = ''
+                        elif col_name in ['original_family_id']:
+                            row_dict[col_name] = 0
+                        else:
+                            row_dict[col_name] = value
+                    else:
+                        row_dict[col_name] = value
+                relations.append(row_dict)
                 
             log.debug(f"Retrieved {len(relations)} relations from database")
             return relations
@@ -2957,10 +2987,7 @@ def get_relations() -> List[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
-def add_or_update_relation(
-    relation_data: Dict[str, Any], 
-    update: bool = False
-) -> int:
+def add_or_update_relation(relation_data: Dict[str, Any], update: bool = False) -> int:
     """
     Add or update a relationship record in db_tables['relations'] table.
     
@@ -3160,10 +3187,7 @@ def get_families() -> List[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
-def add_or_update_family(
-    family_data: Dict[str, Any], 
-    update: bool = False
-) -> int:
+def add_or_update_family(family_data: Dict[str, Any], update: bool = False) -> int:
     """
     Add or update family data to the `families` table.
     
@@ -3715,32 +3739,51 @@ def export_to_file(file_path: Union[str, Path], table: str) -> Dict[str, Any]:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     
     try:
-        if table == db_tables['users']:
-            rcds = get_users()
-        elif table == db_tables['members']:
-            rcds = get_members()
-        elif table == db_tables['relations']:
-            rcds = get_relations()
-        elif table == db_tables['families']:
-            rcds = get_families()
-        elif table == db_tables['mirrors']:
-            rcds = get_mirrors()
-        else:
+        # Get the appropriate data based on table name
+        table_map = {
+            db_tables['users']: get_users,
+            db_tables['members']: get_members,
+            db_tables['relations']: get_relations,
+            db_tables['families']: get_families,
+            db_tables['mirrors']: get_mirrors
+        }
+        
+        if table not in table_map:
             return {
                 'success': False,
-                'message': "Unsupported table. Please use users, members, relations, or families"
+                'message': f"Unsupported table: {table}. Must be one of: {', '.join(table_map.keys())}"
             }
         
+        # Get the records
+        rcds = table_map[table]()
+        
+        # Ensure all records have consistent field types
+        if rcds and table == db_tables['relations']:
+            for rcd in rcds:
+                # Ensure all relation records have the same fields
+                rcd.setdefault('end_date', '')
+                rcd.setdefault('original_family_id', 0)
+                rcd.setdefault('original_name', '')
+        
+        # Write to file
         if file_path.suffix.lower() == '.json':
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(rcds, f, indent=2, ensure_ascii=False)
+                json.dump(rcds, f, indent=2, ensure_ascii=False, default=str)
         elif file_path.suffix.lower() == '.csv':
             if rcds:
-                fieldnames = rcds[0].keys()
+                # Get all possible fieldnames from all records
+                fieldnames = set()
+                for rcd in rcds:
+                    fieldnames.update(rcd.keys())
+                fieldnames = sorted(fieldnames)
+                
                 with open(file_path, 'w', encoding='utf-8', newline='') as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
-                    writer.writerows(rcds)
+                    for rcd in rcds:
+                        # Ensure all records have all fields
+                        row = {field: rcd.get(field, '') for field in fieldnames}
+                        writer.writerow(row)
         else:
             return {
                 'success': False,
@@ -3896,13 +3939,14 @@ if __name__ == "__main__":
     print(f"Database location: {db_path}")
     
     # Test query for living members
-    # try:
-    #     alive_members = get_members_when_alive()
-    #     print(f"Found {len(alive_members)} living members")
-    #     for member in alive_members[:5]:  # Only show first 5 members
-    #         print(f"- {member.get('name', '')} (ID: {member.get('id')})")
-    #     if len(alive_members) > 5:
-    #         print(f"... and {len(alive_members) - 5} more members")
+    try:
+        alive_members = get_members_when_alive()
+        print(f"Found {len(alive_members)} living members")
+        for member in alive_members[:5]:  # Only show first 5 members
+            print(f"- {member.get('name', '')} (ID: {member.get('id')})")
+            print(f"\tDied:{member.get('died')}")
+        if len(alive_members) > 5:
+            print(f"... and {len(alive_members) - 5} more members")
             
     #     # Example: Query all relationships for member with ID 123
     #     relations = get_relations(123)
@@ -3913,6 +3957,5 @@ if __name__ == "__main__":
     #             print(f"Relationship ID: {rel['id']}, Member 1: {rel['member_id']}, Member 2: {rel['partner_id']}, Relationship Type: {rel['relation_type']}")
     #     else:
     #         print("No related relationship records found")
-        
-    # except sqlite3.Error as e:
-    #     print(f"Error: {str(e)}")
+    except sqlite3.Error as e:
+        print(f"Error: {str(e)}")

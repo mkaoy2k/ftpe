@@ -18,7 +18,6 @@ load_dotenv()
 
 # General Settings
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
-ENABLE_MAINTENANCE = False
 SITE_TITLE = os.getenv("APP_NAME", "")
 RELEASE = os.getenv("RELEASE", "")
 
@@ -68,7 +67,6 @@ def init_context() -> Dict[str, Any]:
     # Default settings
     default_settings = {
         'timezone': TIMEZONE,
-        'enable_maintenance': ENABLE_MAINTENANCE,
         'site_title': SITE_TITLE,
         'language': LANGUAGE,
         'languages': LANGUAGES,
