@@ -8,8 +8,6 @@ It shows the member, their parents, and their children in a graph visualization.
 import streamlit as st
 import graphviz as gv
 import pandas as pd
-import os
-import time
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, date
@@ -439,8 +437,8 @@ def main():
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
-            if st.session_state.user_state == dbm.User_State['f_admin']:
-                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="👨‍👩‍👧‍👦")
+            st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
+            st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True, key="show_3g_logout"):

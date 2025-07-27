@@ -366,6 +366,7 @@ def show_fmember_sidebar():
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
+        st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
         
         # Display Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
@@ -415,7 +416,8 @@ def show_fadmin_sidebar():
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
-        st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="👨‍👩‍👧‍👦")
+        st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
+        st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="🌲")
  
         # Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
@@ -637,13 +639,13 @@ def search_members_page() -> None:
         row2_col1, row2_col2, row2_col3 = st.columns(3)
         row3_col1, row3_col2, row3_col3 = st.columns(3)
         
-        with row1_col1:
+        with row2_col1:
             name = st.text_input("Name", "")
         with row1_col2:
             born = st.text_input(
                 "Birth Date",
                 "",
-                placeholder="birth_date_placeholder"
+                placeholder="in YYYY-MM-DD format"
             )
         with row1_col3:
             gen_order = st.number_input(
@@ -652,21 +654,22 @@ def search_members_page() -> None:
                 step=1,
                 value=0
             )
-        with row2_col1:
+        with row3_col1:
             alias = st.text_input("Alias", "")
         with row2_col2:
             died = st.text_input(
                 "Death Date",
                 "",
-                placeholder="death_date_placeholder"
+                placeholder="in YYYY-MM-DD format"
             )
         with row2_col3:
-            family_id = st.text_input("Family ID", "")
+            family_id = st.number_input("Family ID", 
+                        min_value=0, step=1, value=0)
             
         # Third row of search filters
-        with row3_col1:
+        with row1_col1:
             member_id = st.number_input(
-                "ID",
+                "Member ID",
                 min_value=0,
                 step=1,
                 value=0
@@ -688,11 +691,11 @@ def search_members_page() -> None:
                 results = dbm.search_members(
                     name=name if name else "",
                     alias=alias if alias else "",
-                    family_id=family_id if family_id else "",
-                    gen_order=gen_order if gen_order > 0 else None,
+                    family_id=family_id if family_id > 0 else 0,
+                    gen_order=gen_order if gen_order > 0 else 0,
                     born=born if born else "",
                     died=died if died else "",
-                    id=member_id if member_id > 0 else None,
+                    id=member_id if member_id > 0 else 0,
                     email=email if email else "",
                     sex={"Male": "M", "Female": "F", "Other": "O"}.get(sex, "") if sex else ""
                 )
@@ -715,6 +718,12 @@ def search_members_page() -> None:
                 for field in all_fields:
                     if field not in df.columns:
                         df[field] = None
+                        
+                # Convert date columns to string to avoid serialization issues
+                date_columns = ['born', 'died', 'created_at', 'updated_at']
+                for col in date_columns:
+                    if col in df.columns and not df[col].empty:
+                        df[col] = df[col].astype(str)
         
                 # Display data table with all fields
                 st.dataframe(
