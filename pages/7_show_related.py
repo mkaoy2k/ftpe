@@ -1,4 +1,10 @@
 """
+# Add parent directory to path to allow absolute imports
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+
 Family Tree Visualization - show partners of a given member from
 the dbm.db_tables['relations'] table.
 
@@ -95,8 +101,8 @@ def get_inverse_relation(relation_type: str) -> str:
         'parent': 'child inversed',
         'child': 'parent inversed',
         'spouse': 'spouse inversed',
-        'partner': 'partner inversed',
-        'sibling': 'sibling inversed'
+        'parent adopted within family': 'child adopted within family inversed',
+        'child adopted within family': 'parent adopted within family inversed'
     }
     return relation_map.get(relation_type.lower(), relation_type)
 
@@ -199,6 +205,8 @@ def main():
             st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
             if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
+                st.page_link("pages/9_birthday.py", label="Birthday of the Month", icon="🎂")
                 st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom

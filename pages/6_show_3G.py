@@ -1,4 +1,10 @@
 """
+# Add parent directory to path to allow absolute imports
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+
 Family Tree Visualization - 3 Generations
 
 This script displays a 3-generation family tree centered around a given member ID.

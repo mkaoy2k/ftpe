@@ -1,4 +1,10 @@
 """
+# Add parent directory to path to allow absolute imports
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+
 Admin UI Module
 
 This module provides the complete admin interface for the application.
@@ -44,13 +50,23 @@ def show_reset_password_page():
     if 'reset_success' not in st.session_state:
         st.session_state.reset_success = None
     
+    # Always check for token in URL parameters first
+    token_param = st.query_params.get("token")
+    if token_param:
+        if isinstance(token_param, list):
+            token_param = token_param[0] if token_param else None
+        if token_param and token_param != st.session_state.get('reset_token'):
+            st.session_state.reset_token = token_param
+            st.session_state.reset_email = None  # Reset email to force reload from token
+            st.rerun()  # Rerun to ensure state is updated
+    
     # Center the form
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         # Show back to login link
         if st.button("← Back to Login"):
-            st.session_state.show_reset_password = False
+            st.session_state.show_forgot_password = False
             st.rerun()
             
         st.markdown("<h2 style='text-align: center;'>Reset Password</h2>", unsafe_allow_html=True)
@@ -63,98 +79,116 @@ def show_reset_password_page():
         if st.session_state.reset_success:
             st.success(st.session_state.reset_success)
         
-        # If token is provided in URL or session state, show password reset form
-        token = st.query_params.get("token", [None])[0] or st.session_state.reset_token
+        # Get token from session state or query params
+        token = st.session_state.get('reset_token') or st.query_params.get('token')
         
         if token:
+            # Store token in session state
             st.session_state.reset_token = token
             
-            # Get email from token or session state
-            email = st.session_state.reset_email
+            # Get email from session state or database
+            email = st.session_state.get('reset_email')
             
-            # If email is not in session state, get it from the token
-            if not email and token:
+            # If email is not in session state, try to get it from the token
+            if not email:
                 try:
-                    with dbm.get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            SELECT email FROM password_reset_tokens 
-                            WHERE token = ? AND expires_at > datetime('now')
-                        """, (token,))
-                        result = cursor.fetchone()
-                        if result:
-                            email = result[0]
-                            st.session_state.reset_email = email
+                    try:
+                        with dbm.get_db_connection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                SELECT email FROM password_reset_tokens 
+                                WHERE token = ? AND expires_at > datetime('now')
+                            """, (token,))
+                            result = cursor.fetchone()
+                            
+                            if result:
+                                email = result[0]
+                                st.session_state.reset_email = email
+                            else:
+                                error_msg = "Invalid or expired token. Please request a new password reset."
+                                st.error(error_msg)
+                                return
+                    except Exception as e:
+                        error_msg = f"Error verifying token: {str(e)}"
+                        st.error(error_msg)
+                        return
                 except Exception as e:
                     st.error(f"Error verifying token: {str(e)}")
+                    return
             
-            if email:
-                with st.form("reset_password_form"):
-                    st.info(f"Resetting password for: {email}")
-                    new_password = st.text_input("New Password", type="password", key="new_password")
-                    confirm_password = st.text_input("Confirm New Password", type="password", key="confirm_password")
-                    reset_button = st.form_submit_button("Reset Password")
-                    
-                    if reset_button:
-                        # Validate input
-                        if not new_password or not confirm_password:
-                            st.session_state.reset_error = "Please enter and confirm your new password"
-                        elif new_password != confirm_password:
-                            st.session_state.reset_error = "Passwords do not match"
-                        elif len(new_password) < 8:
-                            st.session_state.reset_error = "Password must be at least 8 characters long"
-                        else:
-                            try:
-                                with dbm.get_db_connection() as conn:
-                                    cursor = conn.cursor()
-                                    # Verify token is still valid
-                                    cursor.execute("""
-                                        SELECT email FROM password_reset_tokens 
-                                        WHERE token = ? AND email = ? AND expires_at > datetime('now')
-                                    """, (token, email))
-                                    if cursor.fetchone():
-                                        # Update password
-                                        password_hash, salt = au.hash_password(new_password)
-                                        cursor.execute("""
-                                            UPDATE users 
-                                            SET password_hash = ?, salt = ?, updated_at = datetime('now')
-                                            WHERE email = ?
-                                        """, (password_hash, salt, email))
-                                        
-                                        # Delete used token
-                                        cursor.execute("""
-                                            DELETE FROM password_reset_tokens 
-                                            WHERE token = ?
-                                        """, (token,))
-                                        
-                                        conn.commit()
-                                        
-                                        st.session_state.reset_success = "Password has been reset successfully. You can now login with your new password."
-                                        st.session_state.reset_error = None
-                                        st.session_state.reset_token = None
-                                        st.session_state.reset_email = None
-                                        
-                                        # Clear form
-                                        st.session_state.new_password = ""
-                                        st.session_state.confirm_password = ""
-                                        
-                                        st.rerun()
-                                    else:
-                                        st.session_state.reset_error = "Invalid or expired token. Please request a new password reset."
-                                        st.session_state.reset_token = None
-                                        st.session_state.reset_email = None
-                            except Exception as e:
-                                st.session_state.reset_error = f"Error resetting password: {str(e)}"
-                        
-                        st.rerun()
-            else:
-                st.error("Invalid or expired token. Please request a new password reset.")
-                st.session_state.reset_token = None
-                st.session_state.reset_email = None
+            # Show the reset password form with the email
+            st.write("### Reset Your Password")
+            st.write(f"Please enter a new password for: **{email}**")
+            
+            with st.form("reset_password_form"):
+                new_password = st.text_input("New Password", 
+                                          type="password", 
+                                          key="new_password",
+                                          help="Enter a strong password with at least 8 characters")
                 
-                # Add a small delay before showing the reset form
-                st.rerun()
-        
+                confirm_password = st.text_input("Confirm New Password", 
+                                              type="password", 
+                                              key="confirm_password",
+                                              help="Please re-enter your new password")
+                
+                reset_button = st.form_submit_button("Reset Password", 
+                                                  type="primary",
+                                                  use_container_width=True)
+                
+                if reset_button:
+                    # Validate input
+                    if not new_password or not confirm_password:
+                        st.session_state.reset_error = "Please enter and confirm your new password"
+                        st.rerun()
+                    elif new_password != confirm_password:
+                        st.session_state.reset_error = "Passwords do not match"
+                        st.rerun()
+                    elif len(new_password) < 8:
+                        st.session_state.reset_error = "Password must be at least 8 characters long"
+                        st.rerun()
+                    else:
+                        try:
+                            with dbm.get_db_connection() as conn:
+                                cursor = conn.cursor()
+                                cursor.execute("""
+                                    SELECT email FROM password_reset_tokens 
+                                    WHERE token = ? AND email = ? AND expires_at > datetime('now')
+                                """, (token, email))
+                                if cursor.fetchone():
+                                    # Update password
+                                    password_hash, salt = au.hash_password(new_password)
+                                    cursor.execute("""
+                                        UPDATE users 
+                                        SET password_hash = ?, salt = ?, updated_at = datetime('now')
+                                        WHERE email = ?
+                                    """, (password_hash, salt, email))
+                                    
+                                    # Delete used token
+                                    cursor.execute("""
+                                        DELETE FROM password_reset_tokens 
+                                        WHERE token = ?
+                                    """, (token,))
+                                    
+                                    conn.commit()
+                                    
+                                    # Clear form state
+                                    st.session_state.pop('new_password', None)
+                                    st.session_state.pop('confirm_password', None)
+                                    
+                                    # Set success message and reset state
+                                    st.session_state.reset_success = "Password has been reset successfully. You can now login with your new password."
+                                    st.session_state.reset_error = None
+                                    st.session_state.reset_token = None
+                                    st.session_state.reset_email = None
+                                    st.rerun()
+                                else:
+                                    st.session_state.reset_error = "Invalid or expired token. Please request a new password reset."
+                                    st.session_state.reset_token = None
+                                    st.session_state.reset_email = None
+                                    st.rerun()
+                        except Exception as e:
+                            st.session_state.reset_error = f"Error resetting password: {str(e)}"
+                            st.rerun()
         # If no token, show email input form
         else:
             with st.form("request_reset_form"):
@@ -170,26 +204,21 @@ def show_reset_password_page():
                         try:
                             with dbm.get_db_connection() as conn:
                                 cursor = conn.cursor()
-                                # Check if email exists
                                 cursor.execute("""
                                     SELECT id FROM users 
                                     WHERE email = ?
                                 """, (email,))
                                 if cursor.fetchone():
-                                    # Generate token
                                     token = eu.generate_verification_token()
                                     
-                                    # Store token in database
                                     cursor.execute("""
                                         INSERT OR REPLACE INTO password_reset_tokens 
                                         (email, token, created_at, expires_at)
                                         VALUES (?, ?, datetime('now'), datetime('now', '+1 hour'))
                                     """, (email, token))
                                     
-                                    # Send reset email
-                                    reset_link = f"{os.getenv('BASE_URL', 'http://localhost:5566')}/?token={token}"
+                                    reset_link = f"{os.getenv('FT_SVR', 'http://localhost:8501')}/?token={token}"
                                     
-                                    # Create email content
                                     subject = "Password Reset Request"
                                     text = f"""
                                     Hello,
@@ -224,7 +253,6 @@ def show_reset_password_page():
                                     </div>
                                     """
                                     
-                                    # Send email
                                     publisher = eu.EmailPublisher(
                                         email_sender=eu.Config.MAIL_USERNAME,
                                         email_password=eu.Config.MAIL_PASSWORD
@@ -236,39 +264,38 @@ def show_reset_password_page():
                                     else:
                                         st.session_state.reset_error = "Failed to send password reset email. Please try again later."
                                 else:
-                                    # Don't reveal if email exists or not for security
                                     st.session_state.reset_success = "If your email exists in our system, you will receive a password reset link."
                                     st.session_state.reset_error = None
                                     
                                 conn.commit()
+                                st.rerun()
                         except Exception as e:
-                            st.session_state.reset_error = f"Error processing your request: {str(e)}"
-                        
-                    st.rerun()
+                            st.error(f"Error processing your request: {str(e)}")
+   
 
 def show_login_page():
     """Display the login page"""
     # Clear any existing content
     st.empty()
     
-    # Check if we should show reset password page
-    if hasattr(st.session_state, 'show_reset_password') and st.session_state.show_reset_password:
-        show_reset_password_page()
-        return
-    
-    # Set page title and header
-    st.title(os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""))
-    
-    # Initialize login error message in session state if not exists
-    if 'login_error' not in st.session_state:
-        st.session_state.login_error = None
+    # Initialize forgot password message in session state if not exists
+    if 'show_forgot_password' not in st.session_state:
+        st.session_state.show_forgot_password = False
     
     # Check for password reset token in URL
-    token = st.query_params.get("token", [None])[0]
-    if token:
-        st.session_state.show_reset_password = True
-        st.session_state.reset_token = token
-        st.rerun()
+    token = st.query_params.get("token")
+    if token and not st.session_state.show_forgot_password:
+        if isinstance(token, list):
+            token = token[0] if token else None
+        if token:
+            st.session_state.show_forgot_password = True
+            st.session_state.reset_token = token
+            st.rerun()
+    
+    # Forgot Password page
+    if st.session_state.show_forgot_password:
+        show_reset_password_page()
+        return  # Important: Don't show login form if showing reset password
     
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -277,60 +304,51 @@ def show_login_page():
         with st.container():
             st.markdown("<h2 style='text-align: center;'>Admin Login</h2>", unsafe_allow_html=True)
             
-            # Display error message if exists
-            if st.session_state.login_error:
-                st.error(st.session_state.login_error)
-            
             # Login form
-            with st.form("login_form"):
-                email = st.text_input("Email Address", key="login_email")
-                password = st.text_input("Password", type="password", key="login_password")
-                submit_button = st.form_submit_button("Login")
+            email = st.text_input("Email Address", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
                 
-                if submit_button:
-                    # Reset previous error
-                    st.session_state.login_error = None
-                    
-                    # Validate input
-                    if not email or not password:
-                        st.session_state.login_error = "Please enter both email and password"
-                    else:
-                        # Verify credentials
-                        if au.verify_padmin(email, password):
-                            st.session_state.authenticated = True
-                            st.session_state.user_email = email
-                            st.session_state.user_state = dbm.User_State['p_admin']
-                            # Clear error on successful login
-                            st.session_state.login_error = None
-                            st.rerun()
-                        elif au.verify_fadmin(email, password):
-                            st.session_state.authenticated = True
-                            st.session_state.user_email = email
-                            st.session_state.user_state = dbm.User_State['f_admin']
-                            st.session_state.login_error = None
-                            st.rerun()
-                        elif au.verify_fmember(email, password):
-                            st.session_state.authenticated = True
-                            st.session_state.user_email = email
-                            st.session_state.user_state = dbm.User_State['f_member']
-                            st.session_state.login_error = None
-                            st.rerun()
-                        else:
-                            st.session_state.login_error = "Invalid email or password"
-                    
-                    # Rerun to show error message
-                    st.rerun()
-            
-            # Add Forgot Password button above the form
-            col1, col2 = st.columns([2, 1])
+            # Login and Forgot Password buttons
+            col1, col2  = st.columns([2,1])
+            with col1:
+                login_clicked = st.button("Login", type="primary")
             with col2:
-                if st.button("Forgot Password?", key="forgot_password_btn", 
-                          type="secondary",
-                          icon="🔑",
-                          use_container_width=False,
-                          help="Click to reset your password"):
-                    st.session_state.show_reset_password = True
-                    st.rerun()
+                forgot_clicked = st.button("Forgot Password?",
+                                           type="secondary",
+                                           icon="🔑")
+            
+            # Handle Forgot Password button click
+            if forgot_clicked:
+                st.session_state.show_forgot_password = True
+                st.rerun()
+            
+            # Handle login
+            if login_clicked:                    
+                # Validate input
+                if not email or not password:
+                    st.error("Please enter both email and password")
+                else:
+                    # Verify credentials
+                    if au.verify_padmin(email, password):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = email
+                        st.session_state.user_state = dbm.User_State['p_admin']
+                        st.session_state.login_error = None
+                        st.rerun()
+                    elif au.verify_fadmin(email, password):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = email
+                        st.session_state.user_state = dbm.User_State['f_admin']
+                        st.session_state.login_error = None
+                        st.rerun()
+                    elif au.verify_fmember(email, password):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = email
+                        st.session_state.user_state = dbm.User_State['f_member']
+                        st.session_state.login_error = None
+                        st.rerun()
+                    else:
+                        st.error("Invalid email or password")
 
 def show_fmember_sidebar():
     """Display the family member sidebar with 
@@ -417,7 +435,9 @@ def show_fadmin_sidebar():
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
         st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
-        st.page_link("pages/2_famMgmt.py", label="Family Tree Management", icon="🌲")
+        st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
+        st.page_link("pages/9_birthday.py", label="Birthday", icon="🎂")
+        st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
  
         # Logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True):
@@ -632,7 +652,7 @@ def search_members_page() -> None:
     
     # Search form
     with st.form("search_form"):
-        st.subheader("Search Family Members")
+        st.subheader("Search Members")
         
         # Create three rows of search fields
         row1_col1, row1_col2, row1_col3 = st.columns(3)
@@ -751,10 +771,10 @@ def search_members_page() -> None:
         
                 # Show result count
                 st.markdown(f"### Total: {len(df)} records")
-    
-            # No results message
+                st.success(f"✅ Search completed successfully")
             elif submitted:
-                st.info("No matching members found")
+                # No results message
+                st.warning(f"⚠️ No matching members found")
 
 def show_fadmin_content():
     """Display the family admin content area"""
@@ -971,11 +991,14 @@ def handle_import(import_func, file_path, table):
             return
             
         st.info(f"Importing {file_path} to '{table}' table")       
-        success, error, skipped = import_func(file_path, table)
-        st.info(
-            f"Import {file_path} to {table} completed. "
-            f"Success: {success}, Errors: {error}, Skipped: {skipped}"
-            )
+        result = import_func(file_path, table)
+        st.info(f"Import {file_path} to {table} completed. ")
+        if result['success']:
+            st.success(f"✅ Successfully imported {result['imported']} records to '{table}' table")
+        else:
+            for error in result.get('errors', []):
+                st.error(f"❌ {error}")
+            st.info(f"Imported: {result['imported']}, Skipped: {result['skipped']}")
             
     except Exception as e:
         st.error(f"❌ An error occurred during import: {str(e)}")
@@ -1185,7 +1208,7 @@ def show_padmin_content():
             
             # Drop table button
             with st.expander("Danger Zone", expanded=False):
-                st.warning("This action cannot be undone!")
+                st.warning("⚠️ This action cannot be undone!")
                 if st.button(f"Drop Table '{selected_table}'", type="primary"):
                     if drop_table(selected_table):
                         st.success(f"Dropped table '{selected_table}'")
@@ -1240,7 +1263,7 @@ def show_padmin_content():
                             else:
                                 st.error(f"Failed to remove column '{col_to_remove}'")
                 else:
-                    st.warning("Cannot remove the last column from a table")
+                    st.warning("⚠️ Cannot remove the last column from a table")
         show_back_end(available_tables)
     
     # Reset Password Management
@@ -1249,6 +1272,9 @@ def show_padmin_content():
 # Main application
 def main():
     """Main application entry point"""
+    # Set page title and header
+    st.title(os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""))
+    
     # Initialize session state
     cu.init_session_state()
     
