@@ -22,13 +22,8 @@ test_*
 prod_*
 __init__*.py
 .streamlit/*
-# a_*
 
-# Allow family_management module
-!pages/family_management/
-!pages/family_management/**/*.py
-!pages/family_management/**/*.md
-
+#
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
