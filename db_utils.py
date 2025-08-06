@@ -682,6 +682,72 @@ def delete_subscriber(email: str) -> bool:
         log.error(error_msg)
         raise
 
+def insert_user(user_data: Dict[str, Any]) -> int:
+    """
+    Insert a new user into the db_table['users'] table by id.
+    This function is used for importing members from a CSV/JSON
+    file. All the fields except `updated_at` can be imported.
+    
+    Args:
+        user_data: Dictionary containing user information,
+        see db_table['users'] for details.
+        
+    Returns:
+        int: A positive integer ID of the inserted user. 
+        Zero if failed.
+        
+    Raises:
+        ValueError: If user_data is not a dictionary or if id is invalid.
+        sqlite3.Error: If there is a database error.
+    """
+    try:
+        if not isinstance(user_data, dict):
+            error_msg = f"Invalid user data: {user_data}. Must be a dictionary."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+        id = user_data.get('id')
+        if not id or not isinstance(id, int) or id <= 0:
+            error_msg = f"Invalid user data: {user_data}. Invalid id."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO {db_tables['users']} (
+                    id, email, password_hash, salt, 
+                    is_admin, is_active, l10n, token,
+                    created_at, family_id, member_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_data['id'],
+                user_data['email'],
+                user_data['password_hash'],
+                user_data['salt'],
+                user_data.get('is_admin', User_State['f_member']),
+                user_data.get('is_active', Subscriber_State['inactive']),
+                user_data.get('l10n', 'US'),
+                user_data.get('token'),
+                user_data.get('created_at'),
+                user_data.get('family_id'),
+                user_data.get('member_id')
+            ))
+            if cursor.rowcount > 0:
+                log.debug(f"Successfully inserted user: {user_data['email']} (ID: {user_data['id']})")
+                conn.commit()
+                return user_data['id']
+            else:
+                log.debug(f"Failed to insert user: {user_data['email']} (ID: {user_data['id']})")
+                return 0
+    except sqlite3.Error as e:
+        error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
+        log.error(error_msg)
+        raise
+    
 def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[bool, str]:
     """
     Add a new user or update an existing user to the 
@@ -908,16 +974,24 @@ def delete_user(user_id: int) -> bool:
         error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
+    
 def insert_member(member_data: Dict[str, Any]) -> int:
     """
     Insert a new member into the db_table['members'] table by id.
+    This function is used for importing members from a CSV/JSON
+    file. All the fields except `updated_at` can be imported.
     
     Args:
         member_data: Dictionary containing member information,
-        see db_tables['members'] for details
+        see db_tables['members'] for details. 
         
     Returns:
-        int: A positive integer ID of the inserted member. zero if failed.
+        int: A positive integer ID of the inserted member. 
+        Zero if failed.
+        
+    Raises:
+        ValueError: If member_data is not a dictionary or if id is invalid.
+        sqlite3.Error: If there is a database error.
     """
     try:
         if not isinstance(member_data, dict):
@@ -935,8 +1009,9 @@ def insert_member(member_data: Dict[str, Any]) -> int:
             cursor.execute(f"""
                 INSERT INTO {db_tables['members']} (
                     id, name, family_id, born, sex, gen_order,
-                    alias, email, url, died, dad_id, mom_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    alias, email, url, died, dad_id, mom_id,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 member_data['id'],
                 member_data['name'],
@@ -949,17 +1024,22 @@ def insert_member(member_data: Dict[str, Any]) -> int:
                 member_data.get('url'),
                 member_data.get('died'),
                 member_data.get('dad_id'),
-                member_data.get('mom_id')
+                member_data.get('mom_id'),
+                member_data.get('created_at')
             ))
-            conn.commit()
             if cursor.rowcount > 0:
                 log.debug(f"Successfully inserted member: {member_data['name']} (ID: {member_data['id']})")
+                conn.commit()
                 return member_data['id']
             else:
-                log.warning(f"Failed to insert member: {member_data['name']} (ID: {member_data['id']})")
+                log.debug(f"Failed to insert member: {member_data['name']} (ID: {member_data['id']})")
                 return 0
     except sqlite3.Error as e:
         error_msg = f"Database error in {fu.get_function_name()}: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -2944,6 +3024,82 @@ def get_relations() -> List[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
+def insert_relation(relation_data: Dict[str, Any]) -> int:
+    """
+    Insert a new relationship record into db_tables['relations'] 
+    table. This function is used for importing relations from 
+    external sources.
+    
+    Args:
+        relation_data: A dictionary containing relationship 
+        information, see db_tables['relations'] table for details.
+    
+    Returns:
+        int: An positive integer ID of the inserted relationship record.
+        Zero if failed.
+        
+    Raises:
+        sqlite3.Error: If there's a database error while inserting the relation.
+        Exception: If there's an unexpected error while inserting the relation.
+    """
+    try:
+        if not isinstance(relation_data, dict):
+            error_msg = f"Invalid relation data: {relation_data}. Must be a dictionary."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+        
+        id = relation_data.get('id')
+        if not id or not isinstance(id, int) or id <= 0:
+            error_msg = f"Invalid relation data: {relation_data}. Invalid id."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO {db_tables['relations']} (
+                    id,
+                    member_id,
+                    partner_id,
+                    relation,
+                    join_date,
+                    end_date,
+                    original_family_id,
+                    original_name,
+                    dad_name,
+                    mom_name,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                relation_data['id'],
+                relation_data['member_id'],
+                relation_data['partner_id'],
+                relation_data['relation'],
+                relation_data['join_date'],
+                relation_data['end_date'],
+                relation_data['original_family_id'],
+                relation_data['original_name'],
+                relation_data['dad_name'],
+                relation_data['mom_name'],
+                relation_data['created_at']
+            ))
+            if cursor.rowcount > 0:
+                log.debug(f"Relation {relation_data['id']} inserted successfully.")
+                conn.commit()
+                return relation_data['id']
+            else:
+                log.debug(f"Relation {relation_data['id']} not inserted.")
+                return 0
+            
+    except sqlite3.Error as e:
+        error_msg = f"Database error in {fu.get_function_name()}: Error inserting relation: {str(e)}"
+        log.error(error_msg)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error in {fu.get_function_name()}: Error inserting relation: {str(e)}"
+        log.error(error_msg)
+        raise
+    
 def add_or_update_relation(relation_data: Dict[str, Any], update: bool = False) -> int:
     """
     Add if not exists or update a relationship record in db_tables['relations'] 
@@ -3261,6 +3417,59 @@ def get_families() -> List[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
+def insert_family(family_data: Dict[str, Any]) -> int:
+    """
+    Insert a new family into the `families` table by id.
+    This function is used to import family data from a CSV/JSON
+    file. All fields, except `updated_at` in `families` table 
+    can be inserted.
+    
+    Args:
+        family_data: A dictionary containing family information, 
+        containing fields in `families` table.
+    
+    Returns:
+        int: A positive integer ID of the inserted family record.
+        Zero if failed.
+        
+    Raises:
+        ValueError: If family_data is not a dictionary or if id is invalid.
+        sqlite3.Error: If there is a database error.
+    """
+    try:
+        if not isinstance(family_data, dict):
+            error_msg = f"Invalid family data: {family_data}. Must be a dictionary."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+        id = family_data.get('id')
+        if not id or not isinstance(id, int) or id <= 0:
+            error_msg = f"Invalid family data: {family_data}. Invalid id."
+            log.error(error_msg)
+            raise ValueError(error_msg)
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                INSERT INTO {db_tables['families']} (
+                    id, name, background, url, created_at   )
+                VALUES (?, ?, ?, ?, ?)
+                """, (family_data['id'], 
+                      family_data['name'], 
+                      family_data.get('background'), 
+                      family_data.get('url'), 
+                      family_data.get('created_at')))
+            if cursor.rowcount > 0:
+                log.debug(f"Family {family_data['name']} inserted successfully.")
+                conn.commit()
+                return family_data['id']
+            else:
+                log.debug(f"Family {family_data['name']} not inserted.")
+                return 0
+    except sqlite3.Error as e:
+        error_msg = f"Database error in {fu.get_function_name()}: Error inserting family: {str(e)}"
+        log.error(error_msg)
+        raise
+    
 def add_or_update_family(family_data: Dict[str, Any], update: bool = False) -> int:
     """
     Add or update family data to the `families` table.
@@ -3500,57 +3709,74 @@ def import_users(users: List[Dict[str, Any]]) -> Dict[str, Any]:
     Import users into the db_tables['users'] table.
     
     Args:
-        users: List of user dictionaries with required fields
+        users: List of user dictionaries with required fields.
+        - id (int): User identifier (required)
+        - email (str): User email (required)
+        - password_hash (str): User password hash (required)
+        - salt (str): User salt (required)
         
     Returns:
         Dict with import results
+        {
+            'success': bool,
+            'imported': int,
+            'skipped': int,
+            'errors': List[str]
+        }
     """
     imported = 0
     skipped = 0
     errors = []
-    
+    required_fields = ['id', 'email', 'password_hash', 'salt']
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
     
-    for i, user in enumerate(users, 1):
-        try:
-            # Prepare user data for add_user function
-            user_data = {
-                'password_hash': user.get('password_hash'),
-                'salt': user.get('salt'),
-                'is_admin': user.get('is_admin', User_State['f_member']),
-                'is_active': user.get('is_active', Subscriber_State['inactive']),
-                'l10n': user.get('l10n', 'US'),
-                'token': user.get('token'),
-                'created_at': user.get('created_at'),
-                'updated_at': user.get('updated_at')
-            }
+        for i, user in enumerate(users, 1):
+            try:
+                # Check for required fields
+                missing_fields = [field for field in required_fields if field not in user]
+                if missing_fields:
+                    errors.append(f"User {i} is missing required fields: {', '.join(missing_fields)}")
+                    skipped += 1
+                    continue
+                
+                
+                # Prepare user data for add_user function
+                user_data = {
+                    'id': int(user.get('id')),
+                    'email': user.get('email'),
+                    'password_hash': user.get('password_hash'),
+                    'salt': user.get('salt'),
+                    'is_admin': user.get('is_admin', User_State['f_member']),
+                    'is_active': user.get('is_active', Subscriber_State['inactive']),
+                    'l10n': user.get('l10n', 'US'),
+                    'token': user.get('token'),
+                    'created_at': user.get('created_at'),
+                    'family_id': int(user.get('family_id')) if user.get('family_id') else 0,
+                    'member_id': int(user.get('member_id')) if user.get('member_id') else 0
+                }
             
-            # Use add_or_update_user function to prevent overwriting existing users
-            success, message = add_or_update_user(
-                email=user['email'],
-                **user_data
-            )
+                user_id = insert_user(user_data)
+                if user_id > 0:
+                    imported += 1
+                else:
+                    errors.append(f"User {i} ({user.get('email', 'unknown')}): {message}")
+                    skipped += 1
             
-            if success:
-                imported += 1
-            else:
-                errors.append(f"User {i} ({user.get('email', 'unknown')}): {message}")
+            except Exception as e:
+                errors.append(f"Error in {fu.get_function_name()}: importing user {i} ({user['email']}): {str(e)}")
                 skipped += 1
-            
-        except Exception as e:
-            errors.append(f"Error in {fu.get_function_name()}: importing user {i} ({user['email']}): {str(e)}")
-            skipped += 1
     
-    if imported > 0:
-        db_connection.commit()
+        if imported > 0:
+            conn.commit()
     
     return {
         'success': len(errors) == 0,
         'imported': imported,
         'skipped': skipped,
         'errors': errors
-    }
+        }
 
 def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -3558,19 +3784,10 @@ def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     Args:
         members: List of member dictionaries with required fields:
-            - name (str): Last name (required)
-            - family_id (int): Family identifier (required)
-            - born (str): Date of birth in YYYY-MM-DD format (required)
-            - sex (str): Gender, typically 'M' or 'F' (required)
-            - gen_order (int): Generation order (required)
-            
-            Optional fields:
-            - alias (str): Nickname or alias
-            - email (str): Email address
-            - url (str): Personal URL
-            - died (str): Date of death in YYYY-MM-DD format
-            - dad_id (int): Father's member ID
-            - mom_id (int): Mother's member ID
+        - id (int): Member identifier (required)
+        - name (str): Full name (required)
+        - born (str): Date of birth in YYYY-MM-DD format (required)
+        - gen_order (int): Generation order (required)
     
     Returns:
         Dict with import results:
@@ -3612,7 +3829,8 @@ def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
                     'url': member.get('url'),
                     'died': member.get('died'),
                     'dad_id': int(member.get('dad_id')) if member.get('dad_id') and member.get('dad_id').strip() else 0,
-                    'mom_id': int(member.get('mom_id')) if member.get('mom_id') and member.get('mom_id').strip() else 0
+                    'mom_id': int(member.get('mom_id')) if member.get('mom_id') and member.get('mom_id').strip() else 0,
+                    'created_at': member.get('created_at')
                 }
                 
                 # Add new member only
@@ -3640,27 +3858,30 @@ def import_members(members: List[Dict[str, Any]]) -> Dict[str, Any]:
 def import_relations(relations: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Import member relations into the db_tables['relations'] table.
+    This function is used to import family data from a CSV/JSON
+    file. All fields, except `updated_at` in `relations` table 
+    can be inserted.
     
     Args:
         relations: List of relation dictionaries with required fields:
-            - member_id (int): ID of the first member in the relationship (required)
-            - partner_id (int): ID of the second member in the relationship (required)
-            - relation (str): Type of relationship, e.g., 'spouse', 'parent' (required)
-            - join_date (str): Date when relationship started in YYYY-MM-DD format (required)
-            
-            Optional fields:
-            - original_family_id (int): Original family ID before joining
-            - original_name (str): Original name before marriage
-            - end_date (str): Date when relationship ended in YYYY-MM-DD format
+        - member_id (int): ID of the first member in the relationship (required)
+        - partner_id (int): ID of the second member in the relationship (required)
+        - relation (str): Type of relationship, e.g., 'spouse', 'parent' (required)
     
     Returns:
         Dict with import results
+        {
+            'success': bool,
+            'imported': int,
+            'skipped': int,
+            'errors': List[str]
+        }
     """
     imported = 0
     skipped = 0
     errors = []
     
-    required_fields = ['member_id', 'partner_id', 'relation', 'join_date']
+    required_fields = ['id', 'member_id', 'partner_id', 'relation']
     
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -3674,47 +3895,28 @@ def import_relations(relations: List[Dict[str, Any]]) -> Dict[str, Any]:
                     skipped += 1
                     continue
                 
-                # Check if both members exist
-                cursor.execute(f"SELECT id FROM {db_tables['members']} WHERE id IN (?, ?)", 
-                             (rel['member_id'], rel['partner_id']))
-                existing_members = {row['id'] for row in cursor.fetchall()}
+                # prepare relation data for insert_relation function
+                relation_data = {
+                    'id': int(rel.get('id')),
+                    'member_id': int(rel.get('member_id')),
+                    'partner_id': int(rel.get('partner_id')),
+                    'relation': rel.get('relation'),
+                    'join_date': rel.get('join_date'),
+                    'end_date': rel.get('end_date'),
+                    'original_family_id': int(rel.get('original_family_id')),
+                    'original_name': rel.get('original_name'),
+                    'dad_name': rel.get('dad_name'),
+                    'mom_name': rel.get('mom_name'),
+                    'created_at': rel.get('created_at')
+                }
                 
-                if len(existing_members) != 2:
-                    errors.append(f"Relation {i}: One or both member IDs do not exist: {rel['member_id']}, {rel['partner_id']}")
+                # add new relation only
+                relation_id = insert_relation(relation_data)
+                if relation_id > 0:
+                    imported += 1
+                else:
+                    errors.append(f"Failed to import relation {i}: {rel.get('member_id', '?')}-{rel.get('partner_id', '?')}")
                     skipped += 1
-                    continue
-                
-                # Check if relation already exists
-                cursor.execute(f"""
-                    SELECT id FROM {db_tables['relations']} 
-                    WHERE (member_id = ? AND partner_id = ?) 
-                    OR (member_id = ? AND partner_id = ?)
-                """, (rel['member_id'], rel['partner_id'], 
-                     rel['partner_id'], rel['member_id']))
-                
-                if cursor.fetchone():
-                    errors.append(f"Relation {i}: Relationship already exists between members {rel['member_id']} and {rel['partner_id']}")
-                    skipped += 1
-                    continue
-                
-                # Insert new relation
-                cursor.execute(f"""
-                    INSERT INTO {db_tables['relations']} (
-                        member_id, partner_id, relation, join_date,
-                        original_family_id, original_name, end_date,
-                        created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (
-                    rel['member_id'],
-                    rel['partner_id'],
-                    rel['relation'],
-                    rel['join_date'],
-                    rel.get('original_family_id'),
-                    rel.get('original_name'),
-                    rel.get('end_date')
-                ))
-                
-                imported += 1
                 
             except Exception as e:
                 errors.append(f"Error in {fu.get_function_name()}: importing relation {i} (members {rel.get('member_id', '?')}-{rel.get('partner_id', '?')}): {str(e)}")
@@ -3736,18 +3938,22 @@ def import_families(families: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     Args:
         families: List of family dictionaries with required fields:
+            - id (int): Family identifier (required)
             - name (str): Family name (required)
             
-            Optional fields:
-            - background (str): Family background/history
-            - url (str): Family website URL
-    
     Returns:
         Dict with import results
+        {
+            'success': bool,
+            'imported': int,
+            'skipped': int,
+            'errors': List[str]
+        }
     """
     imported = 0
     skipped = 0
     errors = []
+    required_fields = ['id', 'name']
     
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -3755,32 +3961,26 @@ def import_families(families: List[Dict[str, Any]]) -> Dict[str, Any]:
         for i, family in enumerate(families, 1):
             try:
                 # Check for required fields
-                if 'name' not in family:
-                    errors.append(f"Family {i} is missing required field: name")
+                missing_fields = [field for field in required_fields if field not in family]
+                if missing_fields:
+                    errors.append(f"Family {i} is missing required fields: {', '.join(missing_fields)}")
                     skipped += 1
                     continue
                 
-                # Check if family already exists
-                cursor.execute(f"SELECT id FROM {db_tables['families']} WHERE name = ?", 
-                             (family['name'],))
-                
-                if cursor.fetchone():
-                    errors.append(f"Family '{family['name']}' already exists")
+                # prepare family data for insert_family function
+                family_data = {
+                    'id': int(family.get('id')),
+                    'name': family.get('name'),
+                    'url': family.get('url'),
+                    'background': family.get('background'),
+                    'created_at': family.get('created_at')
+                }
+                family_id = insert_family(family_data)
+                if family_id > 0:
+                    imported += 1
+                else:
+                    errors.append(f"Failed to import family {i}: {family.get('name', 'Unknown')}")
                     skipped += 1
-                    continue
-                
-                # Insert new family
-                cursor.execute(f"""
-                    INSERT INTO {db_tables['families']} (
-                        name, background, url, created_at, updated_at
-                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (
-                    family['name'],
-                    family.get('background', ''),
-                    family.get('url', '')
-                ))
-                
-                imported += 1
                 
             except Exception as e:
                 errors.append(f"Error in {fu.get_function_name()}: importing family {i} ('{family.get('name', 'Unknown')}'): {str(e)}")
@@ -3801,8 +4001,9 @@ def import_from_file(file_path: Union[str, Path], table: str) -> Dict[str, Any]:
     Import records from a JSON or CSV file into the specified table.
     
     Args:
-        file_path: Path to the JSON or CSV file containing records data
-        db_connection: SQLite database connection object
+        file_path: Path to the JSON or CSV file containing 
+        records data
+        table: Name of the table to import records into
         
     Returns:
         Dict with import results: {
