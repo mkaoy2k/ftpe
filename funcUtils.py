@@ -1,3 +1,9 @@
+# Add parent directory to path to allow absolute imports
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+
 import os
 from dotenv import load_dotenv  # pip install python-dotenv
 import json
@@ -29,13 +35,14 @@ def get_languages():
 @st.cache_data(ttl=300)
 def load_L10N(base=None):
     """
-    Load supported localization dictionary
+    Load supported localization dictionaries, which 
+    are specified in L10N.json file. 
     
     Args:
         base (str, optional): Base directory
     
     Returns:
-        dict: Dictionary containing all supported language localizations
+        dict: Dictionary containing all supported languages
     """
     load_dotenv(".env")
     f_l10n = os.getenv("L10N_FILE", "L10N.json")
@@ -53,7 +60,6 @@ def load_L10N(base=None):
         dl10n[key] = d
     
     return dl10n
-
 
 @st.cache_data(ttl=300)
 def get_1st_mbr_dict(df, mem, born, base=None):

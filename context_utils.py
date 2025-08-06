@@ -1,4 +1,10 @@
 """
+# Add parent directory to path to allow absolute imports
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+
 Context Utilities
 
 This module provides utility functions for managing application context and settings.
@@ -98,12 +104,19 @@ def init_session_state():
         st.session_state.authenticated = False
     if 'app_context' not in st.session_state:
         st.session_state.app_context = init_context()
+    if 'ui_context' not in st.session_state:
+        st.session_state.ui_context = fu.load_L10N()
     if 'user_email' not in st.session_state:
         st.session_state.user_email = None
     if 'user_state' not in st.session_state:
         st.session_state.user_state = dbm.User_State['f_member']
+    if 'relation' not in st.session_state:
+        st.session_state.relation = None
           
 # Example usage
 if __name__ == "__main__":
-    update_context({'timezone': 'Asia/Taipei'})
+    init_session_state()
+    update_context({'timezone': 'Asia/Taipei', 'language': '繁中'})
     print("Current context:", st.session_state.app_context)
+    print("Current UI context:(US)", st.session_state.ui_context['US'])
+    print("Current UI context:(繁中)", st.session_state.ui_context['繁中'])
