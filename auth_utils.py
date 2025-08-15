@@ -67,7 +67,7 @@ def verify_fmember(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"Error updating login time: {update_error}")
+                    st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
                 return True
             
@@ -76,7 +76,6 @@ def verify_fmember(email, password):
     except sqlite3.Error as e:
         st.error(f"Error verifying member: {e}")
         return False
-
 
 def verify_padmin(email, password):
     """Verify platform admin credentials
@@ -115,7 +114,7 @@ def verify_padmin(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"Error updating login time: {update_error}")
+                    st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
                 return True
             
@@ -162,7 +161,7 @@ def verify_fadmin(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"Error updating login time: {update_error}")
+                    st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
                 return True
             
@@ -205,7 +204,6 @@ def create_password_reset_token(email: str, expires_hours: int = 24) -> str:
         st.error(f"Error creating password reset token: {e}")
         return None
 
-
 def validate_password_reset_token(token: str) -> tuple:
     """Validate a password reset token
     
@@ -237,7 +235,6 @@ def validate_password_reset_token(token: str) -> tuple:
     except Exception as e:
         st.error(f"Error validating password reset token: {e}")
         return False, None
-
 
 def reset_password(email: str, new_password: str) -> bool:
     """Reset a user's password
@@ -280,7 +277,13 @@ def reset_password(email: str, new_password: str) -> bool:
         return False
 
 
-def create_user(email, password, role, family_id=0, member_id=0):
+def create_user (email, 
+    password, 
+    role=None,
+    l10n="US",
+    is_active=None,
+    family_id=0, 
+    member_id=0):
     """Create a new user
     
     Args:
@@ -289,12 +292,25 @@ def create_user(email, password, role, family_id=0, member_id=0):
         role: The role of the user, see dbm.User_State
         
     Returns:
-        id: The id of the user if the user was created successfully, 
-        None otherwise
+        id: The id of the user if the user was created 
+        when not existed or updated when existed
+        successfully, None otherwise.
+    
+    Raises:
+        ValueError: If the role is not valid
+        
+    Examples:
+        >>> create_user("test@example.com", "password", 
+            role=dbm.User_State['f_admin'],
+            l10n="US",
+            is_active=dbm.Subscriber_State['inactive'],
+            family_id=0, 
+            member_id=0)
+        1
     """
     try:
         # check if role is valid
-        if role not in dbm.User_State.values():
+        if role is not None and role not in dbm.User_State.values():
             return None
         
         # Check if user already exists
@@ -325,12 +341,16 @@ def create_user(email, password, role, family_id=0, member_id=0):
                         salt = ?, 
                         is_admin = ?, 
                         is_active = ?,
+                        l10n = ?,
                         family_id = ?,
                         member_id = ?,
-                        updated_at = strftime('%%Y-%%m-%%d %%H:%%M:%%f', 'now', 'localtime')
-                    WHERE id = ?
-                """, (password_hash, salt, role, sub_state, 
-                      family_id, member_id, user_id))
+                        WHERE id = ?
+                """, 
+                (password_hash, salt, 
+                 role, is_active, 
+                 l10n, family_id, 
+                 member_id, user_id)
+                )
                 conn.commit()
                 return user_id
             else:
@@ -343,19 +363,18 @@ def create_user(email, password, role, family_id=0, member_id=0):
                         salt, 
                         is_admin, 
                         is_active,
+                        l10n,
                         family_id,
                         member_id,
-                        created_at,
-                        updated_at
+                        created_at
                     ) 
                     VALUES (?, ?, ?, 
-                    ?, ?, 
-                    ?, ?, 
-                    datetime('now'), 
+                    ?, ?, ?, ?, ?, ?, 
                     datetime('now')
                     )
                 """, (email, password_hash, salt, 
-                      role, sub_state, family_id, member_id))
+                      role, is_active, l10n, 
+                      family_id, member_id))
                 conn.commit()
                 user_id = cursor.lastrowid
                 return user_id

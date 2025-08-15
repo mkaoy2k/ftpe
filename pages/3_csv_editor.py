@@ -41,7 +41,7 @@ def load_csv(file_path):
             return pd.read_csv(file_path)
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error loading CSV file: {e}")
+        st.error(f"❌ Error loading CSV file: {e}")
         return pd.DataFrame()
 
 def save_csv(file_path, df):
@@ -59,7 +59,7 @@ def save_csv(file_path, df):
         df.to_csv(file_path, index=False)
         return True
     except Exception as e:
-        st.error(f"Error saving file: {e}")
+        st.error(f"❌ Error saving file: {e}")
         return False
 
 def load_file_content(file_path=None):
@@ -79,20 +79,20 @@ def load_file_content(file_path=None):
             try:
                 df = pd.read_csv(file_path)
                 if df.empty:
-                    st.warning("The file is empty. Starting with an empty table.")
+                    st.warning("⚠️ The file is empty. Starting with an empty table.")
                     return pd.DataFrame(columns=['Column 1'])
                 return df
             except pd.errors.EmptyDataError:
-                st.warning("The file is empty. Starting with an empty table.")
+                st.warning("⚠️ The file is empty. Starting with an empty table.")
                 return pd.DataFrame(columns=['Column 1'])
             except Exception as e:
-                st.error(f"Error reading file: {e}")
+                st.error(f"❌ Error reading file: {e}")
                 return pd.DataFrame(columns=['Column 1'])
         else:
             # For new files, start with one empty column
             return pd.DataFrame(columns=['Column 1'])
     except Exception as e:
-        st.error(f"Unexpected error: {e}")
+        st.error(f"❌ Unexpected error: {e}")
         return pd.DataFrame(columns=['Column 1'])
 
 def main():
@@ -195,7 +195,7 @@ def main():
                 if 'reload_file' in st.session_state:
                     del st.session_state.reload_file
             except Exception as e:
-                st.error(f"Error loading file: {e}")
+                st.error(f"❌ Error loading file: {e}")
                 st.session_state.file_content = pd.DataFrame(columns=['Column 1'])
     
         # Display current file path
@@ -239,7 +239,7 @@ def main():
                 if save_csv(file_path, edited_df):
                     st.success(f"Saved to {file_path}")
             except Exception as e:
-                st.error(f"Error saving file: {e}")
+                st.error(f"❌ Error saving file: {e}")
     
     with col2:
         if st.button("Reload"):
@@ -258,9 +258,9 @@ def main():
                     # Force a rerun to update the editor
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error reloading file: {e}")
+                    st.error(f"❌ Error reloading file: {e}")
             else:
-                st.warning("No valid file selected or file doesn't exist")
+                st.warning("⚠️ No valid file selected or file doesn't exist")
     
     with col3:
         if st.button("Download"):

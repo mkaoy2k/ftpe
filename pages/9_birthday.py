@@ -17,21 +17,10 @@ from datetime import datetime
 import funcUtils as fu
 import email_utils as eu
 
-UI_TEXTS = {
-    "birthday": {
-        "member_not_found": "No members found for the selected month",
-        "saved": "Birthday list saved in {file} successfully!",
-        "error": "Error saving birthday list: {error}",
-        "downloaded": "Birthday list downloaded in {file} successfully!",
-        "error_download": "Error downloading birthday list: {error}",
-        "published": "Birthday list published to {receivers} successfully!",
-        "error_publish": "Error publishing birthday list: {error}"
-    }
-}
-
 def birthday_of_the_month_page():
     """Display members born in a specific month."""
-    st.header("🎂 Birthday Calendar")
+    global UI_TEXTS
+    st.header(f"🎂 {UI_TEXTS['birthday']} {UI_TEXTS['calendar']}")
     
     # Get current month as default
     current_month = datetime.now().month
@@ -46,7 +35,7 @@ def birthday_of_the_month_page():
             "July", "August", "September", "October", "November", "December"
         ]
         selected_month = st.selectbox(
-            "Select Month", 
+            f"{UI_TEXTS['select']} {UI_TEXTS['month']}", 
             options=months, 
             index=current_month-1,
             format_func=lambda x: f"{x}"
@@ -56,13 +45,13 @@ def birthday_of_the_month_page():
     with col2:
         st.write("")
     
-    if st.button("Query"):
+    if st.button(f"{UI_TEXTS['query']}", type="primary"):
         try:
             # Get members born in the selected month
             members = dbm.get_members_when_born_in(month_number)
             
             if not members:
-                message = f"⚠️ {UI_TEXTS['birthday']['member_not_found']}"
+                message = f"⚠️ {fu.get_function_name()}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}"
                 st.warning(message)
                 return
             
@@ -114,10 +103,10 @@ def birthday_of_the_month_page():
             # Save to CSV
             try:
                 df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-                message = f"✅ {UI_TEXTS['birthday']['saved'].format(file=csv_file)}"
+                message = f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['saved']}: {csv_file}"
                 st.info(message)
             except Exception as e:
-                message = f"❌ {UI_TEXTS['birthday']['error']}: {str(e)}"
+                message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['error']}: {str(e)}"
                 st.error(message)
            
             # Create a row with two columns for the buttons
@@ -134,7 +123,7 @@ def birthday_of_the_month_page():
                         recipients = [m.get('email') for m in members if m.get('email')]
                         
                         if not recipients:
-                            st.error("⚠️ No valid email addresses found to send to")
+                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['email']} {UI_TEXTS['not_found']}")
                             return
                         
                         # Rest of the email sending code...
@@ -250,7 +239,7 @@ def birthday_of_the_month_page():
                         # Check if the attached b'day card file exists
                         card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
                         if not os.path.exists(card_file):
-                            st.error(f"❌ {card_file} not found.")
+                            st.error(f"❌ {fu.get_function_name()} {card_file} {UI_TEXTS['not_found']}")
                             return
                         
                         # Send email with the animated birthday card
@@ -261,47 +250,47 @@ def birthday_of_the_month_page():
                             attached_file=card_file,
                             recipients=recipients
                         )
-                        st.success(f"✅ Successfully sent birthday emails to {len(recipients)} recipients")
+                        st.success(f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['published']}  {UI_TEXTS['count']}: {len(recipients)}")
                     except Exception as e:
-                        st.error(f"❌ Failed to send emails: {str(e)}")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['publish_error']}: {str(e)}")
                 
                 def on_download():
                     try:
                         csv_data = df.to_csv(index=False, encoding='utf-8-sig')
                         st.download_button(
-                            label="⬇️ Download CSV",
+                            label=f"⬇️ {UI_TEXTS['download']} CSV",
                             data=csv_data,
                             file_name=f"birthday_list_{selected_month.lower()}_{datetime.now().year}.csv",
                             mime="text/csv",
                             key="download_csv"
                         )
-                        st.success(f"✅ Birthday list ready for download")
+                        st.success(f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['downloaded']}")
                     except Exception as e:
-                        st.error(f"❌ Failed to prepare download: {str(e)}")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}: {str(e)}")
                 
                 # Create buttons with callbacks
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("📧 Publish Birthday List", 
+                    if st.button(f"📧 {UI_TEXTS['publish']} {UI_TEXTS['birthday']} {UI_TEXTS['list']}", 
                                use_container_width=True, 
                                type="primary",
                                on_click=on_publish):
                         pass  # Callback handles the action
                 
                 with col2:
-                    if st.button("💾 Download Birthday List", 
+                    if st.button(f"💾 {UI_TEXTS['download']} {UI_TEXTS['birthday']} {UI_TEXTS['list']}", 
                                use_container_width=True, 
                                type="secondary",
                                on_click=on_download):
                         pass  # Callback handles the action
         except Exception as e:
-            message = f"❌ {UI_TEXTS['birthday']['error'].format(error=str(e))}"
+            message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}: {str(e)}"
             st.session_state.birthday_message = message
             st.error(message)
 
 def sidebar() -> None:
     """Sidebar application entry point."""
-
+    global UI_TEXTS
     # Sidebar --- from here
     with st.sidebar:
         if st.session_state.user_state == dbm.User_State['p_admin']:
@@ -317,7 +306,7 @@ def sidebar() -> None:
                 })
                 
                 # Add logout button at the bottom for admin
-                if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
+                if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
                     st.session_state.authenticated = False
                     st.session_state.user_email = None
                     st.rerun()
@@ -341,7 +330,7 @@ def sidebar() -> None:
                     'email_user': st.session_state.user_email
                 })
             
-            st.subheader("Navigation")
+            st.subheader(f"{UI_TEXTS['navigation']}")
             st.page_link("ftpe_ui.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
@@ -353,23 +342,29 @@ def sidebar() -> None:
                 st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
             # Add logout button at the bottom for non-admin users
-            if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
+            if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
                 st.session_state.authenticated = False
                 st.session_state.user_email = None
                 st.rerun()
     
 def main():
     """Main application entry point."""
-    st.title("🎂 Birthday of the Month")
+    global UI_TEXTS
+    
+    st.header(f"🎂 {UI_TEXTS['birthday_of_the_month']}")
     
     # Main Page --- frome here
     birthday_of_the_month_page()
         
-# Initialize session state and app context
-cu.init_session_state()
-
 if 'app_context' not in st.session_state:
     st.session_state.app_context = cu.init_context()
+    
+# Get UI_TEXTS with a fallback to English if needed
+try:
+    UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+except (KeyError, AttributeError):
+    # Fallback to English if there's any issue
+    UI_TEXTS = st.session_state.ui_context['US']
 
 # Check authentication
 if not st.session_state.get('authenticated', False):

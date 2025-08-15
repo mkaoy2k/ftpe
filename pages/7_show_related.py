@@ -1,21 +1,11 @@
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
-Family Tree Visualization - show partners of a given member from
-the dbm.db_tables['relations'] table.
-
 This script displays a relationship tree centered around a given 
 member ID via streamlit.
-It shows the member (id and name from dbm.db_tables['members'] table), 
-their partners (id and name from dbm.db_tables['members'] table), 
-and corresponding relation types (as label of edges) 
-in a graph visualization using graphviz.
-The style of the graph is similar to 
-the one in page 6_show_3G.py.
+It shows :
+- the center member (id and name from dbm.db_tables['members'] table), 
+- their related family members (id and name from dbm.db_tables['members'] table), 
+- and corresponding relation types (on the label of edges) 
+- draw a graph visualization using graphviz.
 """
 
 import streamlit as st
@@ -24,36 +14,41 @@ import logging
 from typing import Dict, List, Optional, Tuple, Any
 import db_utils as dbm
 import context_utils as cu
+import funcUtils as fu
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_relationship_data(member_id: int) -> Dict[str, Any]:
+def get_relationship_data(member_id: int, relations: List[str]) -> Dict[str, Any]:
     """
     Retrieve relationship data for a given member ID.
     
     Args:
         member_id: The ID of the center member
+        relations: List of relations to be displayed
         
     Returns:
         Dict containing:
             - center: The center member
             - relationships: List of relationships where the member is involved
-            - partners: List of partners with their relationship info
+            - family_members: List of family members with their relationship info
     """
     try:
+        if relations is None or len(relations) == 0:
+            # Default to all relations
+            relations = list(dbm.Relation_Type.values())
         # Get the center member
         center = dbm.get_member(member_id)
         if not center:
-            st.error(f"No member found with ID: {member_id}")
+            st.error(f"❌ No member found with ID: {member_id}")
             return {}
             
         # Get all relationships where this member is either member_id or partner_id
         relationships = dbm.get_relations_by_id(member_id)
         
-        # Process relationships to get partner information
-        partners = []
+        # Process relationships to get family member information
+        family_members = []
         for rel in relationships:
             # Determine if the current member is member_id or partner_id
             if rel['member_id'] == member_id:
@@ -63,11 +58,13 @@ def get_relationship_data(member_id: int) -> Dict[str, Any]:
                 partner_id = rel['member_id']
                 # Reverse the relation for display (e.g., "spouse" remains the same, but "parent" becomes "child")
                 relation_type = get_inverse_relation(rel['relation'])
-            
+            if relation_type not in relations:
+                continue
+
             # Get partner details
             partner = dbm.get_member(partner_id)
             if partner:
-                partners.append({
+                family_members.append({
                     'id': partner_id,
                     'name': partner.get('name', 'Unknown'),
                     'relation': relation_type,
@@ -79,12 +76,12 @@ def get_relationship_data(member_id: int) -> Dict[str, Any]:
         return {
             'center': center,
             'relationships': relationships,
-            'partners': partners
+            'family_members': family_members
         }
         
     except Exception as e:
-        st.error(f"Error retrieving relationship data: {str(e)}")
-        logger.exception("Error in get_relationship_data")
+        st.error(f"❌ Error retrieving relationship data: {str(e)}")
+        logger.exception(f"Error in {fu.get_function_name()}")
         return {}
 
 def get_inverse_relation(relation_type: str) -> str:
@@ -98,13 +95,17 @@ def get_inverse_relation(relation_type: str) -> str:
         The inverse relation type (e.g., 'child' for 'parent', 'spouse' for 'spouse')
     """
     relation_map = {
-        'parent': 'child inversed',
-        'child': 'parent inversed',
-        'spouse': 'spouse inversed',
-        'parent adopted within family': 'child adopted within family inversed',
-        'child adopted within family': 'parent adopted within family inversed'
+        'parent': dbm.Relation_Type['child'],
+        'child': dbm.Relation_Type['parent'],
+        'parent adopted within family': dbm.Relation_Type['child ai'],
+        'child adopted within family': dbm.Relation_Type['parent ai'],
+        'parent adopted from another family': dbm.Relation_Type['child ao'],
+        'child adopted from another family': dbm.Relation_Type['parent ao'],
+        'parent step': dbm.Relation_Type['child step'],
+        'child step': dbm.Relation_Type['parent step']
     }
-    return relation_map.get(relation_type.lower(), relation_type)
+    relation = relation_map.get(relation_type.lower(), relation_type)
+    return relation
 
 def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
     """
@@ -141,7 +142,7 @@ def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
     )
     
     center = relationship_data.get('center', {})
-    partners = relationship_data.get('partners', [])
+    family_members = relationship_data.get('family_members', [])
     
     # Add center node
     center_id = str(center.get('id', 'unknown'))
@@ -154,18 +155,18 @@ def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
               style='filled,bold',
               penwidth='1.5')
     
-    # Add partner nodes and edges
-    for partner in partners:
-        partner_id = str(partner['id'])
-        partner_name = partner['name']
-        relation_type = partner['relation']
+    # Add family member nodes and edges
+    for family_member in family_members:
+        family_member_id = str(family_member['id'])
+        family_member_name = family_member['name']
+        relation_type = family_member['relation']
         
-        # Create partner node
-        partner_label = f"{partner_id}: {partner_name}"
-        graph.node(partner_id, partner_label)
+        # Create family member node
+        family_member_label = f"{family_member_id}: {family_member_name}"
+        graph.node(family_member_id, family_member_label)
         
         # Add edge with relation type
-        graph.edge(center_id, partner_id, label=relation_type)
+        graph.edge(center_id, family_member_id, label=relation_type)
     
     return graph
 
@@ -173,8 +174,10 @@ def main():
     """
     Main function to render the Streamlit app.
     """
+    global UI_TEXTS
+    
     st.set_page_config(
-        page_title="Family Relationships",
+        page_title="Member Relationship Visualization",
         page_icon="👨‍👩‍👧‍👦",
         layout="wide"
     )
@@ -198,7 +201,7 @@ def main():
             cu.update_context({'email_user': st.session_state.user_email})
         
         if st.session_state.user_state != dbm.User_State['p_admin']:
-            st.subheader("Navigation")
+            st.subheader(f"{UI_TEXTS['navigation']}")
             st.page_link("ftpe_ui.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
@@ -216,8 +219,8 @@ def main():
             st.rerun()
     
     # Main page --- from here
-    st.title("👨‍👩‍👧‍👦 Family Relationships")
-    st.write("Visualize relationships for a family member.")
+    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['relation']} {UI_TEXTS['visualization']}")
+    st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['relation']}")
     
     # Get member ID from URL parameters or input
     member_id = int(st.query_params.get('id', 0))
@@ -226,23 +229,30 @@ def main():
     col1, col2 = st.columns([1, 3])
     with col1:
         member_id = st.number_input(
-            "Enter Member ID:",
+            f"{UI_TEXTS['enter']} {UI_TEXTS['member']} {UI_TEXTS['id']}",
             min_value=0,
             value=member_id if member_id > 0 else 0,
             step=1
         )
+    with col2:
+        relations = st.multiselect(
+            f"{UI_TEXTS['select']} {UI_TEXTS['relation_type']}",
+            dbm.Relation_Type.values(),
+            default=dbm.Relation_Type['parent'],
+            help=f"{UI_TEXTS['select']} {UI_TEXTS['multiple']} {UI_TEXTS['relation_type']}"
+        )
     
-    if st.button("Show Relationships") or member_id > 0:
-        with st.spinner("Loading relationship data..."):
+    if st.button(f"{UI_TEXTS['submit']}", type="primary") or member_id > 0:
+        with st.spinner(f"{UI_TEXTS['search']} {UI_TEXTS['relation']} {UI_TEXTS['in_progress']}..."):
             # Get relationship data
-            relationship_data = get_relationship_data(member_id)
+            relationship_data = get_relationship_data(member_id, relations)
             
             if not relationship_data:
-                st.warning("No relationship data found for this member.")
+                st.warning(f"⚠️ {fu.get_function_name()} {UI_TEXTS['relation']} {UI_TEXTS['not_found']}: {member_id}")
                 return
                 
             # Display the member name as a header
-            st.subheader(f"Relationships for {relationship_data['center'].get('name', 'Unknown')}")
+            st.subheader(f"{UI_TEXTS['member']} {UI_TEXTS['name']}: {relationship_data['center'].get('name', 'Unknown')}")
             
             # Display the graph
             graph = create_relationship_graph(relationship_data)
@@ -250,14 +260,14 @@ def main():
             
             # Create a container for relationship details below the graph
             with st.container():
-                st.subheader("Relationship Details")
-                if not relationship_data['partners']:
-                    st.info("No relationships found for this member.")
+                st.subheader(f"{UI_TEXTS['relation']} {UI_TEXTS['details']}")
+                if not relationship_data['family_members']:
+                    st.info(f"{UI_TEXTS['relation']} {UI_TEXTS['not_found']}")
                 else:
                     # Create columns for better organization of partner details
                     cols = st.columns(2)  # 2 columns for partner details
                     
-                    for i, partner in enumerate(relationship_data['partners']):
+                    for i, partner in enumerate(relationship_data['family_members']):
                         # Alternate between columns for better use of space
                         with cols[i % 2]:
                             with st.expander(f"{partner['name']} (ID: {partner['id']})"):
@@ -269,8 +279,16 @@ def main():
                                     st.markdown(f"**Ended:** {partner['end_date']}")
                             st.markdown("---")
 
-# Initialize session state
-cu.init_session_state()
+# Initialize session state and UI_TEXTS
+if 'app_context' not in st.session_state:
+    cu.init_session_state()
+
+# Get UI_TEXTS with a fallback to English if needed
+try:
+    UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+except (KeyError, AttributeError):
+    # Fallback to English if there's any issue
+    UI_TEXTS = st.session_state.ui_context['US']
 
 # Check authentication
 if not st.session_state.get('authenticated', False):
