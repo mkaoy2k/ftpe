@@ -17,6 +17,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Union
 import funcUtils as fu
+import auth_utils as au
 import csv
 import json
 from datetime import datetime
@@ -69,19 +70,19 @@ User_State = {
 }
 
 # Member codes in mirrors table
-# Used in the 'status' field of the mirdb_table['mirrors'] table
+# Used in the 'status' field of the db_table['mirrors'] table
 Member_Status = {
     'single': 0,    # single
     'married': 1,   # married
     'together': 2   # live-together
 }
-# Used in the 'relation' vs parents of the mirdb_table['mirrors'] table
+# Used in the 'relation' vs parents of the db_table['mirrors'] table
 Member_Relation = {
     'bio': 0,    # biological
     'adopt': 1,   # adopted
     'step': 2   # step
 }
-# Used in the 'sex' field of the mirdb_table['mirrors'] table
+# Used in the 'sex' field of the db_table['mirrors'] table
 Member_Sex = {
     'male': 0,    # male
     'female': 1,   # female
@@ -89,20 +90,22 @@ Member_Sex = {
     'inlaw-female': 3   # inlaw-female
 }
 
-# Used in the 'relation_type' field of the mirdb_table['relations'] table
+# Used in the 'relation_type' field of the db_table['relations'] table
 Relation_Type = {
-    'spouse': 'spouse',    # spouse
-    'spouse divorced': 'spouse divorced',   # spouse divorced
-    'spouse separated': 'spouse separated',   # spouse separated
-    'parent adopted within the family': 'parent ai',   # parent adopted within the family
-    'parent adopted from another family': 'parent ao',   # parent adopted from another family
-    'parent': 'parent',   # biological parent
-    'child adopted within the family': 'child ai',   # child adopted within the family
-    'child adopted from another family': 'child ao',   # child adopted from another family
     'child': 'child',   # biological child
-    'child adopted within the family': 'child ai',   # child adopted within the family
-    'child adopted from another family': 'child ao',   # child adopted from another family
-    'sibling': 'sibling',   # sibling
+    'child ai': 'child adopted within the family',   # adopted child within the family
+    'child ao': 'child adopted from another family',   # adopted child from another family
+    'child step': 'child step',   # step child
+    'parent': 'parent',   # biological parent
+    'parent ai': 'parent adopted within the family',   # adopted parent within the family
+    'parent ao': 'parent adopted from another family',   # adopted parent from another family
+    'parent step': 'parent step',   # step parent
+    'sibling': 'sibling',   # biological sibling
+    'spouse': 'spouse',    # married spouse 
+    'spouse cu': 'spouse civil union',   # civil union spouse
+    'spouse divorced': 'spouse divorced',   # divorced spouse
+    'spouse dp': 'spouse domestic partnership',   # domestic partnership spouse
+    'spouse separated': 'spouse separated',   # separated spouse
     'other': 'other'   # other
 }
 # Log database configuration
@@ -748,7 +751,11 @@ def insert_user(user_data: Dict[str, Any]) -> int:
         log.error(error_msg)
         raise
     
-def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[bool, str]:
+def add_or_update_user(
+    email: str,
+    password: str,
+    user_data: Dict[str, Any],
+    update: bool = False) -> Tuple[bool, str]:
     """
     Add a new user or update an existing user to the 
     db_table['users'] table.
@@ -757,17 +764,41 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
     
     Args:
         email: The user's email address (required)
+        password: The user's password (required)
+        user_data (optional): Other user data, may include all the fields 
+            in the db_table['users'] table, including:
+            - is_admin: The user's role, must be one of the following:
+                - User_State['p_admin']
+                - User_State['f_admin']
+                - User_State['f_member']
+            - is_active: The user's active status, must be one of the following:
+                - Subscriber_State['active']
+                - Subscriber_State['inactive']
+            - l10n: The user's language, must be one of the following:
+                - 'US'
+            - family_id: The user's family ID, must be an integer
+            - member_id: The user's member ID, must be an integer
         update: If True, update the user when the user already exists; 
         if False, return an error when the user already exists
-        **user_data: Other user data, may include all the fields 
-            in the db_table['users'] table.
     
     Returns:
         Tuple[bool, str]: (success status, error message if any)
+    
+    Raises:
+        ValueError: If email is empty or not a valid string
+        sqlite3.Error: If there's a database error
+        Exception: If an unexpected error occurs
+    
+    Example:
+        >>> add_or_update_user("test@example.com", "password", update=False, user_data={"password": "password"})
+        (True, "User added successfully")
     """
     if not email or not isinstance(email, str) or '@' not in email:
         return False, "Invalid email address"
-        
+    
+    if not password or not isinstance(password, str):
+        return False, "Invalid password"
+    
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -789,9 +820,9 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 params = []
                 
                 # valid fields allowed to update
-                for field in ['password_hash', 'salt', 
-                              'is_admin', 'is_active', 'l10n', 'token',
-                              'created_at']:
+                for field in ['password', 'is_admin', 
+                              'family_id', 'member_id',
+                              'l10n', 'is_active']:
                     if field in user_data and user_data[field] is not None:
                         update_fields.append(f"{field} = ?")
                         params.append(user_data[field])
@@ -799,9 +830,6 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 if not update_fields:
                     return False, "No fields to update"
                     
-                # Add update timestamp
-                update_fields.append("updated_at = datetime('now')")
-                
                 query = f"""
                     UPDATE {db_tables['users']}
                     SET {', '.join(update_fields)}
@@ -816,36 +844,20 @@ def add_or_update_user(email: str, update: bool = False, **user_data) -> Tuple[b
                 return True, ""
                 
             else:
-                # Add new user
-                required_fields = ['password_hash', 'salt']
-                for field in required_fields:
-                    if field not in user_data or not user_data[field]:
-                        return False, f"Missing required field: {field}"
-                
-                # Set default values
-                is_admin = user_data.get('is_admin', User_State['f_memeber'])
-                is_active = user_data.get('is_active', Subscriber_State['inactive'])
-                l10n = user_data.get('l10n', 'US')
-                
-                cursor.execute(f"""
-                    INSERT INTO {db_tables['users']} (
-                        email, password_hash, salt, 
-                        is_admin, is_active, l10n, token,
-                        created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                """, (
-                    email,
-                    user_data['password_hash'],
-                    user_data['salt'],
-                    is_admin,
-                    is_active,
-                    l10n,
-                    user_data.get('token')
-                ))
-                
-                conn.commit()
-                log.debug(f"Successfully added user: {email}")
-                return True, ""
+                # Create a new user
+                user_fields = {
+                    'is_admin': user_data['is_admin'] if 'is_admin' in user_data else User_State['f_member'],
+                    'is_active': user_data['is_active'] if 'is_active' in user_data else Subscriber_State['inactive'],
+                    'l10n': user_data['l10n'] if 'l10n' in user_data else 'US',
+                    'family_id': user_data['family_id'] if 'family_id' in user_data else 0,
+                    'member_id': user_data['member_id'] if 'member_id' in user_data else 0,
+                }
+                au.create_user(email, password, 
+                    role=user_fields['is_admin'],
+                    is_active=user_fields['is_active'],
+                    l10n=user_fields['l10n'],
+                    family_id=user_fields['family_id'],
+                    member_id=user_fields['member_id'])
                 
     except sqlite3.IntegrityError as e:
         error_msg = f"Database integrity error: {str(e)}"
@@ -1106,9 +1118,6 @@ def add_or_update_member(member_data: Dict[str, Any], update: bool = False) -> i
                 if not update_fields:
                     log.debug("No fields to update for existing member")
                     return member_id
-                
-                # Add updated_at timestamp
-                update_fields.append("updated_at = datetime('now')")
                 
                 # Add member_id to params for WHERE clause
                 params.append(member_id)
@@ -1941,7 +1950,8 @@ def get_relations_by_id(member_id: int,
         get all relations if relation is None
         
     Returns:
-        Optional[Dict[str, Any]]: A dictionary containing the relation's data if found, 
+        Optional[List[Dict[str, Any]]]: A list of dictionaries containing 
+        the relation's data if found, 
         None if no relation exists with the given ID. 
         The dictionary includes all the fields from the relations table.
             
@@ -1971,8 +1981,8 @@ def get_relations_by_id(member_id: int,
                 cursor.execute(f"""
                     SELECT * FROM {db_tables['relations']}
                     WHERE member_id = ? or partner_id = ?
-                    AND relation = ?
-                """, (member_id, member_id, relation))
+                    AND relation LIKE ?
+                """, (member_id, member_id, f'%{relation}%'))
             else:
                 # Query the database for the relation
                 cursor.execute(f"""
@@ -2291,7 +2301,7 @@ def delete_member(member_id: int) -> bool:
                 log.debug(f"Successfully deleted member ID {member_id} (Name: {member_name})")
                 return True
             else:
-                log.warning(f"No member found with ID {member_id} to delete")
+                log.warning(f"No member found with ID {member_id} (Name: {member_name})")
                 return False
                 
     except sqlite3.IntegrityError as e:
@@ -2661,7 +2671,7 @@ def get_member_relations(member_id: int) -> List[Dict[str, Any]]:
         log.error(error_msg)
         raise
 
-def update_member_when_ended(
+def update_relation_when_ended(
     member1_id: int,
     member2_id: int,
     relation: str,
@@ -2685,17 +2695,18 @@ def update_member_when_ended(
         end_date: The end date of the relationship in YYYY-MM-DD format.
         
     Returns:
-        int: The number of relationship records updated (should be 1 if successful).
+        int: The number of relationship records updated (should be 1 or 2 if successful).
+        Zero if not successful.
         
     Raises:
         ValueError: If any input parameters are invalid.
         sqlite3.Error: If a database error occurs during the update.
         
     Example:
-        >>> update_count = update_member_when_ended(
+        >>> update_count = update_relation_when_ended(
         ...     member1_id=123,
         ...     member2_id=456,
-        ...     relation='spouse',
+        ...     relation='spouse divorced',
         ...     end_date='2023-01-15'
         ... )
         >>> if update_count > 0:
@@ -2721,79 +2732,63 @@ def update_member_when_ended(
     cursor = None
     
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
         
-        # Start transaction
-        cursor.execute("BEGIN TRANSACTION")
+            # Check if both members exist
+            cursor.execute(f"""
+                SELECT id FROM {db_tables["members"]} 
+                WHERE id IN (?, ?)
+            """, (member1_id, member2_id))
         
-        # Check if both members exist
-        cursor.execute(f"""
-            SELECT id FROM {db_tables["members"]} 
-            WHERE id IN (?, ?)
-        """, (member1_id, member2_id))
+            members = cursor.fetchall()
         
-        members = cursor.fetchall()
+            if len(members) != 2:
+                found_ids = [str(m[0]) for m in members]
+                raise ValueError(f"One or both members not found. Found member IDs: {', '.join(found_ids) if found_ids else 'None'}")
         
-        if len(members) != 2:
-            found_ids = [str(m[0]) for m in members]
-            conn.rollback()
-            raise ValueError(f"One or both members not found. Found member IDs: {', '.join(found_ids) if found_ids else 'None'}")
-        
-        # Update the relationship record
-        cursor.execute(f"""
-            UPDATE {db_tables["relations"]}
-            SET end_date = ?,
-                relation = ?
-            WHERE ((member_id = ? AND partner_id = ?) OR
+            # Update the relationship record
+            cursor.execute(f"""
+                UPDATE {db_tables["relations"]}
+                SET end_date = ?,
+                    relation = ?
+                WHERE ((member_id = ? AND partner_id = ?) OR
                    (member_id = ? AND partner_id = ?))
-            AND (end_date IS NULL OR end_date = '' OR end_date > ?)
-        """, (
-            end_date,
-            relation,
-            member1_id,
-            member2_id,
-            member2_id,
-            member1_id,
-            end_date
-        ))
+                AND (end_date IS NULL OR end_date = '' OR end_date <= ?)
+            """, (
+                end_date,
+                relation,
+                member1_id,
+                member2_id,
+                member2_id,
+                member1_id,
+                end_date
+            ))
         
-        updated_count = cursor.rowcount
+            updated_count = cursor.rowcount
         
-        if updated_count == 0:
-            log.warning(f"No active relationship found between member {member1_id} and {member2_id}")
-        else:
-            log.debug(f"Updated relationship between member {member1_id} and {member2_id} with end date {end_date}")
-        
-        # Commit the transaction
-        conn.commit()
-        return updated_count
+            if updated_count == 1 or updated_count == 2:
+                log.debug(f"Updated relations:{updated_count} for {member1_id}-{member2_id}")
+            else:
+                # should not happen, but just in case
+                log.warning(f"Updated relations:{updated_count} for {member1_id}-{member2_id}")
+            return updated_count
         
     except sqlite3.Error as dbe:
-        if conn:
-            conn.rollback()
         log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
         raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
         
     except Exception as e:
-        if conn:
-            conn.rollback()
         log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
-        
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
 
-def update_member_when_died(
+def update_relations_when_died(
     member_id: int,
     died_date: str
-) -> Tuple[int, int]:
+) -> Tuple[bool, int, int]:
     """
     Update a member's status to deceased and update related 
-    relationship records.
+    relationship records in the db_tables['relations'] table.
     
     This function performs the following operations in a single transaction:
     1. Updates the member's 'died' field with the provided date
@@ -2804,7 +2799,8 @@ def update_member_when_died(
         died_date: Date of death in YYYY-MM-DD format
         
     Returns:
-        Tuple[int, int]: A tuple containing:
+        Tuple[bool, int, int]: A tuple containing:
+            - success: True if the update was successful, False otherwise
             - updated_members_count: Number of members updated
             - updated_relations_count: Number of relationships updated
         
@@ -2813,8 +2809,9 @@ def update_member_when_died(
         sqlite3.Error: If a database error occurs during the update
         
     Example:
-        >>> updated = update_member_when_died(123, '2023-12-31')
-        >>> print(f"Updated {updated[0]} member and {updated[1]} relationships")
+        >>> updated = update_relations_when_died(123, '2023-12-31')
+        >>> if updated[0]:
+            print(f"Updated member count: {updated[1]}\nUpdated relationships count: {updated[2]}")
     """
     # Input validation
     if not isinstance(member_id, int) or member_id <= 0:
@@ -2830,63 +2827,43 @@ def update_member_when_died(
     cursor = None
     
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
         
-        # Start transaction
-        cursor.execute("BEGIN TRANSACTION")
+            # 1. Update the member's died date
+            cursor.execute(f"""
+                UPDATE {db_tables["members"]}
+                SET died = ?
+                WHERE id = ?
+            """, (died_date, member_id))
         
-        # 1. Update the member's died date
-        cursor.execute(f"""
-            UPDATE {db_tables["members"]}
-            SET died = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        """, (died_date, member_id))
+            updated_members = cursor.rowcount
         
-        updated_members = cursor.rowcount
+            if updated_members == 0:
+                raise ValueError(f"No member found with ID {member_id}")
+            log.debug(f"Marked member ID: {member_id} as deceased on {died_date} in members table.")
+                    
+            # 2. Update any active relationships to mark them as ended
+            cursor.execute(f"""
+                UPDATE {db_tables["relations"]}
+                SET end_date = ?
+                WHERE (member_id = ? OR partner_id = ?)
+                AND (end_date IS NULL OR end_date = ''
+                OR end_date = '0000-00-00'
+                OR end_date > ?)
+            """, (died_date, member_id, member_id, died_date))
         
-        if updated_members == 0:
-            conn.rollback()
-            raise ValueError(f"No member found with ID {member_id}")
+            updated_relations = cursor.rowcount
         
-        # 2. Update any active relationships to mark them as ended
-        cursor.execute(f"""
-            UPDATE {db_tables["relations"]}
-            SET end_date = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE (member_id = ? OR partner_id = ?)
-            AND (end_date IS NULL OR end_date = ''
-            OR end_date = '0000-00-00')
-        """, (died_date, member_id, member_id))
+            log.debug(f"Marked member ID: {member_id} as deceased on {died_date} in relations table. " +
+                    f"Updated {updated_relations} relationships.")
         
-        updated_relations = cursor.rowcount
-        
-        # Commit the transaction
-        conn.commit()
-        log.debug(f"Marked member {member_id} as deceased on {died_date}. "
-                f"Updated {updated_relations} relationships.")
-        
-        return updated_members, updated_relations
-        
-    except sqlite3.Error as dbe:
-        if conn:
-            conn.rollback()
-        log.error(f"Database error in {fu.get_function_name()}: {str(dbe)}")
-        raise sqlite3.Error(f"Database operation failed: {str(dbe)}")
+            return updated_relations > 0, updated_members, updated_relations
         
     except Exception as e:
-        if conn:
-            conn.rollback()
         log.error(f"Unexpected error in {fu.get_function_name()}: {str(e)}")
-        raise Exception(f"An unexpected error occurred: {str(e)}")
+        raise
         
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
 def get_members_when_alive() -> List[Dict[str, Any]]:
     """
     Retrieve a list of all living members
@@ -3103,8 +3080,7 @@ def insert_relation(relation_data: Dict[str, Any]) -> int:
 def add_or_update_relation(relation_data: Dict[str, Any], update: bool = False) -> int:
     """
     Add if not exists or update a relationship record in db_tables['relations'] 
-    table when matching record (member_id, partner_id) 
-    is found.
+    table when matching record (member_id, partner_id) is found.
     
     This function is used to add or update a relationship record.
     
@@ -3233,19 +3209,6 @@ def add_or_update_relation(relation_data: Dict[str, Any], update: bool = False) 
             log.debug(f"Added new relationship record ID: {relation_id}")
             return relation_id
             
-    except sqlite3.IntegrityError as e:
-        error_msg = f"Error in {fu.get_function_name()}: adding/updating relationship record"
-        if "FOREIGN KEY constraint failed" in str(e):
-            if "member_id" in str(e):
-                error_msg = f"Invalid member ID: {relation_data.get('member_id')}"
-            elif "partner_id" in str(e):
-                error_msg = f"Invalid partner ID: {relation_data.get('partner_id')}"
-            elif "original_family_id" in str(e):
-                error_msg = f"Invalid original family ID: {relation_data.get('original_family_id')}"
-        
-        log.error(f"{error_msg}: {str(e)}")
-        raise ValueError(error_msg) from e
-        
     except sqlite3.Error as e:
         error_msg = f"Error in {fu.get_function_name()}: {str(e)}"
         log.error(error_msg)
@@ -3299,44 +3262,18 @@ def delete_relation(relation_id: int) -> bool:
             relation_id, member_id, partner_id, relation_type = result
             log.debug(f"Found relation - ID: {relation_id}, Member: {member_id}, Partner: {partner_id}, Type: {relation_type}")
             
-            # Check for any constraints that might prevent deletion
-            log.debug("Checking for dependent records...")
-            cursor.execute("PRAGMA foreign_keys = ON")
+            # Delete the relation
+            cursor.execute(f"DELETE FROM {db_tables['relations']} WHERE id = ?", (relation_id,))
+            rows_affected = cursor.rowcount
+            conn.commit()
             
-            # Log the current foreign key constraints
-            cursor.execute("PRAGMA foreign_key_check(relations)")
-            fk_check = cursor.fetchall()
-            if fk_check:
-                log.warning(f"Foreign key constraint violations found: {fk_check}")
-            
-            # Perform the deletion within a savepoint for safety
-            log.debug(f"Attempting to delete relation with ID: {relation_id}")
-            try:
-                cursor.execute("SAVEPOINT delete_relation")
-                cursor.execute(f"""
-                    DELETE FROM {db_tables['relations']} 
-                    WHERE id = ?
-                """, (relation_id,))
-                
-                rows_affected = cursor.rowcount
-                conn.commit()
-                log.debug(f"Delete executed. Rows affected: {rows_affected}")
-                
-                if rows_affected > 0:
-                    log.info(f"Successfully deleted relation: {relation_id}")
-                    return True
-                    
-                log.warning(f"No rows affected when deleting relation: {relation_id}")
+            if rows_affected > 0:
+                log.debug(f"Successfully deleted relation ID {relation_id} (Member: {member_id}, Partner: {partner_id}, Type: {relation_type})")
+                return True
+            else:
+                log.warning(f"No relation found with ID {relation_id} (Member: {member_id}, Partner: {partner_id}, Type: {relation_type})")
                 return False
                 
-            except sqlite3.Error as e:
-                cursor.execute("ROLLBACK TO delete_relation")
-                error_msg = f"Database error during deletion: {str(e)}"
-                log.error(error_msg, exc_info=True)
-                raise
-            finally:
-                cursor.execute("RELEASE delete_relation")
-            
     except sqlite3.Error as e:
         error_msg = f"Database error in delete_relation: {str(e)}"
         log.error(error_msg, exc_info=True)
@@ -4279,6 +4216,8 @@ if __name__ == "__main__":
     
     # Test query for living members
     try: 
-        pass
+        updated = update_relations_when_died(1650, '2023-12-31')
+        if updated[0]:
+            print(f"Updated member count: {updated[1]}\nUpdated relationships count: {updated[2]}")
     except sqlite3.Error as e:
         print(f"Error: {str(e)}")

@@ -41,7 +41,7 @@ def load_json(file_path):
                 return json.load(f)
         return {}
     except json.JSONDecodeError:
-        st.error("Error: Invalid JSON file")
+        st.error("❌ Error: Invalid JSON file")
         return {}
 
 def save_json(file_path, data):
@@ -60,7 +60,7 @@ def save_json(file_path, data):
             json.dump(data, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
-        st.error(f"Error saving file: {e}")
+        st.error(f"❌ Error saving file: {e}")
         return False
 
 def main():
@@ -146,7 +146,7 @@ def main():
                 if 'reload_file' in st.session_state:
                     del st.session_state.reload_file
             except Exception as e:
-                st.error(f"Error loading file: {e}")
+                st.error(f"❌ Error loading file: {e}")
                 st.session_state.file_content = "{\n    \"key\": \"value\"\n}"
         elif not file_path or not file_path.exists():
             st.session_state.file_content = "{\n    \"key\": \"value\"\n}"
@@ -183,7 +183,7 @@ def main():
                 if save_json(file_path, parsed_json):
                     st.success(f"Saved to {file_path}")
             except json.JSONDecodeError as e:
-                st.error(f"Invalid JSON: {e}")
+                st.error(f"❌ Invalid JSON: {e}")
     
     with col2:
         if st.button("Reload", type="secondary") and file_path and file_path.exists():
@@ -208,7 +208,7 @@ def main():
             parsed = json.loads(edited_json)
             st.json(parsed)
         except json.JSONDecodeError:
-            st.error("Invalid JSON")
+            st.error("❌ Invalid JSON")
     # --- Main Content --- to here
     
 # Initialize session state

@@ -80,100 +80,13 @@ logger.addHandler(console_handler)
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger().setLevel(logging.WARNING)
 
-# Constants for UI text
-UI_TEXTS = {
-    "search": {
-        "title": "Search Family Members",
-        "form_title": "Search Criteria",
-        "name": "Name",
-        "alias": "Alias",
-        "family_id": "Family ID",
-        "family_id_prompt": "Family ID",
-        "family_name_prompt": "Family Name",
-        "background_prompt": "Background contains",
-        "url_prompt": "Website URL",
-        "generation": "Generation",
-        "birth_date": "Birth Date",
-        "birth_date_placeholder": "YYYY or YYYY-MM or YYYY-MM-DD",
-        "death_date": "Death Date",
-        "death_date_placeholder": "YYYY or YYYY-MM or YYYY-MM-DD",
-        "search_button": "Search",
-        "searching": "Searching...",
-        "results_title": "Search Results",
-        "no_results": "No matching members found",
-        "results_count": "Found {count} records",
-        "error_required": "Please enter at least one search criteria"
-    },
-    "add": {
-        "title": "Add Family Member",
-        "name": "Full Name*",
-        "sex": "Gender",
-        "sex_options": ["Male", "Female", "Other"],
-        "birth_date": "Birth Date (YYYY-MM-DD)*",
-        "birth_date_placeholder": "e.g., 1990-01-01",
-        "family_id": "Family ID",
-        "alias": "Alias",
-        "generation": "Generation*",
-        "email": "Email",
-        "password": "Password",
-        "confirm_password": "Confirm Password",
-        "url": "Website",
-        "submit_button": "Add Member",
-        "success": "Member added successfully! Member ID: {id}",
-        "update_user_table": "User table {email} updated successfully!",
-        "no_update_user_table": "User table not updated. Please update manually.",
-        "error_required": "Please fill in all required fields (marked with *)",
-        "error_generic": "Error adding member: {error}"
-    },
-    "update": {
-        "title": "Update Family Member",
-        "case": "Update Cases",
-        "member_id_prompt": "Enter Member ID to update",
-        "family_id_prompt": "Enter Family ID to update",
-        "family_name_prompt": "Enter Family Name to update",
-        "url_prompt": "Enter Website URL to update",
-        "background_prompt": "Enter Background to update",
-        "relation_id_prompt": "Enter Relation ID to update",
-        "relation_type_prompt": "Relation Type",
-        "join_date_prompt": "Start Date",
-        "partner_id_prompt": "Partner ID",
-        "original_family_id_prompt": "Original Family ID",
-        "end_date_prompt": "End Date (optional)",
-        "original_name_prompt": "Original Name (if different)",
-        "dad_name_prompt": "Father's Name (if applicable)",
-        "mom_name_prompt": "Mother's Name (if applicable)",
-        "not_found": "Record not found",
-        "form_title": "Update Member: {name} (ID: {id})",
-        "submit_button": "Update Information",
-        "success": "Member information updated successfully!",
-        "no_changes": "No changes were made (data was not modified)",
-        "nothing_to_update": "No changes to update",
-        "error": "Error updating member: {error}",
-        "error_required": "Please fill in all required fields (marked with *)",
-        "error_generic": "Error updating member: {error}"
-    },
-    "delete": {
-        "title": "Delete Family Member",
-        "member_id_prompt": "Enter Member ID to delete",
-        "family_id_prompt": "Enter Family ID to delete",
-        "not_found": "Record not found",
-        "warning": "This action cannot be undone!",
-        "confirm_title": "The following record will be deleted:",
-        "confirm_checkbox": "I confirm that I want to delete this record",
-        "confirm_button": "Confirm Deletion",
-        "success": "Successfully deleted member: {name}",
-        "success_family": "Successfully deleted family: {name}",
-        "error": "Error deleting record: {error}",
-        "error_required": "Please fill in all required fields (marked with *)",
-        "error_generic": "Error deleting record: {error}"
-    }
-}
-
 def search_families_page() -> None:
     """
     Display the family search page with filters and results.
     """
-    st.subheader("Search Families")
+    global UI_TEXTS
+    
+    st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
     
     # Initialize session state for search results
     if 'family_search_results' not in st.session_state:
@@ -181,18 +94,21 @@ def search_families_page() -> None:
     
     # Search form
     with st.form("family_search_form"):
-        st.subheader("Search Criteria")
+        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['criteria']}")
         
         # Create two rows of search fields
         row1_col1, row1_col2 = st.columns(2)
         row2_col1, row2_col2 = st.columns(2)
         
         with row1_col2:
-            name = st.text_input(UI_TEXTS["search"]["family_name_prompt"], key="search_family_name")
+            name = st.text_input(
+                f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['name']}",
+                key="search_family_name"
+            )
         
         with row1_col1:
             family_id = st.number_input(
-                UI_TEXTS["search"]["family_id_prompt"],
+                f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
                 min_value=0,
                 value=0,
                 step=1,
@@ -200,13 +116,16 @@ def search_families_page() -> None:
             )
             
         with row2_col2:
-            background = st.text_area(UI_TEXTS["search"]["background_prompt"])
+            background = st.text_area(
+                f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['background']}")
             
         with row2_col1:
-            url = st.text_input(UI_TEXTS["search"]["url_prompt"], key="search_url")
+            url = st.text_input(
+                f"{UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['url']}",
+                key="search_url")
         
         # add a search button
-        submitted = st.form_submit_button("search")
+        submitted = st.form_submit_button(f"{UI_TEXTS['search']}", type="primary")
     
         # process search when form is submitted
         if submitted:
@@ -214,7 +133,8 @@ def search_families_page() -> None:
             name = name.strip()
             background = background.strip()
             
-            with st.spinner(UI_TEXTS["search"]["searching"]):
+            with st.spinner(
+                f"{UI_TEXTS['search']} {UI_TEXTS['in_progress']}"):
                 if family_id > 0:
                     # Get family by ID
                     family = dbm.get_family(family_id)
@@ -290,15 +210,17 @@ def search_families_page() -> None:
 
 def add_family_page() -> None:
     """Display the form to add a new family."""
-    st.subheader("Add New Family")
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['add']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
     
     with st.form("add_family_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            name = st.text_input("Family Name*", "", key="family_name_2")
+            name = st.text_input(
+                f"{UI_TEXTS['family']} {UI_TEXTS['name']}", "", key="family_name_2")
             url = st.text_input(
-                "Family Website",
+                f"{UI_TEXTS['family']} {UI_TEXTS['url']}",
                 "",
                 placeholder="https://example.com",
                 key="family_url_2"
@@ -306,7 +228,7 @@ def add_family_page() -> None:
         
         with col2:
             background = st.text_area(
-                "Family Background/History",
+                f"{UI_TEXTS['family']} {UI_TEXTS['background']}",
                 "",
                 height=100,
                 help="Enter any relevant family history or background information",
@@ -314,12 +236,12 @@ def add_family_page() -> None:
             )
         
         # Form submission button
-        submitted = st.form_submit_button("Add Family")
+        submitted = st.form_submit_button(f"{UI_TEXTS['add']} {UI_TEXTS['family']}", type="primary")
         
         if submitted:
             # Validate required fields
             if not name:
-                st.error(f"{UI_TEXTS["add"]["error_required"]} {UI_TEXTS["add"]["name"]}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}")
                 return
                 
             try:
@@ -336,23 +258,24 @@ def add_family_page() -> None:
                     update=False)
                 
                 if family_id:
-                    st.success(f"✅ {UI_TEXTS["add"]["success"]} {name} (ID: {family_id})")
+                    st.success(f"✅ {name} (ID: {family_id})")
                     
                 else:
-                    st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str("Failed to add family. Please try again.")}")
+                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}")
                 
             except ValueError as ve:
-                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(ve)}")
+                st.error(f"❌ {fu.get_function_name()} {str(ve)}")
             except Exception as e:
-                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(e)}")
+                st.error(f"❌ {fu.get_function_name()} {str(e)}")
 
 def update_family_page() -> None:
     """Display the form to update an existing family."""
-    st.subheader(UI_TEXTS["update"]["title"])
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
     
     # Get family ID to update
     family_id = st.number_input(
-        UI_TEXTS["update"]["family_id_prompt"],
+        f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         key="update_family_id_2"
@@ -362,27 +285,28 @@ def update_family_page() -> None:
         st.info(st.session_state.update_message)
         del st.session_state.update_message
     
-    if st.button("Update Family", type="primary"):
+    if st.button(f"{UI_TEXTS['update']} {UI_TEXTS['family']}", type="primary"):
         if family_id:
             # Get family data
             family = dbm.get_family(family_id)
             
             if not family:
-                message = f"⚠️ {UI_TEXTS['update']['not_found']}"
+                message = f"⚠️ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}"
                 st.session_state.update_message = message
                 st.rerun()
             
         with st.form(f"update_family_form_{family_id}"):
-            st.subheader(UI_TEXTS["update"]["form_title"].format(
+            st.subheader(
+                f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['form']}",
                 name=family.get('name', ''),
                 id=family_id
-            ))
+            )
             
             col1, col2 = st.columns(2)
             
             with col1:
                 name = st.text_input(
-                    UI_TEXTS['update']['family_name_prompt'],
+                    f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['name']}",
                     family.get('name', ''),
                     key=f"update_name_{family_id}"
                 )
@@ -396,26 +320,26 @@ def update_family_page() -> None:
                 
             with col2:
                 url = st.text_input(
-                    UI_TEXTS["update"]["url_prompt"],
+                    f"{UI_TEXTS['update']} {UI_TEXTS['url']}",
                     family.get('url', ''),
                     placeholder="https://example.com",
                     key=f"update_url_{family_id}"
                 )
             
             background = st.text_area(
-                UI_TEXTS["update"]["background_prompt"],
+                f"{UI_TEXTS['update']} {UI_TEXTS['background']}",
                 family.get('background', ''),
                 height=150,
                 help="Enter any relevant family history or background information",
                 key=f"update_background_{family_id}"
             )
             
-            submitted = st.form_submit_button(UI_TEXTS["update"]["submit_button"])
+            submitted = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
             
             if submitted:
                 # Validate required fields
                 if not name.strip():
-                    message = f"❌ {UI_TEXTS['update']['error_required']}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['name']} {UI_TEXTS['required']}"
                     st.session_state.update_message = message
                     st.rerun()
                     
@@ -439,24 +363,24 @@ def update_family_page() -> None:
                             update=True)
                         
                         if updated_id:
-                            message = f"✅ {UI_TEXTS['update']['success']} {name} (ID: {family_id})"
+                            message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['family']} {UI_TEXTS['update']} {name} (ID: {family_id})"
                             st.session_state.update_message = message
                             st.rerun()
                         else:
-                            message = f"❌ {UI_TEXTS['update']['error_generic']} {str('Failed to update family. Please try again.')}"
+                            message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {updated_id}"
                             st.session_state.update_message = message
                             st.rerun()
                     else:
-                        message = UI_TEXTS["update"]["nothing_to_update"]
+                        message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {updated_data   }"
                         st.session_state.update_message = message
                         st.rerun()
                         
                 except ValueError as ve:
-                    message = f"❌ {UI_TEXTS['update']['error_required']} {str(ve)}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {str(ve)}"
                     st.session_state.update_message = message
                     st.rerun()
                 except Exception as e:
-                    message = f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {str(e)}"
                     st.session_state.update_message = message
                     st.rerun()
 
@@ -464,7 +388,8 @@ def search_relations_page() -> None:
     """
     Display the relation search page with filters and results.
     """
-    st.subheader("Search Relations")
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['relation']} {UI_TEXTS['page']}")
     
     # Initialize session state for search results
     if 'relation_search_results' not in st.session_state:
@@ -472,7 +397,7 @@ def search_relations_page() -> None:
     
     # Search form
     with st.form("relation_search_form"):
-        st.subheader("Search Criteria")
+        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['criteria']}")
         
         # Create two rows of search fields
         row1_col1, row1_col2 = st.columns(2)
@@ -512,11 +437,11 @@ def search_relations_page() -> None:
             )
         
         # Add a search button
-        submitted = st.form_submit_button("Search")
+        submitted = st.form_submit_button(f"{UI_TEXTS['search']}", type="primary")
     
         # Process search when form is submitted
         if submitted:
-            with st.spinner("Searching..."):
+            with st.spinner(f"{UI_TEXTS['search']} {UI_TEXTS['in_progress']}"):
                 try:
                     if some_id > 0:
                         relations = dbm.get_relations_by_id(some_id)
@@ -539,11 +464,11 @@ def search_relations_page() -> None:
                 
                 except Exception as e:
                     st.session_state.relation_search_results = []
-                    st.error(f"Error searching relations: {str(e)}")
+                    st.error(f"❌ Error searching relations: {str(e)}")
     
             # Display search results if available
             if st.session_state.relation_search_results:
-                st.subheader("Search Results")
+                st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['results']}")
         
                 # Convert results to DataFrame for better display
                 df = pd.DataFrame(st.session_state.relation_search_results)
@@ -600,7 +525,8 @@ def add_relation_page() -> None:
     """
     Display the form to add a new relation between members.
     """
-    st.subheader("Add New Relation")
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['add']} {UI_TEXTS['relation']} {UI_TEXTS['page']}")
     
     with st.form("add_relation_form"):
 
@@ -608,7 +534,7 @@ def add_relation_page() -> None:
         
         with col1:
             member_id = st.number_input(
-                "Member ID*",
+                f"{UI_TEXTS['member']} {UI_TEXTS['id']}*",
                 min_value=1,
                 step=1,
                 help="ID of the first member in the relationship",
@@ -616,22 +542,22 @@ def add_relation_page() -> None:
             )
             rel_list = dbm.Relation_Type.keys()
             relation_type = st.selectbox(
-                "Relation Type*",
+                f"{UI_TEXTS['relation_type']}*",
                 rel_list,
                 help="Type of relationship between the members",
                 key="add_relation_type_2"
             )
             
             join_date = st.text_input(
-                "Start Date*",
+                f"{UI_TEXTS['relation_join_date']}*",
                 value=date.today().strftime("%Y-%m-%d"),
                 help="When this relationship began",
-                key="add_join_date_2"
+                key="add_relation_join_date_2"
             )
             
         with col2:
             partner_id = st.number_input(
-                "Partner ID*",
+                f"{UI_TEXTS['partner']} {UI_TEXTS['id']}*",
                 min_value=1,
                 step=1,
                 value=1,
@@ -640,7 +566,7 @@ def add_relation_page() -> None:
             )
             
             original_family_id = st.number_input(
-                "Original Family ID",
+                f"{UI_TEXTS['original']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
                 min_value=0,
                 step=1,
                 value=0,
@@ -649,7 +575,7 @@ def add_relation_page() -> None:
             )
             
             end_date = st.text_input(
-                "End Date (optional)",
+                f"{UI_TEXTS['relation_end_date']})",
                 value=None,
                 help="If this relationship has ended, when it ended",
                 key="add_end_date_2"
@@ -657,7 +583,7 @@ def add_relation_page() -> None:
             
             # Validate date range if end date is provided
             if end_date and end_date < join_date:
-                st.error("End date cannot be before start date")
+                st.error(f"❌ End date cannot be before start date")
                 st.stop()
         
         # Additional fields
@@ -665,12 +591,12 @@ def add_relation_page() -> None:
         dad_name = st.text_input("Father's Name (if applicable)", "", key="add_dad_name_2")
         mom_name = st.text_input("Mother's Name (if applicable)", "", key="add_mom_name_2")
         
-        submitted = st.form_submit_button("Add Relation")
+        submitted = st.form_submit_button(f"{UI_TEXTS['add']} {UI_TEXTS['relation']}", type="primary")
         
         if submitted:
             # Validate required fields
             if not member_id or not partner_id or not relation_type:
-                st.error(f"❌ {UI_TEXTS["add"]["error_required"]}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}")
                 return
                 
             try:
@@ -695,19 +621,20 @@ def add_relation_page() -> None:
                     relation_data, update=False)
                 
                 if relation_id:
-                    st.success(f"✅ {UI_TEXTS["add"]["success"]} {relation_id}")
+                    st.success(f"✅ {UI_TEXTS['add']} {UI_TEXTS['relation']} {UI_TEXTS['id']}: {relation_id}")
                 else:
-                    st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str("Failed to add relation. Please check the member IDs and try again.")}")
+                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']} {UI_TEXTS['id']}: {relation_id}")
                 
             except ValueError as ve:
-                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(ve)}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}: {str(ve)}")
             except Exception as e:
-                st.error(f"❌ {UI_TEXTS["add"]["error_generic"]} {str(e)}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}: {str(e)}")
 
 def update_relation_page() -> None:
     """
     Display the form to update an existing relation.
     """
+    global UI_TEXTS
     # 初始化 session state 變數
     if 'update_relation' not in st.session_state:
         st.session_state.update_relation = None
@@ -716,22 +643,22 @@ def update_relation_page() -> None:
     if 'submitted' not in st.session_state:
         st.session_state.submitted = False
         
-    st.subheader("Update Relation")
+    st.subheader(f"{UI_TEXTS['update']} {UI_TEXTS['relation']} {UI_TEXTS['page']}")
     
     # Get relation ID to update
     relation_id = st.number_input(
-        UI_TEXTS["update"]["relation_id_prompt"],
+        f"{UI_TEXTS['relation']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         key="update_relation_id_2"
     )
     
-    if relation_id is not None and st.button("Get Relation"):
+    if relation_id is not None and st.button(f"{UI_TEXTS['search']} {UI_TEXTS['relation']}", type="primary"):
         # Get relation data
         relation = dbm.get_relation(relation_id)
         
         if not relation:
-            st.warning(f"⚠️ {UI_TEXTS['relation_not_found']}: {relation_id}")
+            st.warning(f"⚠️ {UI_TEXTS['relation']} {UI_TEXTS['id']} {UI_TEXTS['not_found']}: {relation_id}")
        
         else:
             st.session_state.update_relation = relation
@@ -748,14 +675,14 @@ def update_relation_page() -> None:
             
             with col1:
                 member_id = st.number_input(
-                        UI_TEXTS["update"]["member_id_prompt"],
+                        f"{UI_TEXTS['member']} {UI_TEXTS['id']}",
                         min_value=1,
                         step=1,
                         value=relation.get('member_id', 1),
                         help="ID of the first member in the relationship",
                         key="update_relation_member_id_2"
                     )
-                rel_list = list(dbm.Relation_Type.keys())  # Convert dict_keys to list
+                rel_list = list(dbm.Relation_Type.values())  # Convert dict_keys to list
                 current_relation = relation.get('relation', 'spouse')
                 try:
                     default_index = rel_list.index(current_relation)
@@ -763,7 +690,7 @@ def update_relation_page() -> None:
                     default_index = 0  # Default to first item if relation not found
                     
                 relation_type = st.selectbox(
-                        UI_TEXTS["update"]["relation_type_prompt"],
+                        f"{UI_TEXTS['relation_type']}",
                         rel_list,
                         index=default_index,
                         help="Type of relationship between the members",
@@ -772,26 +699,26 @@ def update_relation_page() -> None:
                     
                 # Additional fields
                 original_name = st.text_input(
-                        "Original Name (if different)",
+                        f"{UI_TEXTS['original']} {UI_TEXTS['name']}",
                         relation.get('original_name', ''),
                         key=f"update_original_name_{relation_id}"
                     )
                 
                 dad_name = st.text_input(
-                        "Father's Name (if applicable)",
+                        f"{UI_TEXTS['dad']} {UI_TEXTS['name']}",
                         relation.get('dad_name', ''),
                         key=f"update_dad_name_{relation_id}"
                     )
                 
                 mom_name = st.text_input(
-                        "Mother's Name (if applicable)",
+                        f"{UI_TEXTS['mom']} {UI_TEXTS['name']}",
                         relation.get('mom_name', ''),
                         key=f"update_mom_name_{relation_id}"
                     )
                 
             with col2:
                 partner_id = st.number_input(
-                        UI_TEXTS["update"]["partner_id_prompt"],
+                        f"{UI_TEXTS['partner']} {UI_TEXTS['id']}",
                         min_value=1,
                         step=1,
                         value=relation.get('partner_id', 1),
@@ -800,7 +727,7 @@ def update_relation_page() -> None:
                     )
                     
                 original_family_id = st.number_input(
-                        UI_TEXTS["update"]["original_family_id_prompt"],
+                        f"{UI_TEXTS['original']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
                         min_value=0,
                         step=1,
                         value=relation.get('original_family_id', 0),
@@ -809,14 +736,14 @@ def update_relation_page() -> None:
                     )
 
                 join_date = st.text_input(
-                        UI_TEXTS["update"]["join_date_prompt"] + "*",
+                        f"{UI_TEXTS['relation_join_date']}*",
                         value=relation.get('join_date', date.today()),
                         help="When this relationship began",
                         key=f"update_join_date_{relation_id}"
                     )
                 
                 end_date = st.text_input(
-                        UI_TEXTS["update"]["end_date_prompt"],
+                        f"{UI_TEXTS['relation_end_date']}",
                         value=relation.get('end_date', None),
                         help="If this relationship has ended, when it ended",
                         key=f"update_end_date_{relation_id}"
@@ -828,16 +755,17 @@ def update_relation_page() -> None:
 
                 # Validate required fields for relation update
                 if not member_id or not partner_id or not relation_type:
-                    message = f"❌ {UI_TEXTS['update']['error_required']}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}"
                     st.error(message)
-            submitted = st.form_submit_button("Update Relation")    
+            submitted = st.form_submit_button(f"{UI_TEXTS['update']} {UI_TEXTS['relation']}", type="primary")    
             if submitted:
                 # Prepare update data with only changed fields
                 update_data = {}
                         
                 update_data['member_id'] = int(member_id)
                 update_data['partner_id'] = int(partner_id)
-                update_data['relation'] = rel_list.index(relation_type)
+                update_data['relation'] = relation_type
+                logger.debug(f"Relation: {update_data['relation']}")
                     
                 # Handle optional fields
                 optional_fields = {
@@ -865,10 +793,10 @@ def update_relation_page() -> None:
             st.session_state.update_relation, update=True)
         
         if updated_id:
-            message = f"✅ {UI_TEXTS['update']['success']} {relation_id}"
+            message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['update']} {UI_TEXTS['relation']} {UI_TEXTS['id']}: {relation_id}"
             st.success(message)
         else:
-            message = f"❌ {UI_TEXTS['update']['error_generic']} Failed to update relation (ID: {relation_id}). Please try again."
+            message = f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['update']} {UI_TEXTS['relation']} {UI_TEXTS['id']}: {relation_id}"
             st.error(message)
         
         # Clear session state
@@ -878,7 +806,8 @@ def update_relation_page() -> None:
 
 def add_member_page() -> None:
     """Display the form to add a new member."""
-    st.subheader(UI_TEXTS["add"]["title"])
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['add']} {UI_TEXTS['member']} {UI_TEXTS['page']}")
    
     # save message to session state
     if 'add_message' in st.session_state and st.session_state.add_message:
@@ -889,50 +818,71 @@ def add_member_page() -> None:
         col1, col2 = st.columns(2)
         
         with col1:
-            name = st.text_input(UI_TEXTS["add"]["name"], "", key="add_member_name_2")
+            name = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['name']}*",
+                "",
+                key="add_member_name_2"
+            )
             sex = st.selectbox(
-                UI_TEXTS["add"]["sex"],
-                UI_TEXTS["add"]["sex_options"],
+                f"{UI_TEXTS['add']} {UI_TEXTS['sex']}*",
+                [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']],
                 index=0,
                 key="add_member_sex_2"
             )
             born = st.text_input(
-                UI_TEXTS["add"]["birth_date"],
+                f"{UI_TEXTS['add']} {UI_TEXTS['born']}*",
                 value=date.today().strftime("%Y-%m-%d"),
-                help=UI_TEXTS["add"]["birth_date_placeholder"],
+                help=UI_TEXTS["date_placeholder"],
                 key="add_born_date_2"
             )
             family_id = st.number_input(
-                UI_TEXTS["add"]["family_id"],
+                f"{UI_TEXTS['add']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
                 min_value=0,
                 step=1,
                 value=0,
                 key="add_member_family_id_2"
             )
             gen_order = st.number_input(
-                UI_TEXTS["add"]["generation"],
+                f"{UI_TEXTS['add']} {UI_TEXTS['gen_order']}",
                 min_value=0,
                 step=1,
                 value=None,
                 key="add_member_gen_order_2"
             )
         with col2:
-            alias = st.text_input(UI_TEXTS["add"]["alias"], "", key="add_alias_2")
+            alias = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['alias']}", 
+                "", 
+                key="add_alias_2")
             
-            email = st.text_input(UI_TEXTS["add"]["email"], "", key="add_email_2")
-            password = st.text_input(UI_TEXTS["add"]["password"], "", type="password", key="add_password_2")
-            confirm_password = st.text_input(UI_TEXTS["add"]["confirm_password"], "", type="password", key="confirm_password_2")
+            email = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['email']}", 
+                "", 
+                key="add_email_2")
+            password = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['password']}", 
+                "", 
+                type="password", 
+                key="add_password_2")
+            confirm_password = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['password_confirmed']}", 
+                "", 
+                type="password", 
+                key="confirm_password_2")
             if password != confirm_password:
-                st.error(UI_TEXTS["add"]["error_password_match"])
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password_error']}") 
                 return
-            url = st.text_input(UI_TEXTS["add"]["url"], "", key="add_url_2")
+            url = st.text_input(
+                f"{UI_TEXTS['add']} {UI_TEXTS['url']}", 
+                "", 
+                key="add_url_2")
         
-        submitted = st.form_submit_button(UI_TEXTS["add"]["submit_button"])
+        submitted = st.form_submit_button(UI_TEXTS["submit"], type="primary")
         
         if submitted:
             # Validate required fields
             if not name or not gen_order or not born:
-                st.error(f"❌ {UI_TEXTS["add"]["error_required"]}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}")
                 return
                 
             try:
@@ -958,26 +908,27 @@ def add_member_page() -> None:
                                 role=dbm.User_State['f_member'],
                                 member_id=member_id)
                         if user_id:
-                            message = f"✅ {UI_TEXTS["add"]["update_user_table"]} {email}" 
+                            message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['user']} {UI_TEXTS['created']}:  {email}" 
                         else:
-                            message = f"✅ {UI_TEXTS["add"]["no_update_user_table"]} "
+                            message = f"❌ {fu.get_function_name()} {UI_TEXTS['user']['created']} {UI_TEXTS['failed']}: {email} "
                     else:
-                        message = f"✅ {UI_TEXTS["add"]["success"].format(id=member_id)} "
+                        message = f"❌ {fu.get_function_name()} {UI_TEXTS['failed']}: {UI_TEXTS['field']} {UI_TEXTS['required']} "
                 else:
-                    message = f"❌ {UI_TEXTS["add"]["error_generic"].format(error=member_id)}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {member_id}"
                 
             except Exception as e:
-                message = f"❌ {UI_TEXTS["add"]["error_generic"].format(error=str(e))}"
+                message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['failed']}: {member_id}"
             st.session_state.add_message = message
             st.rerun()
 
 def update_member_page() -> None:
     """Display the form to update an existing member."""
-    st.subheader(UI_TEXTS["update"]["title"])
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['update']} {UI_TEXTS['member']} {UI_TEXTS['page']}")
     
     # Get member ID to update
     member_id = st.number_input(
-        UI_TEXTS["update"]["member_id_prompt"],
+        f"{UI_TEXTS['update']} {UI_TEXTS['member']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         key="update_member_id_2"
@@ -993,46 +944,43 @@ def update_member_page() -> None:
         st.session_state.current_member = None
     
     # Handle Get Member button click
-    if st.button("Get Member"):
+    if st.button(f"{UI_TEXTS['search']} {UI_TEXTS['member']}", type="primary"):
         if member_id:
             # Get member data and store in session state
             st.session_state.current_member = dbm.get_member(member_id)
             if not st.session_state.current_member:
-                st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['not_found']}"
+                st.session_state.update_message = f"⚠️ {fu.get_function_name()} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['not_found']}: {member_id}"
                 st.rerun()
         else:
-            st.session_state.update_message = f"⚠️ Please enter a valid member ID"
+            st.session_state.update_message = f"⚠️ {fu.get_function_name()} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['not_found']}: {member_id}"
             st.rerun()
     
     # Display the form if we have member data
     if st.session_state.current_member:
         member = st.session_state.current_member
         with st.form(f"update_form_{member_id}"):
-            st.subheader(UI_TEXTS["update"]["form_title"].format(
-                name=member.get('name', ''),
-                id=member_id
-            ))
+            st.subheader(f"{UI_TEXTS['update']} {UI_TEXTS['member']} {UI_TEXTS['form']}")
             
             # Three-column layout for better organization
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 # Basic Information
-                st.subheader("Basic Information")
+                st.subheader(f"{UI_TEXTS['basic_info']}")
                 name = st.text_input(
-                    "Name*",
+                    f"{UI_TEXTS['name']}*",
                     member.get('name', ''),
                     key=f"update_name_{member_id}_2"
                 )
                 
                 alias = st.text_input(
-                    "Alias",
+                    f"{UI_TEXTS['alias']}",
                     member.get('alias', ''),
                     key=f"update_alias_{member_id}_2"
                 )
                 
                 # Gender selection with proper value mapping
-                gender_options = UI_TEXTS["add"]["sex_options"]
+                gender_options = [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']]
                 gender_values = [gender_options[0][0], 
                                  gender_options[1][0], 
                                  gender_options[2][0]]
@@ -1047,7 +995,7 @@ def update_member_page() -> None:
                 
                 # Display the selectbox and get the selected index
                 selected_index = st.selectbox(
-                    "Gender*",
+                    f"{UI_TEXTS['gender']}*",
                     gender_options,
                     index=current_index
                 )
@@ -1057,7 +1005,7 @@ def update_member_page() -> None:
                 
             with col2:
                 # Dates and Family
-                st.subheader("Dates & Family")
+                st.subheader(f"{UI_TEXTS['dates']} & {UI_TEXTS['family']}")
                 # Convert empty string to '0000-00-00' for date input
                 born_value = str(member.get('born'))
                 logger.debug(f"Born value: {born_value}")
@@ -1065,7 +1013,7 @@ def update_member_page() -> None:
                     born_value = '0000-00-00'
                 
                 born = st.text_input(
-                    "Birth Date* (YYYY-MM-DD)",
+                    f"{UI_TEXTS['born']}* (YYYY-MM-DD)",
                     value=born_value,
                     help="Enter the birth date in the format YYYY-MM-DD",
                     key=f"update_born_{member_id}"
@@ -1078,14 +1026,14 @@ def update_member_page() -> None:
                     died_value = '0000-00-00'
                         
                 died = st.text_input(
-                    "Death Date (YYYY-MM-DD)",
+                    f"{UI_TEXTS['died']} (YYYY-MM-DD)",
                     value=died_value,
                     help="Enter the death date in the format YYYY-MM-DD",
                     key=f"update_died_{member_id}"
                 )
                 
                 family_id = st.number_input(
-                    "Family ID",
+                    f"{UI_TEXTS['family']} {UI_TEXTS['id']}",
                     min_value=0,
                     step=1,
                     value=member.get('family_id', 0),
@@ -1099,7 +1047,7 @@ def update_member_page() -> None:
                     gen_order_value = 0
                     
                 gen_order = st.number_input(
-                    "Generation Order*",
+                    f"{UI_TEXTS['gen_order']}*",
                     min_value=0,
                     step=1,
                     value=gen_order_value,
@@ -1108,7 +1056,7 @@ def update_member_page() -> None:
                 
             with col3:
                 # Contact and Relations
-                st.subheader("Contact & Relationships")
+                st.subheader(f"{UI_TEXTS['contact']} & {UI_TEXTS['relations']}")
                 email = st.text_input(
                     "Email",
                     member.get('email', '')
@@ -1135,12 +1083,12 @@ def update_member_page() -> None:
                     key="update_member_mom_id"
                 )
             
-            submitted = st.form_submit_button(UI_TEXTS["update"]["submit_button"])
+            submitted = st.form_submit_button(UI_TEXTS["submit"])
             
             if submitted:
                 # Validate required fields
                 if not name or not gen_order or not born:
-                    message = f"❌ {UI_TEXTS["add"]["error_required"]}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}"
                     st.session_state.update_message = message
                     return
                 
@@ -1168,22 +1116,23 @@ def update_member_page() -> None:
                     try:
                         success = dbm.update_member(member_id, update_data)
                         if success:
-                            st.session_state.update_message = f"✅ {UI_TEXTS['update']['success']}"
+                            st.session_state.update_message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['update']}"
                             # Refresh member data after successful update
                             st.session_state.current_member = dbm.get_member(member_id)
                         else:
-                            st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['no_changes']}"
+                            st.session_state.update_message = f"⚠️ {UI_TEXTS['update']} {UI_TEXTS['not_changed']}"
                         st.rerun()
                     except Exception as e:
-                        st.session_state.update_message = f"❌ {UI_TEXTS['update']['error_generic']} {str(e)}"
+                        st.session_state.update_message = f"❌ {UI_TEXTS['update_error']} {str(e)}"
                         st.rerun()
                 else:
-                    st.session_state.update_message = f"⚠️ {UI_TEXTS['update']['nothing_to_update']}"
+                    st.session_state.update_message = f"⚠️ {UI_TEXTS['update']} {UI_TEXTS['not_changed']}"
                     st.rerun()
 
 def delete_member_page() -> None:
     """Display the interface for deleting a member."""
-    st.subheader(UI_TEXTS["delete"]["title"])
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['member']} {UI_TEXTS['page']}")
     
     # Initialize session state for delete confirmation
     if 'delete_message' not in st.session_state:
@@ -1195,7 +1144,7 @@ def delete_member_page() -> None:
     
     # Get member ID to delete
     member_id = st.number_input(
-        UI_TEXTS["delete"]["member_id_prompt"],
+        f"{UI_TEXTS['delete']} {UI_TEXTS['member']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         value=st.session_state.get('delete_member_id', 1)
@@ -1221,28 +1170,28 @@ def delete_member_page() -> None:
             member = dbm.get_member(member_id)
         
             if not member:
-                error_msg = f"Member with ID {member_id} not found"
+                error_msg = f"{fu.get_function_name()} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {member_id}"
                 logger.error(error_msg)
                 st.session_state.delete_message = f"❌ {error_msg}"
                 st.session_state.delete_member_confirmation = False
                 st.rerun()
             
             # Display member data for confirmation
-            st.warning(f"⚠️ {UI_TEXTS['delete']['warning']}")
-            st.subheader(UI_TEXTS["delete"]["confirm_title"])
+            st.warning(f"⚠️ {UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
+            st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
             
             # Format member information for display
-            st.write(f"**Member ID:** {member['id']}")
-            st.write(f"**Name:** {member.get('name', 'Unknown')}")
-            st.write(f"**Gender:** {member.get('gender', 'N/A')}")
-            st.write(f"**Date of Birth:** {member.get('born', 'N/A')}")
-            st.write(f"**Email:** {member.get('email', 'N/A')}")
+            st.write(f"**{UI_TEXTS['member']} {UI_TEXTS['id']}:** {member['id']}")
+            st.write(f"**{UI_TEXTS['name']}:** {member.get('name', 'Unknown')}")
+            st.write(f"**{UI_TEXTS['sex']}:** {member.get('gender', 'N/A')}")
+            st.write(f"**{UI_TEXTS['born']}:** {member.get('born', 'N/A')}")
+            st.write(f"**{UI_TEXTS['email']}:** {member.get('email', 'N/A')}")
             
             # Get family information if available
             if member.get('family_id'):
                 family = dbm.get_family(member['family_id'])
                 family_name = family.get('name', 'Unknown') if family else 'Unknown'
-                st.write(f"**Family:** {family_name} (ID: {member['family_id']})")
+                st.write(f"**{UI_TEXTS['family']}:** {family_name} ({UI_TEXTS['id']}: {member['family_id']})")
             
             # Get relations information
             relations = dbm.get_member_relations(member_id)
@@ -1254,13 +1203,15 @@ def delete_member_page() -> None:
                     other_name = other_member.get('name', 'Unknown') if other_member else 'Unknown'
                     relation_list.append(f"{other_name} (ID: {other_member_id}) - {rel.get('relation', 'N/A')}")
                 
-                st.warning(f"⚠️ This member has {len(relations)} relationship(s) that will be affected:")
+                st.warning(f"⚠️ {UI_TEXTS['member']} {UI_TEXTS['relation']} {UI_TEXTS['count']}: {len(relations)}")
                 for rel in relation_list:
                     st.write(f"- {rel}")
             
             # Confirm deletion with a form to avoid button nesting
             with st.form("confirm_delete_member_form"):
-                confirm = st.checkbox(UI_TEXTS["delete"]["confirm_checkbox"])
+                confirm = st.checkbox(
+                    f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}"
+                )
                 logger.debug(f"Checkbox state: {confirm}")
                 
                 col1, col2 = st.columns(2)
@@ -1281,31 +1232,32 @@ def delete_member_page() -> None:
                         success = dbm.delete_member(int(member_id))
                         logger.debug(f"Delete operation result: {success}")
                         if success:
-                            message = f"✅ {UI_TEXTS['delete']['success_member'].format(name=member.get('name', 'Unknown'))}"
+                            message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['delete']} {UI_TEXTS['member']} {UI_TEXTS['id']}: {member_id}"
                             logger.info(message)
                             st.session_state.delete_message = message
                             st.session_state.delete_member_confirmation = False
                             st.session_state.delete_member_id = None
                             st.rerun()
                         else:
-                            message = f"❌ Failed to delete member with ID {member_id}"
+                            message = f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['delete']} {UI_TEXTS['member']} {UI_TEXTS['id']}: {member_id}"
                             logger.error(message)
                             st.session_state.delete_message = message
                             st.rerun()
                     except Exception as e:
-                        error_msg = f"Error deleting member: {str(e)}"
+                        error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
                         st.rerun()
         except Exception as e:
-            error_msg = f"Error retrieving member: {str(e)}"
+            error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
             logger.error(error_msg, exc_info=True)
             st.session_state.delete_message = f"❌ {error_msg}"
             st.rerun()
 
 def delete_family_page() -> None:
     """Display the interface for deleting a family."""
-    st.subheader("Delete Family")
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
     
     # Initialize session state for delete confirmation
     if 'delete_message' not in st.session_state:
@@ -1317,7 +1269,7 @@ def delete_family_page() -> None:
     
     # Get family ID to delete
     family_id = st.number_input(
-        UI_TEXTS["delete"]["family_id_prompt"],
+        f"{UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         value=st.session_state.get('delete_family_id', 1)
@@ -1327,7 +1279,7 @@ def delete_family_page() -> None:
     st.session_state.delete_family_id = family_id
     # Check for error message first
     if st.session_state.get('delete_message'):
-        st.error(st.session_state.delete_message)
+        st.error(f"❌ {st.session_state.delete_message}")
         st.session_state.delete_message = None
     
     # First button to show confirmation
@@ -1343,7 +1295,7 @@ def delete_family_page() -> None:
             # Check if family exists before showing confirmation
             family = dbm.get_family(family_id)
             if not family:
-                error_msg = f"Family ID: {family_id} not found"
+                error_msg = f"{UI_TEXTS['family']} {UI_TEXTS['id']}: {family_id} {UI_TEXTS['not_found']}"
                 logger.error(error_msg)
                 st.session_state.delete_message = f"❌ {error_msg}"
                 st.session_state.delete_family_confirmation = False
@@ -1354,26 +1306,25 @@ def delete_family_page() -> None:
             member_count = len(members)
             
             # Display family data for confirmation
-            st.warning(f"⚠️ {UI_TEXTS['delete']['warning']}")
-            st.subheader(UI_TEXTS["delete"]["confirm_title"])
+            st.warning(f"⚠️ {UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
+            st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
             
             # Format family information for display
-            st.write(f"**Family ID:** {family['id']}")
-            st.write(f"**Family Name:** {family.get('name', 'Unknown')}")
-            st.write(f"**Address:** {family.get('address', 'N/A')}")
-            st.write(f"**Contact Number:** {family.get('contact_number', 'N/A')}")
-            st.write(f"**Email:** {family.get('email', 'N/A')}")
+            st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['id']}:** {family['id']}")
+            st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['name']}:** {family.get('name', 'Unknown')}")
+            st.write(f"**{UI_TEXTS['address']}:** {family.get('address', 'N/A')}")
+            st.write(f"**{UI_TEXTS['contact']}:** {family.get('contact_number', 'N/A')}")
+            st.write(f"**{UI_TEXTS['email']}:** {family.get('email', 'N/A')}")
             
             # Show member information if any
             if member_count > 0:
-                st.warning(f"⚠️ This family has {member_count} member(s) associated with it. "
-                         "Deleting this family will make their family_id unassociated.")
+                st.warning(f"⚠️ {UI_TEXTS['family']} {UI_TEXTS['count']}: {member_count}")
                 member_names = [f"{m.get('name', 'Unknown')} (ID: {m['id']})" for m in members]
-                st.write("**Family Members:**", ", ".join(member_names) if member_names else "None")
+                st.write("**{UI_TEXTS['family']} {UI_TEXTS['member']}**", ", ".join(member_names) if member_names else "None")
             
             # Confirm deletion with a form to avoid button nesting
             with st.form("confirm_delete_family_form"):
-                confirm = st.checkbox(UI_TEXTS["delete"]["confirm_checkbox"])
+                confirm = st.checkbox(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
                 logger.debug(f"Checkbox state: {confirm}")
                 
                 col1, col2 = st.columns(2)
@@ -1383,7 +1334,7 @@ def delete_family_page() -> None:
                         st.rerun()
                 
                 with col2:
-                    submit_button = st.form_submit_button(UI_TEXTS["delete"]["confirm_button"], type="primary")
+                    submit_button = st.form_submit_button(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}", type="primary")
                     logger.debug(f"Submit button state - Confirm: {confirm}, Button Clicked: {submit_button}")
                     
                 if confirm and submit_button:
@@ -1393,25 +1344,25 @@ def delete_family_page() -> None:
                         success = dbm.delete_family(int(family_id))
                         logger.debug(f"Delete operation result: {success}")
                         if success:
-                            message = f"✅ {UI_TEXTS['delete']['success_family'].format(name=family.get('name', 'Unknown'))}"
+                            message = f"✅ {UI_TEXTS['successful']} {UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['id']}: {family_id}"
                             logger.info(message)
                             st.session_state.delete_message = message
                             st.session_state.delete_family_confirmation = False
                             st.session_state.delete_family_id = None
                             st.rerun()
                         else:
-                            message = f"❌ Failed to delete family with ID {family_id}"
+                            message = f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['id']}: {family_id}"
                             logger.error(message)
                             st.session_state.delete_message = message
                             st.rerun()
                     except Exception as e:
-                        error_msg = f"Error deleting family: {str(e)}"
+                        error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
                         st.rerun()
         except Exception as e:
-            error_msg = f"Unexpected error deleting family: {str(e)}"
-            message = f"❌ {UI_TEXTS['delete']['error_generic'].format(error=error_msg)}"
+            error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
+            message = f"❌ {error_msg}"
             st.session_state.delete_message = message
             st.session_state.delete_family_confirmation = False
             logger.error(error_msg, exc_info=True)
@@ -1419,7 +1370,8 @@ def delete_family_page() -> None:
 
 def delete_relation_page() -> None:
     """Display the interface for deleting a relation."""
-    st.subheader("Delete Relation")
+    global UI_TEXTS
+    st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['relation']} {UI_TEXTS['page']}")
     
     # Initialize session state for delete confirmation
     if 'delete_message' not in st.session_state:
@@ -1431,7 +1383,7 @@ def delete_relation_page() -> None:
     
     # Get relation ID to delete
     relation_id = st.number_input(
-        "Enter Relation ID to delete",
+        f"{UI_TEXTS['enter']} {UI_TEXTS['relation']} {UI_TEXTS['id']}",
         min_value=1,
         step=1,
         value=st.session_state.get('delete_relation_id', 1)
@@ -1447,7 +1399,7 @@ def delete_relation_page() -> None:
     
     # First button to show confirmation
     if not st.session_state.delete_relation_confirmation:
-        if st.button("Show Relation Details", type="primary"):
+        if st.button(f"{UI_TEXTS['delete']} {UI_TEXTS['relation']} {UI_TEXTS['confirm']}", type="primary"):
             st.session_state.delete_relation_confirmation = True
             st.rerun()
     
@@ -1458,32 +1410,32 @@ def delete_relation_page() -> None:
             relation = dbm.get_relation(relation_id)
                 
             if not relation:
-                error_msg = f"Relation ID: {relation_id} not found"
+                error_msg = f"{fu.get_function_name()} {UI_TEXTS['relation']} {UI_TEXTS['id']}: {relation_id} {UI_TEXTS['not_found']}"
                 logger.error(error_msg)
                 st.session_state.delete_relation_confirmation = False
                 st.session_state.delete_relation_id = None
                 st.session_state.delete_message = f"❌ {error_msg}"
-                st.rerun()
+                st.error(error_msg)
                 
             # Get member names for display
             member1 = dbm.get_member(relation['member_id'])
             member2 = dbm.get_member(relation['partner_id'])
             
             # Display relation data for confirmation
-            st.warning(f"⚠️ {UI_TEXTS['delete']['warning']}")
-            st.subheader(UI_TEXTS["delete"]["confirm_title"])
+            st.warning(f"⚠️ {UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
+            st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
                 
             # Format relation information for display   
-            st.write(f"**Relation ID:** {relation['id']}")
-            st.write(f"**Member 1 (ID: {relation['member_id']}):** {member1.get('name', 'Unknown') if member1 else 'Unknown'}")
-            st.write(f"**Member 2 (ID: {relation['partner_id']}):** {member2.get('name', 'Unknown') if member2 else 'Unknown'}")
-            st.write(f"**Relation Type:** {relation.get('relation', 'N/A')}")
-            st.write(f"**Start Date:** {relation.get('join_date', 'N/A')}")
-            st.write(f"**End Date:** {relation.get('end_date', 'N/A')}")
+            st.write(f"**{UI_TEXTS['relation']} {UI_TEXTS['id']}:** {relation['id']}")
+            st.write(f"**{UI_TEXTS['member']} 1 (ID: {relation['member_id']}):** {member1.get('name', 'Unknown') if member1 else 'Unknown'}")
+            st.write(f"**{UI_TEXTS['member']} 2 (ID: {relation['partner_id']}):** {member2.get('name', 'Unknown') if member2 else 'Unknown'}")
+            st.write(f"**{UI_TEXTS['relation']} {UI_TEXTS['type']}:** {relation.get('relation', 'N/A')}")
+            st.write(f"**{UI_TEXTS['relation_join_date']}:** {relation.get('join_date', 'N/A')}")
+            st.write(f"**{UI_TEXTS['relation_end_date']}:** {relation.get('end_date', 'N/A')}")
                 
             # Confirm deletion with a form to avoid button nesting
             with st.form("confirm_delete_form"):
-                confirm = st.checkbox(UI_TEXTS["delete"]["confirm_checkbox"])
+                confirm = st.checkbox(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
                 logger.debug(f"Checkbox state: {confirm}")
                 
                 col1, col2 = st.columns(2)
@@ -1493,7 +1445,7 @@ def delete_relation_page() -> None:
                         st.rerun()
                 
                 with col2:
-                    submit_button = st.form_submit_button(UI_TEXTS["delete"]["confirm_button"], type="primary")
+                    submit_button = st.form_submit_button(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}", type="primary")
                     logger.debug(f"Submit button state - Confirm: {confirm}, Button Clicked: {submit_button}")
                     
                 if confirm and submit_button:
@@ -1503,33 +1455,34 @@ def delete_relation_page() -> None:
                         result = dbm.delete_relation(int(relation_id))
                         logger.debug(f"Delete operation result: {result}")
                         if result:
-                            message = f"✅ Relation ID: {relation_id} deleted successfully"
-                            logger.info(message)
+                            message = f"✅ {UI_TEXTS['relation']} {UI_TEXTS['id']}: {relation_id} {UI_TEXTS['deleted']}"
+                            logger.debug(message)
                             st.session_state.delete_message = message
                             st.session_state.delete_relation_confirmation = False
                             st.session_state.delete_relation_id = None
-                            st.rerun()
+                            st.success(message)
                         else:
                             message = f"❌ Failed to delete relation with ID {relation_id}"
                             logger.error(message)
                             st.session_state.delete_message = message
-                            st.rerun()
+                            st.error(message)
                     except Exception as e:
-                        error_msg = f"Error deleting relation: {str(e)}"
+                        error_msg = f"❌ Error deleting relation: {str(e)}"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
-                        st.rerun()
+                        st.error(error_msg)
                 
         except Exception as e:
-            error_msg = f"Error retrieving relation: {str(e)}"
+            error_msg = f"{fu.get_function_name()} {UI_TEXTS['relation']} {UI_TEXTS['delete_error']} {str(e)}"
             logger.error(error_msg, exc_info=True)
             st.session_state.delete_message = f"❌ {error_msg}"
             st.session_state.delete_relation_confirmation = False
-            st.rerun()
+            st.error(error_msg)
 
 def main() -> None:
     """Main application entry point."""
-    st.title("🌲 Family Tree Management")
+    global UI_TEXTS
+    st.title(f"🌲 {UI_TEXTS['family_tree']} {UI_TEXTS['management']}")
 
     # Sidebar --- from here
     with st.sidebar:
@@ -1570,7 +1523,7 @@ def main() -> None:
                     'email_user': st.session_state.user_email
                 })
             
-            st.subheader("Navigation")
+            st.subheader(f"{UI_TEXTS['navigation']}")
             st.page_link("ftpe_ui.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
@@ -1591,19 +1544,19 @@ def main() -> None:
     
     # Main tab groups
     tab1, tab2, tab3 = st.tabs([
-        "👥 Member Management", 
-        "🏠 Family Management", 
-        "🔗 Relation Management"])
+        f"👥 {UI_TEXTS['member']} {UI_TEXTS['management']}", 
+        f"🏠 {UI_TEXTS['family']} {UI_TEXTS['management']}", 
+        f"🔗 {UI_TEXTS['relation']} {UI_TEXTS['management']}"])
     
     with tab1:  # Member Management
-        st.header("👥 Member Management")
+        st.header(f"{UI_TEXTS['member']} {UI_TEXTS['management']}")
         
         # Define the tab labels explicitly to ensure we have the correct number
         member_tab_labels = [
-            "🔍 Search Members",
-            "➕ Add Member",
-            "✏️ Update Member",
-            "🗑️ Delete Member"
+            f"🔍 {UI_TEXTS['search']} {UI_TEXTS['member']}",
+            f"➕ {UI_TEXTS['add']} {UI_TEXTS['member']}",
+            f"✏️ {UI_TEXTS['update']} {UI_TEXTS['member']}",
+            f"🗑️ {UI_TEXTS['delete']} {UI_TEXTS['member']}"
         ]
         
         # Create tabs with explicit labels
@@ -1623,12 +1576,12 @@ def main() -> None:
             delete_member_page()
         
     with tab2:  # Family Management
-        st.header("🏠 Family Management")
+        st.header(f"🏠 {UI_TEXTS['family']} {UI_TEXTS['management']}")
         family_tabs = st.tabs([
-            "🔍 Search Families", 
-            "➕ Add Family", 
-            "✏️ Update Family",
-            "🗑️ Delete Family"])
+            f"🔍 {UI_TEXTS['search']} {UI_TEXTS['family']}", 
+            f"➕ {UI_TEXTS['add']} {UI_TEXTS['family']}", 
+            f"✏️ {UI_TEXTS['update']} {UI_TEXTS['family']}",
+            f"🗑️ {UI_TEXTS['delete']} {UI_TEXTS['family']}"])
         
         with family_tabs[0]:  # Search Families
             search_families_page()
@@ -1643,12 +1596,12 @@ def main() -> None:
             delete_family_page()
     
     with tab3:  # Relations Management
-        st.header("🔗 Relation Management")
+        st.header(f"🔗 {UI_TEXTS['relation']} {UI_TEXTS['management']}")
         relation_tabs = st.tabs([
-            "🔍 Search Relations", 
-            "➕ Add Relation", 
-            "✏️ Update Relation",
-            "🗑️ Delete Relation"])
+            f"🔍 {UI_TEXTS['search']} {UI_TEXTS['relation']}", 
+            f"➕ {UI_TEXTS['add']} {UI_TEXTS['relation']}", 
+            f"✏️ {UI_TEXTS['update']} {UI_TEXTS['relation']}",
+            f"🗑️ {UI_TEXTS['delete']} {UI_TEXTS['relation']}"])
         
         with relation_tabs[0]:  # Search Relations
             search_relations_page()
@@ -1661,12 +1614,17 @@ def main() -> None:
         
         with relation_tabs[3]:  # Delete Relation
             delete_relation_page()
-    
-# Initialize session state and app context
-cu.init_session_state()
 
+# Initialize session state and UI_TEXTS
 if 'app_context' not in st.session_state:
-    st.session_state.app_context = cu.init_context()
+    cu.init_session_state()
+
+# Get UI_TEXTS with a fallback to English if needed
+try:
+    UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+except (KeyError, AttributeError):
+    # Fallback to English if there's any issue
+    UI_TEXTS = st.session_state.ui_context['US']
 
 # Check authentication
 if not st.session_state.get('authenticated', False):

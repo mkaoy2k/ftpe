@@ -12,6 +12,7 @@ This module provides the complete admin interface for the application.
 from dotenv import load_dotenv
 import os
 import sqlite3
+import json
 import db_utils as dbm
 import email_utils as eu
 import auth_utils as au
@@ -271,10 +272,11 @@ def show_reset_password_page():
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error processing your request: {str(e)}")
-   
 
 def show_login_page():
     """Display the login page"""
+    global UI_TEXTS
+    
     # Clear any existing content
     st.empty()
     
@@ -302,18 +304,18 @@ def show_login_page():
     
     with col2:
         with st.container():
-            st.markdown("<h2 style='text-align: center;'>Admin Login</h2>", unsafe_allow_html=True)
+            st.markdown(f"<h2 style='text-align: center;'>{UI_TEXTS['user']} {UI_TEXTS['login']}</h2>", unsafe_allow_html=True)
             
             # Login form
-            email = st.text_input("Email Address", key="login_email")
-            password = st.text_input("Password", type="password", key="login_password")
+            email = st.text_input(f"{UI_TEXTS['email']}", key="login_email")
+            password = st.text_input(f"{UI_TEXTS['password']}", type="password", key="login_password")
                 
             # Login and Forgot Password buttons
             col1, col2  = st.columns([2,1])
             with col1:
-                login_clicked = st.button("Login", type="primary")
+                login_clicked = st.button(f"{UI_TEXTS['login']}", type="primary")
             with col2:
-                forgot_clicked = st.button("Forgot Password?",
+                forgot_clicked = st.button(f"{UI_TEXTS['forgot']} {UI_TEXTS['password']}?",
                                            type="secondary",
                                            icon="🔑")
             
@@ -326,7 +328,7 @@ def show_login_page():
             if login_clicked:                    
                 # Validate input
                 if not email or not password:
-                    st.error("Please enter both email and password")
+                    st.error(f"{fu.get_function_name()} {UI_TEXTS['field']} {UI_TEXTS['required']}")
                 else:
                     # Verify credentials
                     if au.verify_padmin(email, password):
@@ -348,11 +350,12 @@ def show_login_page():
                         st.session_state.login_error = None
                         st.rerun()
                     else:
-                        st.error("Invalid email or password")
+                        st.error(f"{fu.get_function_name()} {UI_TEXTS['email']} or {UI_TEXTS['password']} {UI_TEXTS['not_found']}")
 
 def show_fmember_sidebar():
     """Display the family member sidebar with 
     personal navigation options"""
+    global UI_TEXTS
     
     # Hide the default navigation for members
     st.markdown("""
@@ -364,7 +367,7 @@ def show_fmember_sidebar():
     """, unsafe_allow_html=True)
     
     with st.sidebar:
-        st.sidebar.title("Family Member Sidebar")
+        st.sidebar.title(f"{UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['sidebar']}")
         
         # Display current login email
         if 'user_email' in st.session_state and st.session_state.user_email:
@@ -379,7 +382,7 @@ def show_fmember_sidebar():
             })
         
         # Display navigation options
-        st.sidebar.subheader("Navigation")
+        st.sidebar.subheader(f"{UI_TEXTS['navigation']}")
         st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
@@ -387,7 +390,7 @@ def show_fmember_sidebar():
         st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
         
         # Display Logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True):
+        if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
@@ -395,6 +398,7 @@ def show_fmember_sidebar():
 def show_fadmin_sidebar():
     """Display the family admin sidebar with 
     limited family admin navigation options"""
+    global UI_TEXTS
     
     # Hide the default navigation for members
     st.markdown("""
@@ -406,7 +410,7 @@ def show_fadmin_sidebar():
     """, unsafe_allow_html=True)
     
     with st.sidebar:
-        st.sidebar.title("Family Admin Sidebar")
+        st.sidebar.title(f"{UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['sidebar']}")
         if st.session_state.user_state != dbm.User_State['p_admin']:
             # Hide the default navigation for non-padmin users
             st.markdown("""
@@ -428,7 +432,7 @@ def show_fadmin_sidebar():
             })
         
         # Page Navigation Links
-        st.subheader("Navigation")
+        st.subheader(f"{UI_TEXTS['navigation']}")
         st.page_link("ftpe_ui.py", label="Home", icon="🏠")
         st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
         st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
@@ -440,13 +444,13 @@ def show_fadmin_sidebar():
         st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
  
         # Logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True):
+        if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
         
         # Display current family admin users
-        st.sidebar.subheader("Current Family Admin Users")
+        st.sidebar.subheader(f"{UI_TEXTS['current']} {UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['user']}")
         try:
             admins = dbm.get_users(role=dbm.User_State['f_admin'])
             if admins:
@@ -466,14 +470,14 @@ def show_fadmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )  
             else:
-                st.info(f"No admin users found")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ Error fetching admin users: {e}") 
+            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}") 
         st.divider()
 
         # Display current family subscribers
-        st.sidebar.subheader("Current Family Subscribers")
+        st.sidebar.subheader(f"{UI_TEXTS['current']} {UI_TEXTS['family']} {UI_TEXTS['subscriber']}")
         try:
             subscribers = dbm.get_subscribers()
             if subscribers:
@@ -493,13 +497,15 @@ def show_fadmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )
             else:
-                st.info(f"No subscribers found")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['subscriber']} {UI_TEXTS['not_found']}")
                 
         except sqlite3.Error as e:
-            st.error(f"❌ Error fetching subscribers: {e}")
+            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}")
        
 def show_padmin_sidebar():
     """Display the platform admin sidebar"""
+    global UI_TEXTS
+    
     with st.sidebar:
         st.sidebar.title("Platform Admin Sidebar")
         
@@ -516,10 +522,10 @@ def show_padmin_sidebar():
             })
         
         # Display current platform admin info
-        st.sidebar.subheader("Platform Admin User Management")
-        with st.expander("Create/Update Platform Admin User", expanded=False):
+        st.sidebar.subheader(f"{UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['management']}")
+        with st.expander(f"{UI_TEXTS['create']} {UI_TEXTS['or']} {UI_TEXTS['update']} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']}", expanded=False):
             with st.form("admin_user_form"):
-                st.subheader("Platform Admin User")
+                st.subheader(f"{UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']}")
                 email = st.text_input("Email", key="padmin_email", 
                                    help="Enter the email address for the admin user")
                 new_password = st.text_input("Password", type="password", key="new_password",
@@ -527,32 +533,32 @@ def show_padmin_sidebar():
                 confirm_password = st.text_input("Confirm Password", type="password", 
                                                key="confirm_password")
                 
-                if st.form_submit_button("Save Platform Admin User"):
+                if st.form_submit_button(f"{UI_TEXTS['save']} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']}"):
                     if not email or not eu.validate_email(email):
-                        st.error("Please enter a valid email address")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['email']} {UI_TEXTS['not_found']}: {email}")
                     elif not new_password:
-                        st.error("Please enter a password")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['not_found']}")
                     elif new_password != confirm_password:
-                        st.error("Passwords do not match")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password_error']}")
                     elif len(new_password) < 8:
-                        st.error("Password must be at least 8 characters long")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['at_least_eight_characters']}")
                     else:
                         user_id = au.create_user(
                             email, new_password, 
                             role=dbm.User_State['p_admin'])
                         if user_id:
-                            st.success(f"✅ Platform Admin User created successfully")
+                            st.success(f"✅ {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['created']} {UI_TEXTS['successfully']}")
                         else:
-                            st.error(f"❌ Failed to create Platform Admin User")
+                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
     
         # Display Logout button at the bottom
-        if st.sidebar.button("Logout", type="primary", use_container_width=True):
+        if st.sidebar.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
 
         # Display current platform admin users
-        st.sidebar.subheader("Current Platform Admin Users")
+        st.sidebar.subheader(f"{UI_TEXTS['current']} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']}")
         try:
             admins = dbm.get_users(role=dbm.User_State['p_admin'])
                 
@@ -574,14 +580,14 @@ def show_padmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )
             else:
-                st.info(f"No admin users found")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ Error fetching admin users: {e}")
+            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}")
 
 def show_fmember_content():
     """Display the family member content area"""
-    st.title("Family Member Home")
+    st.header("Family Member Home")
     
     show_front_end()
     
@@ -595,25 +601,29 @@ def reset_password_page():
     """
     Display the reset password page
     """
-    st.subheader("Reset Password")
+    global UI_TEXTS
     
     # Initialize form state if not exists
     if 'reset_form_submitted' not in st.session_state:
         st.session_state.reset_form_submitted = False
     
     with st.form("reset_password_form"):
+        st.subheader(f"{UI_TEXTS['reset']} {UI_TEXTS['password']} {UI_TEXTS['page']}")
         email = st.session_state.user_email
-        st.markdown(f"Email: {email}")
-        new_password = st.text_input("New Password", 
-                                  type="password", 
-                                  key="reset_new_password",
-                                  help="Enter a password (at least 8 characters)")
+        st.markdown(f"{UI_TEXTS['email']}: {email}")
+        new_password = st.text_input(
+            f"{UI_TEXTS['password']}", 
+            type="password", 
+            key="reset_new_password",
+            help=f"{UI_TEXTS['enter']} {UI_TEXTS['password']}")
         
-        confirm_password = st.text_input("Confirm New Password", 
-                                      type="password", 
-                                      key="confirm_new_password")
+        confirm_password = st.text_input(
+            f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}", 
+            type="password", 
+            key="confirm_new_password",
+            help=f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}")
         
-        submit_button = st.form_submit_button("Reset Password", type="primary")
+        submit_button = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
         
         if submit_button:
             st.session_state.reset_form_submitted = True
@@ -621,11 +631,11 @@ def reset_password_page():
     # Handle form submission outside the form context
     if st.session_state.reset_form_submitted:
         if not new_password:
-            st.error("❌ Please enter a password")
+            st.error(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
         elif len(new_password) < 8:
-            st.error("❌ Password must be at least 8 characters long")
+            st.error(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
         elif new_password != confirm_password:
-            st.error("❌ Passwords do not match")
+            st.error(f"❌ {UI_TEXTS['password_error']}")
         else:
             try:
                 user_id = au.create_user(
@@ -634,25 +644,25 @@ def reset_password_page():
                     role=dbm.User_State['f_member']
                 )
                 if user_id:
-                    st.success("✅ Password has been reset successfully")
+                    st.success(f"✅ {UI_TEXTS['password']} {UI_TEXTS['reset']} {UI_TEXTS['successfully']}")
                     st.session_state.reset_form_submitted = False
                 else:
-                    st.error("❌ Failed to reset password. Please try again.")
+                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']}: {UI_TEXTS['password']} {UI_TEXTS['reset']}")
             except Exception as e:
-                st.error(f"❌ An error occurred: {str(e)}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['DB_error']}: {str(e)}")
 
 def search_members_page() -> None:
     """
     Display the member search page with filters and results.
     """
-    
+    global UI_TEXTS
     # Initialize session state for search results
     if 'search_results' not in st.session_state:
         st.session_state.search_results = []
     
     # Search form
     with st.form("search_form"):
-        st.subheader("Search Members")
+        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['member']}")
         
         # Create three rows of search fields
         row1_col1, row1_col2, row1_col3 = st.columns(3)
@@ -660,50 +670,51 @@ def search_members_page() -> None:
         row3_col1, row3_col2, row3_col3 = st.columns(3)
         
         with row2_col1:
-            name = st.text_input("Name", "")
+            name = st.text_input(UI_TEXTS['name'], "")
         with row1_col2:
             born = st.text_input(
-                "Birth Date",
+                UI_TEXTS['born'],
                 "",
                 placeholder="in YYYY-MM-DD format"
             )
         with row1_col3:
             gen_order = st.number_input(
-                "Generation",
+                UI_TEXTS['gen_order'],
                 min_value=0,
                 step=1,
                 value=0
             )
         with row3_col1:
-            alias = st.text_input("Alias", "")
+            alias = st.text_input(UI_TEXTS['alias'], "")
         with row2_col2:
             died = st.text_input(
-                "Death Date",
+                UI_TEXTS['died'],
                 "",
                 placeholder="in YYYY-MM-DD format"
             )
         with row2_col3:
-            family_id = st.number_input("Family ID", 
+            family_id = st.number_input(
+                f"{UI_TEXTS['family']} {UI_TEXTS['id']}", 
                         min_value=0, step=1, value=0)
             
         # Third row of search filters
         with row1_col1:
             member_id = st.number_input(
-                "Member ID",
+                f"{UI_TEXTS['member']} {UI_TEXTS['id']}",
                 min_value=0,
                 step=1,
                 value=0
             )
         with row3_col2:
-            email = st.text_input("Email", "")
+            email = st.text_input(UI_TEXTS['email'], "")
         with row3_col3:
             sex = st.selectbox(
-                "Gender",
+                UI_TEXTS['sex'],
                 ["", "Male", "Female", "Other"]
             )
 
         # Search button
-        submitted = st.form_submit_button("Search")
+        submitted = st.form_submit_button(f"{UI_TEXTS['search']}", type="primary")
         
         if submitted:
             with st.spinner("Searching..."):
@@ -726,7 +737,7 @@ def search_members_page() -> None:
     
             # Display search results
             if st.session_state.search_results:
-                st.subheader("Search Results")
+                st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['results']}")
                 
                 # Prepare data for display
                 df = pd.DataFrame(st.session_state.search_results)
@@ -770,34 +781,37 @@ def search_members_page() -> None:
                 )
         
                 # Show result count
-                st.markdown(f"### Total: {len(df)} records")
-                st.success(f"✅ Search completed successfully")
+                st.markdown(f"### {UI_TEXTS['search']} {UI_TEXTS['count']}: {len(df)} records")
+                st.success(f"✅ {UI_TEXTS['successful']} {UI_TEXTS['search']}")
             elif submitted:
                 # No results message
-                st.warning(f"⚠️ No matching members found")
+                st.warning(f"⚠️ {UI_TEXTS['no_results_found_for']} {UI_TEXTS['member']}")
 
-def show_fadmin_content():
+def show_fadmin_content() -> None:
     """Display the family admin content area"""
-    st.title("Family Admin Home")
+    global UI_TEXTS
+    
+    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['home']}")
     
     show_front_end()
     
     # Search Family Members
     search_members_page()
     
-    # Family User Management
-    st.subheader("Family User Management")
+    # Family Subscription Management
     with st.container(border=True):
+        st.subheader(f"{UI_TEXTS['family']} {UI_TEXTS['subscription']} {UI_TEXTS['management']}")
+
         col21, col22 = st.columns(2)
         with col22:
-            new_password = st.text_input("Password", type="password", key="new_password",
+            new_password = st.text_input(UI_TEXTS['password'], type="password", key="new_password",
                     help="Enter a password (at least 8 characters)")
-            confirm_password = st.text_input("Confirm Password", type="password", 
+            confirm_password = st.text_input(UI_TEXTS['password_confirmed'], type="password", 
                     key="confirm_password")
 
         with col21:
             # Common form fields
-            email = st.text_input("Email", key="family_admin_email", 
+            email = st.text_input(UI_TEXTS['email'], key="family_admin_email", 
                 help="Enter the email address for the family admin/subscriber")
             # Language selection
             lang_list = fu.get_languages()
@@ -810,7 +824,7 @@ def show_fadmin_content():
                 lang_index = lang_list.index(current_lang)
             
             l10n = st.selectbox(
-                "Select Subscription Language for Family Subscriber",
+                f"{UI_TEXTS['select']} {UI_TEXTS['subscription']} {UI_TEXTS['language']}",
                 lang_list,
                 index=lang_index,
                 key="l10n_select"
@@ -828,24 +842,29 @@ def show_fadmin_content():
         # Form for Family Admin
         with col2:
             with st.form("admin_form"):
-                st.markdown("### Create Family Admin")
-                st.markdown("""
+                st.markdown(f"### {UI_TEXTS['create']} {UI_TEXTS['family']} {UI_TEXTS['admin']}")
+                # Create the CSS and HTML with the admin question
+                admin_question = UI_TEXTS['only_family_admin?']
+                css_html = f"""
                 <style>
-                @keyframes blink {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.2; }
-                    100% { opacity: 1; }
-                }
-                .blink {
+                @keyframes blink {{
+                    0% {{ opacity: 1; }}
+                    50% {{ opacity: 0.2; }}
+                    100% {{ opacity: 1; }}
+                }}
+                .blink {{
                     animation: blink 1.5s infinite;
-                }
+                }}
                 </style>
-                <h4 class="blink">Are you the only family admin?</h4>
-                """, unsafe_allow_html=True)
-                st.markdown("To create **another Family Admin** for backup is always a good idea!")
+                <h4 class="blink">{admin_question}</h4>
+                """
+                st.markdown(css_html, unsafe_allow_html=True)
+                st.markdown(f"{UI_TEXTS['create_backup_family_admin']}")
                 
                 # Store form state
-                form_submitted = st.form_submit_button("Create Family Admin")
+                form_submitted = st.form_submit_button(
+                    f"{UI_TEXTS['create']} {UI_TEXTS['family']} {UI_TEXTS['admin']}",
+                    type="primary")
                 
                 if form_submitted:
                     error_messages = []
@@ -875,24 +894,25 @@ def show_fadmin_content():
                                 success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                 if success:
                                     # Save success message in session state before rerun
-                                    st.session_state.success_message = "✅ Family Admin & Subscriber created successfully"
+                                    st.session_state.success_message = f"✅ {UI_TEXTS['family']} {UI_TEXTS['admin']} & {UI_TEXTS['subscriber']} {UI_TEXTS['created']} {UI_TEXTS['successfully']}"
                                     # Clear form on success by rerunning with cleared state
                                     st.rerun()
                                 else:
                                     st.error(f"❌ {message}")
                             else:
-                                st.error(f"❌ Failed to create Family Admin")
+                                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
                         else:
-                            st.error(f"❌ To become a family admin, you must join this family first")
+                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['first']}, {UI_TEXTS['To become a family admin, you must join this family as member first']}")
     
         # Form for Family Subscriber
         with col1:
             with st.form("subscriber_form"):
-                st.markdown("### Family Member Subscription")
-                action = st.radio("Select Action", ["Subscribe", "Unsubscribe"])
+                st.markdown(f"### {UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['subscription']}")
+                action = st.radio(f"{UI_TEXTS['select']}", 
+                        [UI_TEXTS['subscribe'], UI_TEXTS['unsubscribe']])
                 
                 # Store form state
-                form_submitted = st.form_submit_button("Submit")
+                form_submitted = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
                 
                 if form_submitted:
                     error_messages = []
@@ -900,7 +920,7 @@ def show_fadmin_content():
                     if not email or not eu.validate_email(email):
                         error_messages.append("Please enter a valid email address")
                     
-                    if action == "Unsubscribe":
+                    if action == UI_TEXTS['unsubscribe']:
                         # Remove subscriber if Unsubscribe is selected
                         if dbm.remove_subscriber(email):
                             st.success(f"✅ Family member {email} unsubscribed successfully")
@@ -925,7 +945,7 @@ def show_fadmin_content():
                                 user_id = au.create_user(
                                     email, new_password, 
                                     role=dbm.User_State['f_member'])
-                                if user_id and action == "Subscribe":
+                                if user_id and action == UI_TEXTS['subscribe']:
                                     success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                     if success:
                                         st.success(f"✅ Family member {email} subscribed successfully")
@@ -936,9 +956,9 @@ def show_fadmin_content():
                                     else:
                                         st.error(f"❌ {message}")
                                 else:
-                                    st.error(f"❌ Failed to create family member {email}")
+                                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
                             else:
-                                st.error(f"❌ To become a family subscriber, you must join this family first")
+                                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['first']}, {UI_TEXTS['join_family_as']} {UI_TEXTS['subscriber']}")
     
     available_tables =  [os.getenv("TBL_MEMBERS", "members"),
                  os.getenv("TBL_RELATIONS", "relations"),
@@ -987,7 +1007,7 @@ def handle_import(import_func, file_path, table):
     """Handle import operations with proper error handling and user feedback."""
     try:
         if not file_path or not os.path.exists(file_path):
-            st.error(f"File not found: {file_path or 'No file specified'}")
+            st.warning(f"⚠️ File not found: {file_path or 'No file specified'}")
             return
             
         st.info(f"Importing {file_path} to '{table}' table")       
@@ -1004,10 +1024,10 @@ def handle_import(import_func, file_path, table):
         st.error(f"❌ An error occurred during import: {str(e)}")
 
 def show_front_end():
-    st.subheader("Front-end Settings")
-   
+    global UI_TEXTS
     # Create form with a unique key
     with st.form(key="front_end_form"):
+        st.subheader(f"{UI_TEXTS['front_end']} {UI_TEXTS['settings']}")
         col1, col2 = st.columns(2)
         
         with col1:
@@ -1016,7 +1036,7 @@ def show_front_end():
             
             # Timezone selection
             timezone = st.selectbox(
-                "Select Timezone",
+                f"{UI_TEXTS['timezone']}",
                 ["UTC", "America/Los_Angeles", "Asia/Taipei"],
                 index=["UTC", "America/Los_Angeles", "Asia/Taipei"].index(current_timezone) 
                 if current_timezone in ["UTC", "America/Los_Angeles", "Asia/Taipei"] else 0,
@@ -1025,10 +1045,16 @@ def show_front_end():
             
             # Default email
             default_email = st.text_input(
-                "Default Email", 
+                f"{UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['email']}", 
                 value=st.session_state.app_context.get('email_user', ''),
                 key="default_email"
             )
+            email_subscription = st.checkbox(
+                f"{UI_TEXTS['email']} {UI_TEXTS['subscription']}", 
+                value=st.session_state.app_context.get('email_subscription', True),
+                key="email_subscription"
+            )
+            submitted = st.form_submit_button(f"{UI_TEXTS['save']} {UI_TEXTS['settings']}", type="primary")
             
         with col2:
             # Language selection
@@ -1042,35 +1068,29 @@ def show_front_end():
                 lang_index = lang_list.index(current_lang)
                 
             language = st.selectbox(
-                "Select Language",
+                f"{UI_TEXTS['language']}",
                 lang_list,
                 index=lang_index,
                 key="language_select"
             )
             
             admin_email = st.text_input(
-                "Platform Admin Email", 
+                f"{UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['email']}", 
                 value=st.session_state.app_context.get('email_admin', ''),
                 key="platform_admin_email"
             )
         
-        # Checkbox options
-        email_subscription = st.checkbox(
-            "Enable Email Subscription", 
-            value=st.session_state.app_context.get('email_subscription', True),
-            key="email_subscription"
-        )
+            dark_mode = st.checkbox(
+                f"{UI_TEXTS['dark_mode']}", 
+                value=st.session_state.app_context.get('dark_mode', False),
+                key="dark_mode"
+            )
         
-        dark_mode = st.checkbox(
-            "Enable Dark Mode", 
-            value=st.session_state.app_context.get('dark_mode', False),
-            key="dark_mode"
-        )
-        
-        # Form submit button - must be the last element in the form
-        submitted = st.form_submit_button("Save Settings")
+            refresh = st.form_submit_button(f"{UI_TEXTS['refresh']}", type="secondary")
         
     # Handle form submission
+    if refresh:
+        st.rerun()
     if submitted:
         # Update settings in session state
         st.session_state.app_context.update({
@@ -1084,11 +1104,12 @@ def show_front_end():
         
         # Update context
         cu.update_context(st.session_state.app_context)
-        
-        st.success("Settings updated successfully!")
+        UI_TEXTS = st.session_state.ui_context[language]
+
+        st.success(f"{UI_TEXTS['settings']} {UI_TEXTS['updated']} {UI_TEXTS['successfully']}")
 
 def show_back_end(available_tables):
-    st.subheader("Back-end Settings")
+    global UI_TEXTS
     
     # Ensure fss settings exist in the context
     if 'fss' not in st.session_state.app_context:
@@ -1109,9 +1130,11 @@ def show_back_end(available_tables):
     
     # File system settings section
     with st.form("Back-end Form"):
+        st.subheader(f"{UI_TEXTS['back_end']} {UI_TEXTS['DB']} {UI_TEXTS['backup']} {UI_TEXTS['settings']}")
+
         # Directory path input
         dir_path = st.text_input(
-            "Directory Path",
+            f"{UI_TEXTS['dir_path']}",
             value=st.session_state.app_context['fss'].get('dir_path', ''),
             help="Enter the directory path where files will be saved/loaded"
         )
@@ -1128,7 +1151,7 @@ def show_back_end(available_tables):
                 table_index = 0
             
             db_table = st.selectbox(
-                "DB Table",
+                f"{UI_TEXTS['DB']} {UI_TEXTS['table']}",
                 available_tables,
                 index=table_index,
                 help="Select the database table for import/export"
@@ -1136,21 +1159,21 @@ def show_back_end(available_tables):
         with col12:
             # File name input
             file_name = st.text_input(
-                "File Name",
+                f"{UI_TEXTS['file_name']}",
                 value=st.session_state.app_context['fss'].get('file_name', ''),
                 help="Enter the base file name (without extension)"
             )
         with col13:
             # File type selection
             file_type = st.selectbox(
-                "File Type",
+                f"{UI_TEXTS['file_type']}",
                 ["JSON", "CSV"],
                 index=0 if not st.session_state.app_context.get('fss', {}).get('file_type') else 
                     ["JSON", "CSV"].index(st.session_state.app_context.get('fss', {}).get('file_type', 'JSON')),
                 help="Select the file format for import/export"
             )
-        choice = st.radio("Pick an action", ["Export", "Import"])
-        if st.form_submit_button("Go", type="primary"):
+        choice = st.radio(f"{UI_TEXTS['select']}:", ["Export", "Import"])
+        if st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary"):
             cu.update_context({
                 'fss': {
                     'dir_path': dir_path,
@@ -1168,22 +1191,22 @@ def show_back_end(available_tables):
    
 def show_padmin_content():
     """Display the main content area for platform admin"""
-    
-    st.title("Platform Admin Home")
+    global UI_TEXTS
+    st.title(f"{UI_TEXTS['platform_admin']} {UI_TEXTS['home']}")
     
     # Show database tables
-    st.header("Database Table Management")
+    st.header(f"{UI_TEXTS['DB']} {UI_TEXTS['table']} {UI_TEXTS['management']}")
     available_tables = init_db_management()
     
     if not available_tables:
         st.info("No tables found in the database.")
         return
     # Display tables in a select box
-    selected_table = st.selectbox("Select a table", available_tables)
+    selected_table = st.selectbox(f"{UI_TEXTS['select']} {UI_TEXTS['table']}", available_tables)
     
     if selected_table:
         # Show table structure
-        st.subheader(f"Table Structure: {selected_table}")
+        st.subheader(f"{UI_TEXTS['table']} {UI_TEXTS['structure']}: {selected_table}")
         columns = get_table_structure(selected_table)
         cu.update_context({
             'fss': {
@@ -1207,17 +1230,17 @@ def show_padmin_content():
             st.table(column_data)
             
             # Drop table button
-            with st.expander("Danger Zone", expanded=False):
+            with st.expander(UI_TEXTS['danger_zone'], expanded=False):
                 st.warning("⚠️ This action cannot be undone!")
                 if st.button(f"Drop Table '{selected_table}'", type="primary"):
                     if drop_table(selected_table):
                         st.success(f"Dropped table '{selected_table}'")
                         st.rerun()
                     else:
-                        st.error(f"Failed to drop table '{selected_table}'")
+                        st.error(f"❌ Failed to drop table '{selected_table}'")
             
             # Add column form
-            with st.expander("Add Column", expanded=False):
+            with st.expander(UI_TEXTS['add'] + " " + UI_TEXTS['column'], expanded=False):
                 with st.form("add_column_form"):
                     new_col_name = st.text_input("Column Name")
                     col_type = st.selectbox(
@@ -1243,16 +1266,16 @@ def show_padmin_content():
                                 st.success(f"Added column '{new_col_name}' to table '{selected_table}'")
                                 st.rerun()
                             except sqlite3.Error as e:
-                                st.error(f"Error adding column: {e}")
+                                st.error(f"❌ Error adding column: {e}")
                         else:
-                            st.error("Please enter a column name")
+                            st.error("❌ Please enter a column name")
             
             # Drop column form
-            with st.expander("Remove Column", expanded=False):
+            with st.expander(UI_TEXTS['remove'] + " " + UI_TEXTS['column'], expanded=False):
                 if len(columns) > 1:  # Don't allow dropping the last column
                     with st.form("remove_column_form"):
                         col_to_remove = st.selectbox(
-                            "Select column to remove",
+                            UI_TEXTS['select'] + " " + UI_TEXTS['column'] + " to remove",
                             [col[1] for col in columns if col[1] != "id"]  # Don't allow dropping id column
                         )
                         
@@ -1261,7 +1284,7 @@ def show_padmin_content():
                                 st.success(f"Removed column '{col_to_remove}' from table '{selected_table}'")
                                 st.rerun()
                             else:
-                                st.error(f"Failed to remove column '{col_to_remove}'")
+                                st.error(f"❌ Failed to remove column '{col_to_remove}'")
                 else:
                     st.warning("⚠️ Cannot remove the last column from a table")
         show_back_end(available_tables)
@@ -1272,15 +1295,11 @@ def show_padmin_content():
 # Main application
 def main():
     """Main application entry point"""
-    # Set page title and header
-    st.title(os.getenv("APP_NAME", "") + " " + os.getenv("RELEASE", ""))
-    
-    # Initialize session state
-    cu.init_session_state()
-    
+    global UI_TEXTS
+
     # Initialize admin features (adds necessary columns to user table)
     if not init_admin_features():
-        st.error("Failed to initialize admin features")
+        st.error(f"❌ {UI_TEXTS['admin_init_error']}")
         st.stop()
     
     # Check authentication
@@ -1315,5 +1334,9 @@ def main():
             show_fmember_sidebar()
             show_fmember_content()
 
+# Initialize session state
+cu.init_session_state()
+UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', "US")]
+    
 if __name__ == "__main__":
     main()

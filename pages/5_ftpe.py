@@ -898,9 +898,7 @@ def main_page(nav, lname_idx):
 
         if lname_idx <= 0:
             # at least 2 generations
-            st.error(
-                f"{g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}"
-            )
+            st.error(f"❌ {g_loc['MENU_DISP_GRAPH_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}")
             return
 
         # select a generation
@@ -968,7 +966,7 @@ def main_page(nav, lname_idx):
 
                 dot = build_spouse_graph(gbuff)
             except:
-                st.error(g_loc["MEMBER_NOT_FOUND"])
+                st.error(f"❌ {g_loc['MEMBER_NOT_FOUND']}")
                 return
 
             # Show graph on Streamlit Page
@@ -976,7 +974,7 @@ def main_page(nav, lname_idx):
             st.graphviz_chart(dot, use_container_width=True)
 
         except:
-            st.warning(g_loc["MEMBER_NOT_FOUND"])
+            st.warning(f"❌ {g_loc['MEMBER_NOT_FOUND']}")
             # continue to adjust sliders
 
         st.success(
@@ -993,9 +991,7 @@ def main_page(nav, lname_idx):
 
         if lname_idx <= 0:
             # at least 2 generations
-            st.error(
-                f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}"
-            )
+            st.error(f"❌ {g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['GEN_AT_LEAST_2']}")
             return
 
         # select a generation
@@ -1057,9 +1053,7 @@ def main_page(nav, lname_idx):
                     )
                     break
             except:
-                st.error(
-                    f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['FAILED']}"
-                )
+                st.error(f"❌ {g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['FAILED']}")
                 return
 
             # display current generation, plus one level up and down
@@ -1069,7 +1063,7 @@ def main_page(nav, lname_idx):
                 f"{g_loc['MENU_QUERY_3G_BY_MALE']} {g_loc['QUERY']} {g_loc['DONE']}"
             )
         except:
-            st.warning(g_loc["MEMBER_NOT_FOUND"])
+            st.warning(f"⚠️ {g_loc['MEMBER_NOT_FOUND']}")
             # continue to adjust sliders
 
         return
@@ -1109,9 +1103,7 @@ def main_page(nav, lname_idx):
                     load_buff(gbuff["Name"], gbuff["Born"], g_dirtyTree)
 
                 except:
-                    st.error(
-                        f"{g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']} {g_loc['ADD']} {g_loc['FAILED']}"
-                    )
+                    st.error(f"❌ {g_loc['MENU_MEMBER_ADD']}: {gbuff['Name']} {g_loc['ADD']} {g_loc['FAILED']}")
         return
 
     # --- Function 4 --- from here
@@ -1136,7 +1128,7 @@ def main_page(nav, lname_idx):
             # safe guard in case that person not found
             rcd = g_df.iloc[idx]
         except:
-            st.error(f"{g_loc['MEMBER_NOT_FOUND']}")
+            st.error(f"❌ {g_loc['MEMBER_NOT_FOUND']}")
             return
 
         # convert to dict buffer
@@ -1181,9 +1173,7 @@ def main_page(nav, lname_idx):
                             f"{g_loc['MEMBER']} {g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['UPDATE']} {g_loc['DONE']}"
                         )
                     except:
-                        st.error(
-                            f"{g_loc['MEMBER']} {g_loc['UPDATE']} {g_loc['FAILED']}"
-                        )
+                        st.error(f"❌ {g_loc['MEMBER']} {g_loc['UPDATE']} {g_loc['FAILED']}")
         with btn2:
             if st.button(g_loc["B4_MEMBER_DELETE"]):
                 with st.spinner(g_loc["IN_PROGRESS"]):
@@ -1199,13 +1189,9 @@ def main_page(nav, lname_idx):
                         # force to create a new tree cache upon return
                         os.environ["DIRTY_TREE"] = str(time.time())
 
-                        st.success(
-                            f"{g_loc['MEMBER']} {g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['DELETE']} {g_loc['DONE']}"
-                        )
+                        st.success(f"{g_loc['MEMBER']} {g_loc['INDEX']}: {idx} {gbuff['Name']} {g_loc['DELETE']} {g_loc['DONE']}")
                     except:
-                        st.error(
-                            f"{g_loc['MEMBER']} {g_loc['DELETE']} {g_loc['FAILED']}"
-                        )
+                        st.error(f"❌ {g_loc['MEMBER']} {g_loc['DELETE']} {g_loc['FAILED']}")
         gbuff_idx = idx
         return
 
@@ -1227,9 +1213,7 @@ def main_page(nav, lname_idx):
                 all_members['Name'] = all_members['Name'].astype(str)
                 df2 = g_df.query(filter)
                 if df2.empty:
-                    st.error(
-                        f"{rec_name} {g_loc['MENU_QUERY_TBL_BY_NAME']} {g_loc['FAILED']}"
-                    )
+                    st.error(f"❌ {rec_name} {g_loc['MENU_QUERY_TBL_BY_NAME']} {g_loc['FAILED']}")
                 else:
                     st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
                     st.table(df2)
@@ -1272,9 +1256,7 @@ def main_page(nav, lname_idx):
                 try:
                     df2 = df2.query(rec_grp)
                     if df2.empty:
-                        st.error(
-                            f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}"
-                        )
+                        st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
                     else:
                         st.markdown(f"{g_loc['HEAD_COUNT_SELECTED']}{len(df2.index)}")
                         st.table(df2)
@@ -1286,7 +1268,7 @@ def main_page(nav, lname_idx):
                         )
                 except Exception as err:
                     logger.error(err)
-                    st.error(f"{g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
+                    st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_ALIAS']} {g_loc['FAILED']}")
         return
 
     # --- Function 7 --- from here
@@ -1302,9 +1284,7 @@ def main_page(nav, lname_idx):
 
         if max_gen <= 0:
             # at least 1 generation
-            st.error(
-                f"{g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}"
-            )
+            st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
             return
 
         default_gen = gbuff["Order"]
@@ -1322,7 +1302,7 @@ def main_page(nav, lname_idx):
             load_buff(gbuff["Name"], gbuff["Born"], g_dirtyTree)
             st.success(f"{g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['DONE']}")
         except:
-            st.error(g_loc["INFO_NOT_FOUND"])
+            st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_1GEN']} {g_loc['FAILED']}")
         return
 
     # --- Function 8 --- from here
@@ -1368,13 +1348,9 @@ def main_page(nav, lname_idx):
                     display_3gen(dmem)
                     st.markdown("---")
                     gbuff = dmem.copy()
-                st.success(
-                    f"{rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['DONE']}"
-                )
+                st.success(f"{rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['DONE']}")
             except:
-                st.error(
-                    f"{rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['FAILED']}"
-                )
+                st.error(f"❌ {rec_name} {g_loc['MENU_QUERY_3G_BY_NAME']} {g_loc['FAILED']}")
         return
 
     # --- Function 9 --- from here
@@ -1391,9 +1367,7 @@ def main_page(nav, lname_idx):
         max_gen = load_male_gen(g_lname, base=g_dirtyTree)
         if max_gen <= 1:
             # at least 2 generations
-            st.error(
-                f"{g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}"
-            )
+            st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['QUERY']} {g_loc['MEMBER_NOT_FOUND']}")
             return
 
         default_gen = gbuff["Order"]
@@ -1410,7 +1384,7 @@ def main_page(nav, lname_idx):
             st.table(g3_members)
             st.success(f"{g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['DONE']}")
         except:
-            st.error(g_loc["INFO_NOT_FOUND"])
+            st.error(f"❌ {g_loc['MENU_QUERY_TBL_BY_3GEN']} {g_loc['FAILED']}")
         return
 
     # --- Function 10 --- from here
@@ -1462,8 +1436,8 @@ def main_page(nav, lname_idx):
                     # force to create a new UserDB cache upon return
                     os.environ["DIRTY_USER"] = str(time.time())
                 except Exception as err:
-                    st.warning(f"Caught '{err}'. class is {type(err)}")
-                    st.error(f"{g_loc['MENU_SETTINGS']} {g_username} {g_loc['FAILED']}")
+                    st.warning(f"⚠️ Caught '{err}'. class is {type(err)}")
+                    st.error(f"❌ {g_loc['MENU_SETTINGS']} {g_username} {g_loc['FAILED']}")
 
         # --- User Import CSV --- from here
         # drag and drop CSV file to import
@@ -1500,7 +1474,7 @@ def main_page(nav, lname_idx):
                     os.environ["DIRTY_TREE"] = str(time.time())
 
                 except:
-                    st.error(f"{g_loc['BX_IMPORT']} {g_loc['FAILED']}")
+                    st.error(f"❌ {g_loc['BX_IMPORT']} {g_loc['FAILED']}")
     return
 
 
@@ -1863,7 +1837,7 @@ else:
     except:
         # force to create a new tree cache upon loop-back
         os.environ["DIRTY_TREE"] = str(time.time())
-        st.warning(f"{g_loc['MEMBER_NOT_REG']}")
+        st.warning(f"⚠️ {g_loc['MEMBER_NOT_REG']}")
 
     # Invoke main page via Streamlit
     main_page(nav, lname_idx)

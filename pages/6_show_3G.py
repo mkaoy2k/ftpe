@@ -1,14 +1,9 @@
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
-Family Tree Visualization - 3 Generations
+Family Tree Visualization - up and down for 3 Generations, given a member ID.
 
 This script displays a 3-generation family tree centered around a given member ID.
-It shows the member, their parents, and their children in a graph visualization.
+It shows the member, his/her parents, grandparents, children, 
+and grandchildren in a graph visualization.
 """
 
 import streamlit as st
@@ -20,9 +15,11 @@ from datetime import datetime, date
 from pathlib import Path
 from dotenv import load_dotenv
 import context_utils as cu
+import funcUtils as fu
 
 # Import database utilities
 import db_utils as dbm
+from ftpe_ui import UI_TEXTS
 
 # Load environment variables
 load_dotenv()
@@ -50,7 +47,7 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         # Get the center member
         center = dbm.get_member(member_id)
         if not center:
-            st.error(f"No member found with ID: {member_id}")
+            st.error(f"❌ No member found with ID: {member_id}")
             return {}
             
         # Initialize result dictionary
@@ -77,11 +74,11 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                 parent_relations = dbm.add_or_update_relation(
                     relation, update=True)
                 if not parent_relations:
-                    st.error(f"Error adding parent relation: {str(e)}")
+                    st.error(f"❌ Error adding parent relation: {str(e)}")
                     logger.exception("Error adding parent relation: {str(e)}")
                     
             except Exception as e:
-                st.error(f"Error adding parent relation: {str(e)}")
+                st.error(f"❌ Error adding parent relation: {str(e)}")
                 logger.exception("Error adding parent relation: {str(e)}")
 
             # Get grandparents (parents of parents)
@@ -98,11 +95,11 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                     grandparent_relations = dbm.add_or_update_relation(
                         relation, update=True)
                     if not grandparent_relations:
-                        st.error(f"Error adding grandparent relation: {str(e)}")
+                        st.error(f"❌ Error adding grandparent relation: {str(e)}")
                         logger.exception("Error adding grandparent relation: {str(e)}")
                         
                 except Exception as e:
-                    st.error(f"Error adding grandparent relation: {str(e)}")
+                    st.error(f"❌ Error adding grandparent relation: {str(e)}")
                     logger.exception("Error adding grandparent relation: {str(e)}")
                 if grandparent and grandparent not in result['grandparents']:
                     result['grandparents'].append(grandparent)
@@ -121,11 +118,11 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                 child_relations = dbm.add_or_update_relation(
                     relation, update=True)
                 if not child_relations:
-                    st.error(f"Error adding child relation: {str(e)}")
+                    st.error(f"❌ Error adding child relation: {str(e)}")
                     logger.exception("Error adding child relation: {str(e)}")
                     
             except Exception as e:
-                st.error(f"Error adding child relation: {str(e)}")
+                st.error(f"❌ Error adding child relation: {str(e)}")
                 logger.exception("Error adding child relation: {str(e)}")
             # Get grandchildren (children of children)
             grandchildren = dbm.get_children(child['id'])
@@ -141,11 +138,11 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                     grandchild_relations = dbm.add_or_update_relation(
                         relation, update=True)
                     if not grandchild_relations:
-                        st.error(f"Error adding grandchild relation: {str(e)}")
+                        st.error(f"❌ Error adding grandchild relation: {str(e)}")
                         logger.exception("Error adding grandchild relation: {str(e)}")
                         
                 except Exception as e:
-                    st.error(f"Error adding grandchild relation: {str(e)}")
+                    st.error(f"❌ Error adding grandchild relation: {str(e)}")
                     logger.exception("Error adding grandchild relation: {str(e)}")
                 if grandchild and grandchild not in result['grandchildren']:
                     result['grandchildren'].append(grandchild)
@@ -153,7 +150,7 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         return result
         
     except Exception as e:
-        st.error(f"Error fetching family members: {str(e)}")
+        st.error(f"❌ Error fetching family members: {str(e)}")
         logger.exception("Error in get_family_members")
         return {}
 
@@ -417,6 +414,8 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
 
 def main():
     """Main function to render the Streamlit app."""
+    global UI_TEXTS
+    
     # Sidebar --- from here
     with st.sidebar:
         if st.session_state.user_state != dbm.User_State['p_admin']:
@@ -442,9 +441,11 @@ def main():
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-            st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
             st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
-            st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
+                st.page_link("pages/9_birthday.py", label="Birthday of the Month", icon="🎂")
+                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True, key="show_3g_logout"):
@@ -454,70 +455,71 @@ def main():
     
     # Main content area --- from here
         
-    st.title("Family Tree Visualization")
-    st.subheader("View 3 Generations of Family Members")
+    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['gen_order']} {UI_TEXTS['visualization']}")
     
     # Add a form for better user experience
     with st.form("family_tree_form"):
+        st.subheader(f"{UI_TEXTS['search']} 3 {UI_TEXTS['gen_order']} {UI_TEXTS['up_and_down']}")
+
         # Get member ID from user input
         member_id = st.number_input(
-            "Enter Member ID (center of the family tree):",
+            f"{UI_TEXTS['enter']} {UI_TEXTS['member']} {UI_TEXTS['id']}:",
             min_value=1,
             step=1,
             value=1,
-            help="Enter the ID of the family member to center the tree on"
+            help=f"{UI_TEXTS['enter']} {UI_TEXTS['member']} {UI_TEXTS['id']}"
         )
         
         # Add graph configuration options
         col1, col2, col3 = st.columns(3)
         with col1:
             graph_height = st.slider(
-                "Graph Height (inches):",
+                f"{UI_TEXTS['graph_height']}:",
                 min_value=1,
                 max_value=30,
                 value=12,
                 step=1,
-                help="Adjust the height of the family tree graph"
+                help=f"{UI_TEXTS['adjust']} {UI_TEXTS['family_tree']} {UI_TEXTS['graph_height']}"
             )
         with col2:
             graph_width = st.slider(
-                "Graph Width (inches):",
+                f"{UI_TEXTS['graph_width']}:",
                 min_value=1,
                 max_value=30,
                 value=5,
                 step=1,
-                help="Adjust the width of the family tree graph"
+                help=f"{UI_TEXTS['adjust']} {UI_TEXTS['family_tree']} {UI_TEXTS['graph_width']}"
             )
         with col3:
             graph_engine = st.selectbox(
-                "Layout Engine:",
+                f"{UI_TEXTS['layout_engine']}:",
                 options=['dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo'],
                 index=0,
-                help="Choose the layout engine for the graph"
+                help=f"{UI_TEXTS['select']} {UI_TEXTS['layout_engine']}"
             )
         
-        submitted = st.form_submit_button("Generate Family Tree", type="primary")
+        submitted = st.form_submit_button(f"{UI_TEXTS['draw']} {UI_TEXTS['family_tree']}", type="primary")
     
     if submitted:
         if not member_id:
-            st.warning("Please enter a valid member ID.")
+            st.warning(f"⚠️ {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['required']}!")
             st.stop()
             
         # Create a container for the tree visualization
         tree_container = st.container()
         
-        with st.spinner("Generating family tree..."):
+        with st.spinner(f"{UI_TEXTS['draw']} {UI_TEXTS['family_tree']}..."):
             try:
                 # Get family data with error handling
                 family_data = get_family_members(member_id)
                 
                 if not family_data or 'center' not in family_data:
-                    st.error("❌ No family data found for the given member ID.")
+                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}!")
                     st.stop()
                 
                 # Display the tree in the container
                 with tree_container:
-                    st.success("✅ Successfully generated family tree!")
+                    st.success(f"✅  {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['successfully']}!")
                     
                     # Create and display the graph with user-specified settings
                     try:
@@ -573,63 +575,68 @@ def main():
                             unsafe_allow_html=True
                         )
                     except Exception as e:
-                        st.error(f"❌ Failed to generate family tree visualization: {str(e)}")
-                        logger.exception("Error generating graph")
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}: {str(e)}")
+                        logger.exception("Error in drawing family tree graph")
                     
                     # Display family information in an expandable section
                     center = family_data.get('center', {})
-                    with st.expander(f"👨‍👩‍👧‍👦 View Family Details for {center.get('name', 'Unknown')} (ID: {center.get('id', 'N/A')})", expanded=True):
+                    with st.expander(f"👨‍👩‍👧‍👦 {UI_TEXTS['search']} {UI_TEXTS['family']} {UI_TEXTS['details']}: {center.get('name', 'Unknown')} (ID: {center.get('id', 'N/A')})", expanded=True):
                         # Display family members in a structured way
                         cols = st.columns(3)
                         
                         with cols[0]:
                             if family_data.get('grandparents'):
-                                st.markdown("### 👴👵 Grandparents")
+                                st.markdown(f"### 👴👵 {UI_TEXTS['grandparents']}")
                                 for gp in family_data['grandparents']:
                                     st.write(f"- {gp.get('name', 'Unknown')} (ID: {gp.get('id', 'N/A')})")
                                 st.write("")
                             else:
-                                st.info("No grandparents found")
+                                st.info(f"{UI_TEXTS['grandparents']} {UI_TEXTS['not_found']}")
                         
                         with cols[1]:
                             if family_data.get('parents'):
-                                st.markdown("### 👨‍👩‍👦 Parents")
+                                st.markdown(f"### 👨‍👩‍👦 {UI_TEXTS['parents']}")
                                 for p in family_data['parents']:
                                     st.write(f"- {p.get('name', 'Unknown')} (ID: {p.get('id', 'N/A')})")
                                 st.write("")
                             else:
-                                st.info("No parents found")
+                                st.info(f"{UI_TEXTS['parents']} {UI_TEXTS['not_found']}")
                             
-                            st.markdown("### 👤 Center Member")
+                            st.markdown(f"### 👤 {UI_TEXTS['center']} {UI_TEXTS['member']}")
                             st.write(f"- {center.get('name', 'Unknown')} (ID: {center.get('id', 'N/A')})")
                             
                             if family_data.get('children'):
-                                st.markdown("### 👶 Children")
+                                st.markdown(f"### 👶 {UI_TEXTS['children']}")
                                 for c in family_data['children']:
                                     st.write(f"- {c.get('name', 'Unknown')} (ID: {c.get('id', 'N/A')})")
                                 st.write("")
                             else:
-                                st.info("No children found")
+                                st.info(f"{UI_TEXTS['children']} {UI_TEXTS['not_found']}")
                         
                         with cols[2]:
                             if family_data.get('grandchildren'):
-                                st.markdown("### 👶👶 Grandchildren")
+                                st.markdown(f"### 👶👶 {UI_TEXTS['grandchildren']}")
                                 for gc in family_data['grandchildren']:
                                     st.write(f"- {gc.get('name', 'Unknown')} (ID: {gc.get('id', 'N/A')})")
                                 st.write("")
                             else:
-                                st.info("No grandchildren found")
+                                st.info(f"{UI_TEXTS['grandchildren']} {UI_TEXTS['not_found']}")
                 
             except Exception as e:
-                st.error(f"❌ An error occurred while generating the family tree: {str(e)}")
+                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}: {str(e)}")
                 logger.exception("Error in main")
                 
-                # Show helpful error message
-                st.info("💡 Tip: Make sure the member ID exists and has family relationships in the database.")
+# Initialize session state and UI_TEXTS
+if 'app_context' not in st.session_state:
+    cu.init_session_state()
 
-# Initialize session state
-cu.init_session_state()
-    
+# Get UI_TEXTS with a fallback to English if needed
+try:
+    UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+except (KeyError, AttributeError):
+    # Fallback to English if there's any issue
+    UI_TEXTS = st.session_state.ui_context['US']
+
 # Check authentication
 if not st.session_state.get('authenticated', False):
     st.switch_page("ftpe_ui.py")
