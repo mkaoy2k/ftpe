@@ -100,7 +100,7 @@ def new_birth_page():
                 st.info(f"{UI_TEXTS['search_for']} {UI_TEXTS['mom']}")
             
             search_type = st.radio(
-                f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} or {UI_TEXTS['name']}*",
+                f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['or']} {UI_TEXTS['name']}*",
                 [f"{UI_TEXTS['member']} {UI_TEXTS['id']}", f"{UI_TEXTS['member']} {UI_TEXTS['name']}",],
                 horizontal=True,
                 key="search_parent_type",
@@ -236,7 +236,7 @@ def new_birth_page():
         if mother:
             st.write(f"**{UI_TEXTS['mom']}:** {mother.get('name', '?')} (ID: {mother['id']} {UI_TEXTS['born']}: {mother['born']} {UI_TEXTS['gen_order']}: {mother['gen_order']})")
         if not father and not mother:
-            st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} or {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['form']}.")
+            st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['form']}.")
         
         # New member details
         col1, col2 = st.columns(2)
@@ -331,7 +331,7 @@ def new_birth_page():
             if not all([name, born, gen_order]):
                 st.error(f"❌ {UI_TEXTS['required']} fields are marked with *")
             elif not father and not mother:
-                st.error(f"❌ Please select at least one {UI_TEXTS['dad']} or {UI_TEXTS['mom']}.")
+                st.error(f"❌ Please select at least one {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']}.")
             else:
                 try:
                     # Create new member
@@ -588,7 +588,7 @@ def new_adopted_child_page():
             
             # Step 1: Find adopted parent by id or name
             search_type = st.radio(
-                    f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} or {UI_TEXTS['name']}",
+                    f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['or']} {UI_TEXTS['name']}",
                 [f"{UI_TEXTS['member']} {UI_TEXTS['id']}", f"{UI_TEXTS['member']} {UI_TEXTS['name']}",],
                 horizontal=True,
                 key="adopted_parent_search_type",
@@ -726,7 +726,7 @@ def new_adopted_child_page():
         if mother:
             st.write(f"**{UI_TEXTS['mom']}:** {mother.get('name', '?')} (ID: {mother['id']} {UI_TEXTS['born']}: {mother['born']} {UI_TEXTS['gen_order']}: {mother['gen_order']})")
         if not father and not mother:
-            st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} or {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['member']} {UI_TEXTS['form']}.")
+            st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['member']} {UI_TEXTS['form']}.")
         
         col31, col32 = st.columns(2)
         with col31:
@@ -832,7 +832,7 @@ def new_adopted_child_page():
             if not all([name, born, gen_order, join_date, relation_type]):
                 st.error(f"❌ {UI_TEXTS['relation']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
             elif not selected_parents:
-                st.error(f"❌ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} or {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['member']} {UI_TEXTS['form']}.")
+                st.error(f"❌ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['member']} {UI_TEXTS['form']}.")
             else:
                 try:
                     # Create member record
@@ -924,7 +924,7 @@ def new_adopted_parent_page():
     with st.form("search_adopted_child_form"):
         st.markdown(f"### {UI_TEXTS['search']} {UI_TEXTS['member']}: {UI_TEXTS['child']} {UI_TEXTS['details']}")
         search_type = st.radio(
-            f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} or {UI_TEXTS['name']}",
+            f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['or']} {UI_TEXTS['name']}",
             [f"{UI_TEXTS['member']} {UI_TEXTS['id']}", f"{UI_TEXTS['member']} {UI_TEXTS['name']}",],
             horizontal=True,
             key="adopted_child_search_type",
@@ -1189,7 +1189,7 @@ def divorce_seperation_page():
                 st.info(f"{UI_TEXTS['search_for']} {UI_TEXTS['partner']}-2")
             
             search_type = st.radio(
-                f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} or {UI_TEXTS['name']}*",
+                f"{UI_TEXTS['search_by']} {UI_TEXTS['member']} {UI_TEXTS['id']} {UI_TEXTS['or']} {UI_TEXTS['name']}*",
                 [f"{UI_TEXTS['member']} {UI_TEXTS['id']}", f"{UI_TEXTS['member']} {UI_TEXTS['name']}",],
                 horizontal=True,
                 key="search_spouse_to_end_type",
