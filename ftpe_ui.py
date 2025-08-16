@@ -656,6 +656,18 @@ def search_members_page() -> None:
     Display the member search page with filters and results.
     """
     global UI_TEXTS
+    
+    # Initialize session state and UI_TEXTS
+    if 'app_context' not in st.session_state:
+        cu.init_session_state()
+
+    # Get UI_TEXTS with a fallback to English if needed
+    try:
+        UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+    except (KeyError, AttributeError):
+        # Fallback to English if there's any issue
+        UI_TEXTS = st.session_state.ui_context['US']
+    
     # Initialize session state for search results
     if 'search_results' not in st.session_state:
         st.session_state.search_results = []
@@ -717,7 +729,7 @@ def search_members_page() -> None:
         submitted = st.form_submit_button(f"{UI_TEXTS['search']}", type="primary")
         
         if submitted:
-            with st.spinner("Searching..."):
+            with st.spinner(f"{UI_TEXTS['search']} {UI_TEXTS['in_progress']} ..."):
                 # Execute search
                 results = dbm.search_members(
                     name=name if name else "",

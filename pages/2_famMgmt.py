@@ -134,7 +134,7 @@ def search_families_page() -> None:
             background = background.strip()
             
             with st.spinner(
-                f"{UI_TEXTS['search']} {UI_TEXTS['in_progress']}"):
+                f"{UI_TEXTS['search']} {UI_TEXTS['in_progress']} ..."):
                 if family_id > 0:
                     # Get family by ID
                     family = dbm.get_family(family_id)
@@ -169,7 +169,7 @@ def search_families_page() -> None:
             
             # display search results if available
             if st.session_state.family_search_results:
-                st.subheader("search results")
+                st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['results']}")
         
                 # convert results to dataframe for better display
                 df = pd.DataFrame(st.session_state.family_search_results)
@@ -200,13 +200,13 @@ def search_families_page() -> None:
                     )
             
                     # Show result count with bigger and bolder text
-                    st.markdown(f"### Found {len(df)} records")
+                    st.markdown(f"### {UI_TEXTS['search']} {UI_TEXTS['count']}: {len(df)}")
                 else:
-                    st.info("No matching families found")
+                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['search']} {UI_TEXTS['not_found']}")
     
             # No results message
             elif submitted:
-                st.info("No matching families found")
+                st.info(f"❌ {fu.get_function_name()} {UI_TEXTS['search']} {UI_TEXTS['not_found']}")
 
 def add_family_page() -> None:
     """Display the form to add a new family."""
@@ -258,7 +258,7 @@ def add_family_page() -> None:
                     update=False)
                 
                 if family_id:
-                    st.success(f"✅ {name} (ID: {family_id})")
+                    st.success(f"✅ {UI_TEXTS['family']} {UI_TEXTS['added']}: {name} (ID: {family_id})")
                     
                 else:
                     st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}")
@@ -513,13 +513,13 @@ def search_relations_page() -> None:
                     )
             
                     # Show result count with bigger and bolder text
-                    st.markdown(f"### Found {len(df)} records")
+                    st.markdown(f"### {UI_TEXTS['search']} {UI_TEXTS['count']}: {len(df)}")
                 else:
-                    st.info("No matching relation records found")
+                    st.info(f"❌ {fu.get_function_name()} {UI_TEXTS['search']} {UI_TEXTS['not_found']}")
     
             # No results message
             elif submitted:
-                st.info("No matching relation records found")
+                st.info(f"❌ {fu.get_function_name()} {UI_TEXTS['search']} {UI_TEXTS['not_found']}")
 
 def add_relation_page() -> None:
     """
@@ -1482,7 +1482,8 @@ def delete_relation_page() -> None:
 def main() -> None:
     """Main application entry point."""
     global UI_TEXTS
-    st.title(f"🌲 {UI_TEXTS['family_tree']} {UI_TEXTS['management']}")
+    
+    st.header(f"🌲 {UI_TEXTS['family_tree']} {UI_TEXTS['management']}")
 
     # Sidebar --- from here
     with st.sidebar:
@@ -1499,7 +1500,7 @@ def main() -> None:
                 })
                 
                 # Add logout button at the bottom for admin
-                if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
+                if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
                     st.session_state.authenticated = False
                     st.session_state.user_email = None
                     st.rerun()
@@ -1535,7 +1536,7 @@ def main() -> None:
                 st.page_link("pages/9_birthday.py", label="Birthday Calendar", icon="🎂")
             
             # Add logout button at the bottom for non-admin users
-            if st.button("Logout", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
+            if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
                 st.session_state.authenticated = False
                 st.session_state.user_email = None
                 st.rerun()
