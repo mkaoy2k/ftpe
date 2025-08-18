@@ -1,7 +1,10 @@
 """
-Family Tree Visualization - up and down for 3 Generations, given a member ID.
+Family Tree Visualization - 
 
-This script displays a 3-generation family tree centered around a given member ID.
+To draw a graph of a family tree upto 7 generations, i.e.
+up to 3 generations and down to 3 generations, given a member ID.
+
+This script displays a family tree centered around a given member ID.
 It shows the member, his/her parents, grandparents, children, 
 and grandchildren in a graph visualization.
 """

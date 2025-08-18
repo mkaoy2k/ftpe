@@ -1,11 +1,5 @@
 
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
 Birthday of the Month Page
 """
 import os

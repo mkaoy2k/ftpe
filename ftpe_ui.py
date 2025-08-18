@@ -604,8 +604,8 @@ def show_padmin_sidebar():
 def show_fmember_content():
     """Display the family member content area"""
     global UI_TEXTS
-    
-    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['home']}")
+    family_id = st.session_state.app_context.get('family_id')
+    st.header(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['member']} {UI_TEXTS['home']}")
     
     show_front_end()
     
@@ -695,6 +695,7 @@ def search_members_page() -> None:
     # Initialize session state and UI_TEXTS
     if 'app_context' not in st.session_state:
         cu.init_session_state()
+    family_id = st.session_state.app_context.get('family_id')
 
     # Get UI_TEXTS with a fallback to English if needed
     try:
@@ -709,7 +710,7 @@ def search_members_page() -> None:
     
     # Search form
     with st.form("search_form"):
-        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['member']}")
+        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} ({family_id}) {UI_TEXTS['member']}")
         
         # Create three rows of search fields
         row1_col1, row1_col2, row1_col3 = st.columns(3)
@@ -740,9 +741,8 @@ def search_members_page() -> None:
                 placeholder="in YYYY-MM-DD format"
             )
         with row2_col3:
-            family_id = st.number_input(
-                f"{UI_TEXTS['family']} {UI_TEXTS['id']}", 
-                        min_value=0, step=1, value=0)
+            st.write(f"Family ID:")
+            st.write(family_id)
             
         # Third row of search filters
         with row1_col1:
@@ -757,7 +757,7 @@ def search_members_page() -> None:
         with row3_col3:
             sex = st.selectbox(
                 UI_TEXTS['sex'],
-                ["", "Male", "Female", "Other"]
+                ["", UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']]
             )
 
         # Search button
@@ -775,7 +775,7 @@ def search_members_page() -> None:
                     died=died if died else "",
                     id=member_id if member_id > 0 else 0,
                     email=email if email else "",
-                    sex={"Male": "M", "Female": "F", "Other": "O"}.get(sex, "") if sex else ""
+                    sex={UI_TEXTS['sex_male']: "M", UI_TEXTS['sex_female']: "F", UI_TEXTS['sex_other']: "O"}.get(sex, "") if sex else ""
                 )
                 if results: 
                     st.session_state.search_results = results
@@ -837,8 +837,8 @@ def search_members_page() -> None:
 def show_fadmin_content() -> None:
     """Display the family admin content area"""
     global UI_TEXTS
-    
-    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['home']}")
+    family_id = st.session_state.app_context.get('family_id')
+    st.header(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['admin']} {UI_TEXTS['home']}")
     
     show_front_end()
     
@@ -847,7 +847,7 @@ def show_fadmin_content() -> None:
     
     # Family Subscription Management
     with st.container(border=True):
-        st.subheader(f"{UI_TEXTS['family']} {UI_TEXTS['subscription']} {UI_TEXTS['management']}")
+        st.subheader(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['subscription']} {UI_TEXTS['management']}")
 
         col21, col22 = st.columns(2)
         with col22:
@@ -1072,6 +1072,7 @@ def handle_import(import_func, file_path, table):
 
 def show_front_end():
     global UI_TEXTS
+    
     # Create form with a unique key
     with st.form(key="front_end_form"):
         st.subheader(f"{UI_TEXTS['front_end']} {UI_TEXTS['settings']}")
@@ -1353,24 +1354,6 @@ def main():
     if not st.session_state.get('authenticated', False):
         show_login_page()
     else:
-        # Initialize or get context
-        if 'app_context' not in st.session_state:
-            st.session_state.app_context = cu.init_context()
-        
-        # Retrieve the member_id and family_id via login-email and
-        # update the application context
-        email_user = st.session_state.get('user_email', '')
-        member = dbm.get_member_by_email(email_user)
-        if not member:
-            member = {
-            'id': 0,
-            'family_id': 0
-        }
-        cu.update_context({
-            'member_id': member['id'],
-            'family_id': member['family_id']
-        })    
-
         if st.session_state.user_state == dbm.User_State['p_admin']:
             show_padmin_sidebar()
             show_padmin_content()
