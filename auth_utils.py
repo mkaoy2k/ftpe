@@ -13,6 +13,7 @@ import streamlit as st
 import sqlite3
 import hashlib
 import secrets
+import os
 import db_utils as dbm
 
 def hash_password(password, salt=None):
@@ -171,17 +172,22 @@ def verify_fadmin(email, password):
         st.error(f"Error verifying admin: {e}")
         return False
 
-def create_password_reset_token(email: str, expires_hours: int = 24) -> str:
+def create_password_reset_token(email: str, expires_hours: int = None):
     """Create a password reset token for the given email
     
     Args:
         email: The email address to create a token for
-        expires_hours: Number of hours until the token expires (default: 24)
+        expires_hours: Number of hours until the token expires. If None, uses the value from
+                     PASSWORD_RESET_TOKEN_EXPIRY_HOURS environment variable (default: 24)
         
     Returns:
         str: The generated token if successful, None otherwise
     """
     try:
+        # Get expiration hours from environment variable if not provided
+        if expires_hours is None:
+            expires_hours = int(os.getenv('PASSWORD_RESET_TOKEN_EXPIRY_HOURS', '24'))
+        
         # Generate a secure random token
         token = secrets.token_urlsafe(32)
         

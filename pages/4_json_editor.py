@@ -1,10 +1,4 @@
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
 JSON Editor for Streamlit
 
 This module provides a user interface for viewing and editing JSON files within a Streamlit application.
@@ -64,7 +58,7 @@ def save_json(file_path, data):
         return False
 
 def main():
-    st.title("JSON Editor")
+    st.header("JSON Editor")
     # --- Sidebar --- from here
     with st.sidebar:
         if st.session_state.user_state != dbm.User_State['p_admin']:

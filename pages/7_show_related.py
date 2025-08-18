@@ -213,7 +213,7 @@ def main():
                 st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True, key="show_3g_logout"):
+        if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="show_3g_logout"):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()

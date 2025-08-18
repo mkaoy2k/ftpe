@@ -1,18 +1,26 @@
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
+Family Tree Platform - 管理介面模組
 
+此模組提供完整的家族樹平台管理介面，包括：
+- 使用者認證與授權（登入、重設密碼）
+- 家族成員管理（新增、編輯、刪除成員）
+- 家族管理（家族設定、權限管理）
+- 資料匯入/匯出功能
+- 平台管理功能（僅限平台管理員）
 
-Admin UI Module
+主要功能：
+- 提供三種使用者角色：家族成員、家族管理員、平台管理員
+- 支援多國語言介面
+- 響應式設計，適應不同裝置
+- 資料匯出為多種格式（CSV, Excel, JSON）
 
-This module provides the complete admin interface for the application.
+注意：
+- 此模組使用 Streamlit 框架建置網頁介面
+- 依賴多個自訂模組處理資料庫操作、電子郵件發送等功能
 """
 from dotenv import load_dotenv
 import os
 import sqlite3
-import json
 import db_utils as dbm
 import email_utils as eu
 import auth_utils as au
@@ -39,7 +47,7 @@ st.set_page_config(
 
 def show_reset_password_page():
     """Display the password reset page"""
-    st.title("Reset Password")
+    st.header("Reset Password")
     
     # Initialize reset state if not exists
     if 'reset_token' not in st.session_state:
@@ -80,8 +88,13 @@ def show_reset_password_page():
         if st.session_state.reset_success:
             st.success(st.session_state.reset_success)
         
-        # Get token from session state or query params
-        token = st.session_state.get('reset_token') or st.query_params.get('token')
+        # Get token from URL parameters first (if coming from email link)
+        token_param = st.query_params.get('token')
+        if token_param and isinstance(token_param, list):
+            token_param = token_param[0]  # Get the first token if multiple
+            
+        # Use token from URL if available, otherwise use session token
+        token = token_param or st.session_state.get('reset_token')
         
         if token:
             # Store token in session state
@@ -212,11 +225,14 @@ def show_reset_password_page():
                                 if cursor.fetchone():
                                     token = eu.generate_verification_token()
                                     
+                                    # Get expiration hours from environment variable
+                                    expires_hours = int(os.getenv('PASSWORD_RESET_TOKEN_EXPIRY_HOURS', '24'))
+                                    
                                     cursor.execute("""
                                         INSERT OR REPLACE INTO password_reset_tokens 
                                         (email, token, created_at, expires_at)
-                                        VALUES (?, ?, datetime('now'), datetime('now', '+1 hour'))
-                                    """, (email, token))
+                                        VALUES (?, ?, datetime('now'), datetime('now', ? || ' hours'))
+                                    """, (email, token, str(expires_hours)))
                                     
                                     reset_link = f"{os.getenv('FT_SVR', 'http://localhost:8501')}/?token={token}"
                                     
@@ -228,7 +244,7 @@ def show_reset_password_page():
                                     
                                     {reset_link}
                                     
-                                    This link will expire in 1 hour.
+                                    This link will expire in {expires_hours} hours.
                                     
                                     If you did not request this, please ignore this email.
                                     
@@ -248,7 +264,7 @@ def show_reset_password_page():
                                         </p>
                                         <p>Or copy and paste this link into your browser:</p>
                                         <p><code>{reset_link}</code></p>
-                                        <p>This link will expire in 1 hour.</p>
+                                        <p>This link will expire in {expires_hours} hours.</p>
                                         <p>If you did not request this, please ignore this email.</p>
                                         <p>Regards,<br>{os.getenv('APP_NAME', 'FamilyTreePE')} Team</p>
                                     </div>
@@ -587,7 +603,9 @@ def show_padmin_sidebar():
 
 def show_fmember_content():
     """Display the family member content area"""
-    st.header("Family Member Home")
+    global UI_TEXTS
+    
+    st.header(f"{UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['home']}")
     
     show_front_end()
     
@@ -599,7 +617,8 @@ def show_fmember_content():
     
 def reset_password_page():
     """
-    Display the reset password page
+    Display the reset password page on which users can reset 
+    their password.
     """
     global UI_TEXTS
     
@@ -630,26 +649,42 @@ def reset_password_page():
     
     # Handle form submission outside the form context
     if st.session_state.reset_form_submitted:
+        error_messages = []
+        
+        # Validate inputs
         if not new_password:
-            st.error(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
-        elif len(new_password) < 8:
-            st.error(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
-        elif new_password != confirm_password:
-            st.error(f"❌ {UI_TEXTS['password_error']}")
-        else:
+            error_messages.append(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
+        if len(new_password) < 8:
+            error_messages.append(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
+        if new_password != confirm_password:
+            error_messages.append(f"❌ {UI_TEXTS['password_error']}")
+        
+        # If no validation errors, try to reset password
+        if not error_messages:
             try:
-                user_id = au.create_user(
-                    email, 
-                    new_password, 
-                    role=dbm.User_State['f_member']
-                )
-                if user_id:
+                # Use reset_password function instead of create_user
+                success = au.reset_password(email, new_password)
+                if success:
                     st.success(f"✅ {UI_TEXTS['password']} {UI_TEXTS['reset']} {UI_TEXTS['successfully']}")
+                    st.info(f"ℹ️ {UI_TEXTS['login_with_new_password']}")
                     st.session_state.reset_form_submitted = False
+                    
+                    # Clear the form
+                    st.session_state.new_password = ""
+                    st.session_state.confirm_new_password = ""
+                    
+                    # Add a button to go to login page
+                    if st.button(f"← {UI_TEXTS['back_to_login']}"):
+                        st.session_state.show_reset_password = False
+                        st.rerun()
                 else:
-                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']}: {UI_TEXTS['password']} {UI_TEXTS['reset']}")
+                    error_messages.append(f"❌ {UI_TEXTS['password_reset_failed']}")
             except Exception as e:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['DB_error']}: {str(e)}")
+                error_messages.append(f"❌ {UI_TEXTS['error_occurred']}: {str(e)}")
+        
+        # Display all error messages if any
+        for error in error_messages:
+            st.error(error)
 
 def search_members_page() -> None:
     """
