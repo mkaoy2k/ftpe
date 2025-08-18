@@ -90,6 +90,7 @@
     "layout_engine": "Layout Engine",
     "list": "List",
     "login": "Login",
+    "login_with_new_password": "Please login with new password.",
     "logout": "Logout",
     "management": "Management",
     "marriage": "Marriage",

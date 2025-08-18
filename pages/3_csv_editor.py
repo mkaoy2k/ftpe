@@ -1,10 +1,4 @@
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
 CSV Editor for Streamlit
 
 This module provides a user interface for viewing and editing CSV files within a Streamlit application.
@@ -96,7 +90,7 @@ def load_file_content(file_path=None):
         return pd.DataFrame(columns=['Column 1'])
 
 def main():
-    st.title("CSV Editor")
+    st.header("CSV Editor")
     # --- Sidebar --- from here
     with st.sidebar:
         if st.session_state.user_state != dbm.User_State['p_admin']:

@@ -436,7 +436,7 @@ def main():
             cu.update_context({'email_user': st.session_state.user_email})
         
         if st.session_state.user_state != dbm.User_State['p_admin']:
-            st.subheader("Navigation")
+            st.subheader(f"{UI_TEXTS['navigation']}")
             st.page_link("ftpe_ui.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
@@ -448,7 +448,7 @@ def main():
                 st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom
-        if st.button("Logout", type="primary", use_container_width=True, key="show_3g_logout"):
+        if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="show_3g_logout"):
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
