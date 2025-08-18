@@ -1,11 +1,4 @@
-
 """
-# Add parent directory to path to allow absolute imports
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-
 Case Management Page
 
 This module provides a Streamlit interface for managing 
@@ -222,194 +215,193 @@ def new_birth_page():
                         st.session_state.selected_parents['father'] = None
                     if st.session_state.selected_parents.get('mother') == member['id']:
                         st.session_state.selected_parents['mother'] = None
-    
-    # New member form
-    with st.form("new_birth_form"):
-        st.subheader(f"### {UI_TEXTS['new']} {UI_TEXTS['member']}: {UI_TEXTS['child']} {UI_TEXTS['details']}")
-        
-        # Selected parents info
-        father = dbm.get_member(st.session_state.selected_parents.get('father', 0)) if st.session_state.selected_parents.get('father') else None
-        mother = dbm.get_member(st.session_state.selected_parents.get('mother', 0)) if st.session_state.selected_parents.get('mother') else None
-        
-        if father:
-            st.write(f"**{UI_TEXTS['dad']}:** {father.get('name', '?')} (ID: {father['id']} {UI_TEXTS['born']}: {father['born']} {UI_TEXTS['gen_order']}: {father['gen_order']})")
-        if mother:
-            st.write(f"**{UI_TEXTS['mom']}:** {mother.get('name', '?')} (ID: {mother['id']} {UI_TEXTS['born']}: {mother['born']} {UI_TEXTS['gen_order']}: {mother['gen_order']})")
-        if not father and not mother:
-            st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['form']}.")
-        
-        # New member details
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input(f"{UI_TEXTS['name']}*")
-            sex = st.selectbox(
-                    UI_TEXTS['sex'],
-                    [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']],
-                    index=0,
-                    key="add_new_birth_child_sex_2"
+    # Show new birth form if either father or mother is selected
+    if st.session_state.selected_parents.get('father') or st.session_state.selected_parents.get('mother'):
+        # New member form
+        with st.form("new_birth_form"):
+            st.subheader(f"### {UI_TEXTS['new']} {UI_TEXTS['member']}: {UI_TEXTS['child']} {UI_TEXTS['details']}")
+            
+            # Selected parents info
+            father = dbm.get_member(st.session_state.selected_parents.get('father', 0)) if st.session_state.selected_parents.get('father') else None
+            mother = dbm.get_member(st.session_state.selected_parents.get('mother', 0)) if st.session_state.selected_parents.get('mother') else None
+            
+            if father:
+                st.write(f"**{UI_TEXTS['dad']}:** {father.get('name', '?')} (ID: {father['id']} {UI_TEXTS['born']}: {father['born']} {UI_TEXTS['gen_order']}: {father['gen_order']})")
+            if mother:
+                st.write(f"**{UI_TEXTS['mom']}:** {mother.get('name', '?')} (ID: {mother['id']} {UI_TEXTS['born']}: {mother['born']} {UI_TEXTS['gen_order']}: {mother['gen_order']})")
+            if not father and not mother:
+                st.warning(f"⚠️ {UI_TEXTS['select']} {UI_TEXTS['at_least_one']} {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']} {UI_TEXTS['from']} {UI_TEXTS['search']} {UI_TEXTS['form']}.")
+            
+            # New member details
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input(f"{UI_TEXTS['name']}*")
+                sex = st.selectbox(
+                        UI_TEXTS['sex'],
+                        [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']],
+                        index=0,
+                        key="add_new_birth_child_sex_2"
+                    )
+                born = st.text_input(
+                    f"{UI_TEXTS['born']}*",
+                    placeholder=UI_TEXTS['date_placeholder'],
+                    key="add_new_birth_child_born_2"
                 )
-            born = st.text_input(
-                f"{UI_TEXTS['born']}*",
-                placeholder=UI_TEXTS['date_placeholder'],
-                key="add_new_birth_child_born_2"
-            )
-            default_family_id = father.get('family_id', 0) if father else (mother.get('family_id', 0) if mother else 0)
-            family_id = st.number_input(
-                    f"{UI_TEXTS['family']} {UI_TEXTS['id']}",
-                    min_value=0,
-                    step=1,
-                    value=default_family_id,
-                    key="add_new_birth_child_family_id_2"
-                )
-             
-            # Auto-calculate generation if parents exist
-            parent_gen = None
-            if father and father.get('gen_order'):
-                parent_gen = father['gen_order']
-            elif mother and mother.get('gen_order'):
-                parent_gen = mother['gen_order']
+                family_id = father.get('family_id', 0) if father else mother.get('family_id', 0) if mother else 0
+                if family_id == 0:
+                    st.error(f"❌ {UI_TEXTS['unauthorized']} {UI_TEXTS['add']} {UI_TEXTS['member']} {UI_TEXTS['page']}")
+                    st.stop()
+                st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['id']}:**")
+                st.write(family_id)
                 
-            gen_order = st.number_input(
-                f"{UI_TEXTS['gen_order']}*",
-                min_value=1,
-                step=1,
-                value=parent_gen + 1 if parent_gen is not None else 1,
-                key="add_new_birth_child_gen_order_2"
-            )
-        
-        with col2:
-            alias = st.text_input(
-                    f"{UI_TEXTS['alias']}",
-                    key="add_new_birth_child_alias_2"
-                )
-            email = st.text_input(f"{UI_TEXTS['email']}", 
-                                  placeholder=UI_TEXTS['email'],
-                                  key="add_new_birth_child_email_2")
-            password = st.text_input(
-                    f"{UI_TEXTS['password']}",
-                    type="password",
-                    placeholder=UI_TEXTS['password'],
-                    key="add_new_birth_child_password_2"
-                )
-            confirm_password = st.text_input(
-                    f"{UI_TEXTS['password_confirmed']}",
-                    type="password",
-                    placeholder=UI_TEXTS['password_confirmed'],
-                    key="add_new_birth_child_confirm_password_2"
-                )
-            if password != confirm_password:
-                st.error(f"❌ {UI_TEXTS['password_error']}")
-                return
-            url = st.text_input(
-                f"{UI_TEXTS['url']}",
-                placeholder=UI_TEXTS['url'],
-                key="add_new_birth_child_url_2"
-            )
-        
-        # Form actions
-        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-        with col_btn1:
-            submit_clicked = st.form_submit_button(
-                f"{UI_TEXTS['create']} {UI_TEXTS['member']}",
-                type="primary"
-            )
-        with col_btn2:
-            reset_clicked = st.form_submit_button(UI_TEXTS['reset'], type="secondary")
-        with col_btn3:
-            refresh_clicked = st.form_submit_button(UI_TEXTS['refresh'], type="secondary")
-        # Handle reset
-        if reset_clicked:
-            st.session_state.search_results = []
-            st.session_state.selected_parents = {'father': None, 'mother': None}
-            st.rerun()
-        # Handle refresh
-        if refresh_clicked:
-            st.rerun()
-        # Handle form submission
-        if submit_clicked:
-            # Validate required fields
-            if not all([name, born, gen_order]):
-                st.error(f"❌ {UI_TEXTS['required']} fields are marked with *")
-            elif not father and not mother:
-                st.error(f"❌ Please select at least one {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']}.")
-            else:
-                try:
-                    # Create new member
-                    new_member_data = {
-                        'name': name,
-                        'sex': sex,
-                        'born': born,
-                        'email': email,
-                        'gen_order': gen_order,
-                        'alias': alias,
-                        'dad_id': father['id'] if father else 0,
-                        'mom_id': mother['id'] if mother else 0,
-                        'password': password,
-                        'url': url,
-                        'family_id': family_id
-                    }
+                # Auto-calculate generation if parents exist
+                parent_gen = None
+                if father and father.get('gen_order'):
+                    parent_gen = father['gen_order']
+                elif mother and mother.get('gen_order'):
+                    parent_gen = mother['gen_order']
                     
-                    new_member_id = dbm.add_or_update_member(new_member_data, update=False)
-                    
-                    if new_member_id:
-                        # Add parent-child relationships
-                        success_count = 0
+                gen_order = st.number_input(
+                    f"{UI_TEXTS['gen_order']}*",
+                    min_value=1,
+                    step=1,
+                    value=parent_gen + 1 if parent_gen is not None else 1,
+                    key="add_new_birth_child_gen_order_2"
+                )
+            
+            with col2:
+                alias = st.text_input(
+                        f"{UI_TEXTS['alias']}",
+                        key="add_new_birth_child_alias_2"
+                    )
+                email = st.text_input(f"{UI_TEXTS['email']}", 
+                                    placeholder=UI_TEXTS['email'],
+                                    key="add_new_birth_child_email_2")
+                password = st.text_input(
+                        f"{UI_TEXTS['password']}",
+                        type="password",
+                        placeholder=UI_TEXTS['password'],
+                        key="add_new_birth_child_password_2"
+                    )
+                confirm_password = st.text_input(
+                        f"{UI_TEXTS['password_confirmed']}",
+                        type="password",
+                        placeholder=UI_TEXTS['password_confirmed'],
+                        key="add_new_birth_child_confirm_password_2"
+                    )
+                if password != confirm_password:
+                    st.error(f"❌ {UI_TEXTS['password_error']}")
+                    return
+                url = st.text_input(
+                    f"{UI_TEXTS['url']}",
+                    placeholder=UI_TEXTS['url'],
+                    key="add_new_birth_child_url_2"
+                )
+            
+            # Form actions
+            col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+            with col_btn1:
+                submit_clicked = st.form_submit_button(
+                    f"{UI_TEXTS['create']} {UI_TEXTS['member']}",
+                    type="primary"
+                )
+            with col_btn2:
+                reset_clicked = st.form_submit_button(UI_TEXTS['reset'], type="secondary")
+            with col_btn3:
+                refresh_clicked = st.form_submit_button(UI_TEXTS['refresh'], type="secondary")
+            # Handle reset
+            if reset_clicked:
+                st.session_state.search_results = []
+                st.session_state.selected_parents = {'father': None, 'mother': None}
+                st.rerun()
+            # Handle refresh
+            if refresh_clicked:
+                st.rerun()
+            # Handle form submission
+            if submit_clicked:
+                # Validate required fields
+                if not all([name, born, gen_order]):
+                    st.error(f"❌ {UI_TEXTS['required']} fields are marked with *")
+                elif not father and not mother:
+                    st.error(f"❌ Please select at least one {UI_TEXTS['dad']} {UI_TEXTS['or']} {UI_TEXTS['mom']}.")
+                else:
+                    try:
+                        # Create new member
+                        new_member_data = {
+                            'name': name,
+                            'sex': sex,
+                            'born': born,
+                            'email': email,
+                            'gen_order': gen_order,
+                            'alias': alias,
+                            'dad_id': father['id'] if father else 0,
+                            'mom_id': mother['id'] if mother else 0,
+                            'password': password,
+                            'url': url,
+                            'family_id': family_id
+                        }
                         
-                        # Add father relationship if selected
-                        if father:
-                            relation_data = {
-                                'member_id': new_member_id,
-                                'partner_id': father['id'],
-                                'relation': 'parent',  # This is from parent's perspective
-                                'join_date': born
-                            }
-                            if dbm.add_or_update_relation(relation_data, update=True):
-                                success_count += 1
+                        new_member_id = dbm.add_or_update_member(new_member_data, update=False)
                         
-                        # Add mother relationship if selected
-                        if mother:
-                            relation_data = {
-                                'member_id': new_member_id,
-                                'partner_id': mother['id'],
-                                'relation': 'parent',  # This is from parent's perspective
-                                'join_date': born
-                            }
-                            if dbm.add_or_update_relation(relation_data, update=True):
-                                success_count += 1
-                        
-                        if success_count > 0:
-                            st.success(f"✅ {UI_TEXTS['member_created']} (ID: {new_member_id}) with {success_count} {UI_TEXTS['relation']}(s)")
-                            # Clear form and search results
-                            st.session_state.search_results = []
-                            st.session_state.selected_parents = {'father': None, 'mother': None}
+                        if new_member_id:
+                            # Add parent-child relationships
+                            success_count = 0
+                            
+                            # Add father relationship if selected
+                            if father:
+                                relation_data = {
+                                    'member_id': new_member_id,
+                                    'partner_id': father['id'],
+                                    'relation': 'parent',  # This is from parent's perspective
+                                    'join_date': born
+                                }
+                                if dbm.add_or_update_relation(relation_data, update=True):
+                                    success_count += 1
+                            
+                            # Add mother relationship if selected
+                            if mother:
+                                relation_data = {
+                                    'member_id': new_member_id,
+                                    'partner_id': mother['id'],
+                                    'relation': 'parent',  # This is from parent's perspective
+                                    'join_date': born
+                                }
+                                if dbm.add_or_update_relation(relation_data, update=True):
+                                    success_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"✅ {UI_TEXTS['member_created']} (ID: {new_member_id}) with {success_count} {UI_TEXTS['relation']}(s)")
+                                # Clear form and search results
+                                st.session_state.search_results = []
+                                st.session_state.selected_parents = {'father': None, 'mother': None}
+                            else:
+                                st.error(f"❌ {UI_TEXTS['member_created']} but failed to add {UI_TEXTS['relation']}s")
                         else:
-                            st.error(f"❌ {UI_TEXTS['member_created']} but failed to add {UI_TEXTS['relation']}s")
-                    else:
-                        st.error(f"❌ {UI_TEXTS['member_error']}: {UI_TEXTS['member_not_created']}")
-                        
-                except Exception as e:
-                    st.error(f"❌ {UI_TEXTS['member_error']}: {str(e)}")
-            # Check optional user email and password if given for
-            # subscription, create an user in the dbm.db_table['users'] table
-            if email and password:
-                try:
-                    user_data = {
-                        'is_admin': User_State['f_member'],
-                        'is_active': Subscriber_State['active'],
-                        'family_id': family_id,
-                        'member_id': member_id
-                    }
-                    result, error_msg = dbm.add_or_update_user(
-                        email,
-                        password,
-                        user_data=user_data,
-                        update=False)
-                    if result:
-                        st.success(f"✅ {UI_TEXTS['user_created']}: {email}")
-                    else:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
-                except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                            st.error(f"❌ {UI_TEXTS['member_error']}: {UI_TEXTS['member_not_created']}")
+                            
+                    except Exception as e:
+                        st.error(f"❌ {UI_TEXTS['member_error']}: {str(e)}")
+                # Check optional user email and password if given for
+                # subscription, create an user in the dbm.db_table['users'] table
+                if email and password:
+                    try:
+                        user_data = {
+                            'is_admin': User_State['f_member'],
+                            'is_active': Subscriber_State['active'],
+                            'family_id': family_id,
+                            'member_id': member_id
+                        }
+                        result, error_msg = dbm.add_or_update_user(
+                            email,
+                            password,
+                            user_data=user_data,
+                            update=False)
+                        if result:
+                            st.success(f"✅ {UI_TEXTS['user_created']}: {email}")
+                        else:
+                            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
+                    except Exception as e:
+                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
             
 def new_death_page():
     """
@@ -745,14 +737,9 @@ def new_adopted_child_page():
                 placeholder=UI_TEXTS['date_placeholder'],
                 key="add_adopted_child_born_2"
             )
-            default_family_id = father.get('family_id', 0) if father else (mother.get('family_id', 0) if mother else 0)
-            family_id = st.number_input(
-                f"{UI_TEXTS['family']} {UI_TEXTS['id']}",
-                min_value=0,
-                step=1,
-                value=default_family_id,
-                key="add_adopted_child_family_id_2"
-            )
+            family_id = father.get('family_id', 0) if father else (mother.get('family_id', 0) if mother else 0)
+            st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['id']}:** {family_id}")
+
             # Auto-calculate generation if parents exist
             parent_gen = None
             if father and father.get('gen_order'):
@@ -2236,7 +2223,7 @@ def sidebar() -> None:
 
 def main() -> None:
     """Main application entry point."""
-    st.title(f"📋 {UI_TEXTS['case_mgmt']}")
+    st.header(f"📋 {UI_TEXTS['case_mgmt']}")
     
     # Main tab groups
     case_tabs = st.tabs([
@@ -2283,9 +2270,15 @@ def main() -> None:
         new_step_parent_page()
 
 # Initialize session state and app/ui context
-cu.init_session_state()
-lang = st.session_state.app_context.get('language')
-UI_TEXTS = st.session_state.ui_context[lang]
+if 'app_context' not in st.session_state:
+    cu.init_session_state()
+
+# Get UI_TEXTS with a fallback to English if needed
+try:
+    UI_TEXTS = st.session_state.ui_context[st.session_state.app_context.get('language', 'US')]
+except (KeyError, AttributeError):
+    # Fallback to English if there's any issue
+    UI_TEXTS = st.session_state.ui_context['US']
 
 if __name__ == "__main__":
     # Check authentication

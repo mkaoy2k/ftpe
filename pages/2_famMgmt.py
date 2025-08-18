@@ -16,7 +16,7 @@ import context_utils as cu
 import auth_utils as au
 import streamlit as st
 import db_utils as dbm
-from ftpe_ui import search_members_page
+from ftpe_ui import UI_TEXTS, search_members_page
 import pandas as pd
 from datetime import datetime, date
 from typing import List, Dict, Any, Optional
@@ -273,13 +273,24 @@ def update_family_page() -> None:
     global UI_TEXTS
     st.subheader(f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
     
-    # Get family ID to update
-    family_id = st.number_input(
-        f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
-        min_value=1,
-        step=1,
+    if st.session_state.user_state == dbm.User_State['p_admin']:
+        # Get family ID to update
+        family_id = st.number_input(
+            f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
+            min_value=1,
+            step=1,
         key="update_family_id_2"
     )
+    
+    elif st.session_state.user_state == dbm.User_State['f_admin']:
+        family_id = st.session_state.app_context.get('family_id', 0)
+        if family_id == 0:
+            st.error(f"❌ {UI_TEXTS['unauthorized']} {UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
+            st.stop()
+        st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['id']}:** {family_id}")
+    else:
+        st.error(f"❌ {UI_TEXTS['unauthorized']} {UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
+        st.stop()
     
     if 'update_message' in st.session_state:
         st.info(st.session_state.update_message)
@@ -297,10 +308,7 @@ def update_family_page() -> None:
             
         with st.form(f"update_family_form_{family_id}"):
             st.subheader(
-                f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['form']}",
-                name=family.get('name', ''),
-                id=family_id
-            )
+                f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['form']}: {family_id}")
             
             col1, col2 = st.columns(2)
             
@@ -980,13 +988,10 @@ def update_member_page() -> None:
                 )
                 
                 # Gender selection with proper value mapping
-                gender_options = [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']]
-                gender_values = [gender_options[0][0], 
-                                 gender_options[1][0], 
-                                 gender_options[2][0]]
-                
+                gender_options = [UI_TEXTS['sex_male'], UI_TEXTS['sex_female'], UI_TEXTS['sex_other']]                
+                gender_values = ['M', 'F', 'O']
                 # Get current gender, default to 'M' if invalid
-                current_sex = str(member.get('sex', 'M')).strip().upper()
+                current_sex = str(member.get('sex', '')).strip().upper()
                 if current_sex not in gender_values:
                     current_sex = 'M'
                 
@@ -994,14 +999,14 @@ def update_member_page() -> None:
                 current_index = gender_values.index(current_sex)
                 
                 # Display the selectbox and get the selected index
-                selected_index = st.selectbox(
-                    f"{UI_TEXTS['gender']}*",
+                sex = st.selectbox(
+                    f"{UI_TEXTS['sex']}*",
                     gender_options,
                     index=current_index
                 )
                 
                 # Get the corresponding value from our values list
-                sex = gender_values[gender_options.index(selected_index)]
+                sex={UI_TEXTS['sex_male']: "M", UI_TEXTS['sex_female']: "F", UI_TEXTS['sex_other']: "O"}.get(sex, "") if sex else ""
                 
             with col2:
                 # Dates and Family
@@ -1056,7 +1061,7 @@ def update_member_page() -> None:
                 
             with col3:
                 # Contact and Relations
-                st.subheader(f"{UI_TEXTS['contact']} & {UI_TEXTS['relations']}")
+                st.subheader(f"{UI_TEXTS['contact']} & {UI_TEXTS['relation']}")
                 email = st.text_input(
                     "Email",
                     member.get('email', '')
@@ -1266,14 +1271,24 @@ def delete_family_page() -> None:
         st.session_state.delete_family_id = None
     if 'delete_family_confirmation' not in st.session_state:
         st.session_state.delete_family_confirmation = False
-    
-    # Get family ID to delete
-    family_id = st.number_input(
-        f"{UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
-        min_value=1,
-        step=1,
-        value=st.session_state.get('delete_family_id', 1)
-    )
+
+    if st.session_state.user_state == dbm.User_State['p_admin']:
+        # Get family ID to delete
+        family_id = st.number_input(
+            f"{UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['id']}",
+            min_value=1,
+            step=1,
+            value=st.session_state.get('delete_family_id', 1)
+        )
+    elif st.session_state.user_state == dbm.User_State['f_admin']:
+        family_id = st.session_state.app_context.get('family_id', 0)
+        if family_id == 0:
+            st.error(f"❌ {UI_TEXTS['unauthorized']} {UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
+            st.stop()
+        st.write(f"Family ID: {family_id}")
+    else:
+        st.error(f"❌ {UI_TEXTS['unauthorized']} {UI_TEXTS['delete']} {UI_TEXTS['family']} {UI_TEXTS['page']}")
+        st.stop()
     
     # Store the family ID in session state
     st.session_state.delete_family_id = family_id
@@ -1309,18 +1324,18 @@ def delete_family_page() -> None:
             st.warning(f"⚠️ {UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
             st.subheader(f"{UI_TEXTS['delete']} {UI_TEXTS['confirm']}")
             
-            # Format family information for display
+            # Format family detail info for display
             st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['id']}:** {family['id']}")
             st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['name']}:** {family.get('name', 'Unknown')}")
-            st.write(f"**{UI_TEXTS['address']}:** {family.get('address', 'N/A')}")
-            st.write(f"**{UI_TEXTS['contact']}:** {family.get('contact_number', 'N/A')}")
+            st.write(f"**{UI_TEXTS['background']}:** {family.get('background', 'N/A')}")
+            st.write(f"**{UI_TEXTS['url']}:** {family.get('url', 'N/A')}")
             st.write(f"**{UI_TEXTS['email']}:** {family.get('email', 'N/A')}")
             
             # Show member information if any
             if member_count > 0:
                 st.warning(f"⚠️ {UI_TEXTS['family']} {UI_TEXTS['count']}: {member_count}")
                 member_names = [f"{m.get('name', 'Unknown')} (ID: {m['id']})" for m in members]
-                st.write("**{UI_TEXTS['family']} {UI_TEXTS['member']}**", ", ".join(member_names) if member_names else "None")
+                st.write(f"**{UI_TEXTS['family']} {UI_TEXTS['member']}**", ", ".join(member_names) if member_names else "None")
             
             # Confirm deletion with a form to avoid button nesting
             with st.form("confirm_delete_family_form"):
@@ -1626,7 +1641,7 @@ try:
 except (KeyError, AttributeError):
     # Fallback to English if there's any issue
     UI_TEXTS = st.session_state.ui_context['US']
-
+    
 # Check authentication
 if not st.session_state.get('authenticated', False):
     st.switch_page("ftpe_ui.py")

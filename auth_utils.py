@@ -15,6 +15,7 @@ import hashlib
 import secrets
 import os
 import db_utils as dbm
+import context_utils as cu
 
 def hash_password(password, salt=None):
     """Hash password with salt using PBKDF2"""
@@ -45,7 +46,8 @@ def verify_fmember(email, password):
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"""
-                SELECT id, password_hash, salt 
+                SELECT id, password_hash, salt,
+                family_id, member_id 
                 FROM {dbm.db_tables['users']} 
                 WHERE email = ? 
                 AND is_admin = {dbm.User_State['f_member']} 
@@ -55,7 +57,7 @@ def verify_fmember(email, password):
             if result is None:
                 return False
                 
-            user_id, stored_hash, salt = result
+            user_id, stored_hash, salt, family_id, member_id = result
             input_hash, _ = hash_password(password, salt)
             
             if input_hash == stored_hash:
@@ -70,6 +72,11 @@ def verify_fmember(email, password):
                 except sqlite3.Error as update_error:
                     st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
+                # Update context
+                cu.update_context({
+                    'member_id': member_id,
+                    'family_id': family_id
+                })  
                 return True
             
             return False
@@ -139,7 +146,8 @@ def verify_fadmin(email, password):
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"""
-                SELECT id, password_hash, salt  
+                SELECT id, password_hash, salt,
+                family_id, member_id 
                 FROM {dbm.db_tables['users']} 
                 WHERE email = ? 
                 AND is_admin = {dbm.User_State['f_admin']} 
@@ -149,7 +157,7 @@ def verify_fadmin(email, password):
             if result is None:
                 return False
                 
-            user_id, stored_hash, salt = result
+            user_id, stored_hash, salt, family_id, member_id = result
             input_hash, _ = hash_password(password, salt)
             
             if input_hash == stored_hash:
@@ -162,8 +170,13 @@ def verify_fadmin(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
+                    st.warning(f"⚠️ Error updating login time: {update_error}")
+                # Update context
+                cu.update_context({
+                    'member_id': member_id,
+                    'family_id': family_id
+                })  
                 return True
             
             return False
@@ -304,6 +317,7 @@ def create_user (email,
     
     Raises:
         ValueError: If the role is not valid
+        sqlite3.Error: If there's a database error
         
     Examples:
         >>> create_user("test@example.com", "password", 
@@ -317,7 +331,7 @@ def create_user (email,
     try:
         # check if role is valid
         if role is not None and role not in dbm.User_State.values():
-            return None
+            raise ValueError("Invalid role")
         
         # Check if user already exists
         with dbm.get_db_connection() as conn:
@@ -336,7 +350,7 @@ def create_user (email,
             elif role == dbm.User_State['f_member']:
                 sub_state = dbm.Subscriber_State['inactive']
             else:
-                return None
+                raise ValueError("Invalid role")
             if existing_user:
                 # Update existing user
                 user_id = existing_user[0]
@@ -364,9 +378,7 @@ def create_user (email,
                 password_hash, salt = hash_password(password)
                 cursor.execute(f"""
                     INSERT INTO {dbm.db_tables['users']} (
-                        email, 
-                        password_hash, 
-                        salt, 
+                        email, password_hash, salt, 
                         is_admin, 
                         is_active,
                         l10n,
@@ -375,7 +387,7 @@ def create_user (email,
                         created_at
                     ) 
                     VALUES (?, ?, ?, 
-                    ?, ?, ?, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, 
                     datetime('now')
                     )
                 """, (email, password_hash, salt, 
@@ -385,7 +397,5 @@ def create_user (email,
                 user_id = cursor.lastrowid
                 return user_id
     except sqlite3.Error as e:
-        error_msg = str(e)
-        log.error(error_msg)
-        return None
+        raise
 
