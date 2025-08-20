@@ -276,20 +276,23 @@ def reset_password(email: str, new_password: str) -> bool:
             cursor.execute(f"""
                 UPDATE {dbm.db_tables['users']}
                 SET password_hash = ?,
-                    salt = ?,
-                    updated_at = datetime('now')
+                    salt = ?
                 WHERE email = ?
             """, (password_hash, salt, email))
+            result = cursor.rowcount > 0
             
-            # Mark all tokens for this email as used
-            cursor.execute("""
-                UPDATE password_reset_tokens
-                SET used = 1
-                WHERE email = ?
-            """, (email,))
-            
+            # Optionally, mark all tokens for this email as used
+            try:
+                cursor.execute("""
+                    UPDATE password_reset_tokens
+                    SET used = 1
+                    WHERE email = ?
+                """, (email,))
+            except Exception as e:
+                # ignored
+                pass
             conn.commit()
-            return cursor.rowcount > 0
+            return result
             
     except Exception as e:
         st.error(f"Error resetting password: {e}")

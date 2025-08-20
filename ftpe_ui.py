@@ -74,7 +74,7 @@ def show_reset_password_page():
     
     with col2:
         # Show back to login link
-        if st.button("← Back to Login"):
+        if st.button(f"← {UI_TEXTS['back_to_login']}"):
             st.session_state.show_forgot_password = False
             st.rerun()
             
@@ -653,11 +653,11 @@ def reset_password_page():
         
         # Validate inputs
         if not new_password:
-            error_messages.append(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
+            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
         if len(new_password) < 8:
-            error_messages.append(f"❌ {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
+            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
         if new_password != confirm_password:
-            error_messages.append(f"❌ {UI_TEXTS['password_error']}")
+            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_error']}")
         
         # If no validation errors, try to reset password
         if not error_messages:
@@ -667,20 +667,27 @@ def reset_password_page():
                 if success:
                     st.success(f"✅ {UI_TEXTS['password']} {UI_TEXTS['reset']} {UI_TEXTS['successfully']}")
                     st.info(f"ℹ️ {UI_TEXTS['login_with_new_password']}")
+                    
+                    # Reset form state
                     st.session_state.reset_form_submitted = False
                     
-                    # Clear the form
-                    st.session_state.new_password = ""
-                    st.session_state.confirm_new_password = ""
-                    
-                    # Add a button to go to login page
+                    # Show back to login button
                     if st.button(f"← {UI_TEXTS['back_to_login']}"):
-                        st.session_state.show_reset_password = False
+                        # Clear all session states
+                        del st.session_state.authenticated
+                        del st.session_state.user_email
+                        del st.session_state.user_state
+                        del st.session_state.app_context
+                        del st.session_state.ui_context
+                        del st.session_state.reset_form_submitted
                         st.rerun()
+                    
+                    # Prevent form from showing again
+                    st.stop()
                 else:
-                    error_messages.append(f"❌ {UI_TEXTS['password_reset_failed']}")
+                    error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_reset_failed']}")
             except Exception as e:
-                error_messages.append(f"❌ {UI_TEXTS['error_occurred']}: {str(e)}")
+                error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_reset_failed']}: {str(e)}")
         
         # Display all error messages if any
         for error in error_messages:
@@ -695,7 +702,12 @@ def search_members_page() -> None:
     # Initialize session state and UI_TEXTS
     if 'app_context' not in st.session_state:
         cu.init_session_state()
-    family_id = st.session_state.app_context.get('family_id')
+    
+    # Set family_id based on user state
+    if st.session_state.user_state == dbm.User_State['p_admin']:
+        family_id = 0
+    else:
+        family_id = int(st.session_state.app_context.get('family_id'))
 
     # Get UI_TEXTS with a fallback to English if needed
     try:
@@ -741,8 +753,17 @@ def search_members_page() -> None:
                 placeholder="in YYYY-MM-DD format"
             )
         with row2_col3:
-            st.write(f"Family ID:")
-            st.write(family_id)
+            # Only p_admin can change family_id
+            if st.session_state.user_state == dbm.User_State['p_admin']:
+                family_id = st.number_input(
+                    f"{UI_TEXTS['family']} {UI_TEXTS['id']}",
+                    min_value=0,
+                    step=1,
+                    value=family_id
+                )
+            else:
+                st.write(f"{UI_TEXTS['family']} {UI_TEXTS['id']}:")
+                st.write(family_id)
             
         # Third row of search filters
         with row1_col1:
@@ -1347,11 +1368,11 @@ def main():
 
     # Initialize admin features (adds necessary columns to user table)
     if not init_admin_features():
-        st.error(f"❌ {UI_TEXTS['admin_init_error']}")
+        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin_init_error']}")
         st.stop()
     
     # Check authentication
-    if not st.session_state.get('authenticated', False):
+    if 'authenticated' not in st.session_state or st.session_state.get('authenticated', False) != True:
         show_login_page()
     else:
         if st.session_state.user_state == dbm.User_State['p_admin']:
