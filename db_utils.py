@@ -1321,22 +1321,22 @@ def add_related_member(
                 
             except Exception as e:
                 conn.rollback()
-                log.error(f"Transaction rolled back in {fu.get_function_name()} due to error: {str(e)}")
+                log.error(f"Transaction rolled back in {fu.get_function_name()}: due to error: {str(e)}")
                 raise
                 
     except sqlite3.IntegrityError as e:
-        error_msg = "Database integrity error in {fu.get_function_name()} when adding related member"
+        error_msg = "Database integrity error in {fu.get_function_name()}: when adding related member"
         if "FOREIGN KEY" in str(e):
             error_msg = "The specified partner_id does not exist in the database."
         log.error(f"{error_msg}: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} adding related member: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: adding related member: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} adding related member: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: adding related member: {str(e)}"
         log.error(error_msg)
 
 def update_related_member(
@@ -1523,11 +1523,11 @@ def get_members() -> List[Dict[str, Any]]:
             return members
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} while fetching members: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: while fetching members: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} while fetching members: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: while fetching members: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1584,7 +1584,7 @@ def get_member_by_email(email: str) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} while fetching member by email: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: while fetching member by email: {str(e)}"
         log.error(error_msg)
         raise
     except ValueError as ve:
@@ -1592,7 +1592,7 @@ def get_member_by_email(email: str) -> Optional[Dict[str, Any]]:
         log.error(error_msg)
         raise ValueError(error_msg)
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} while fetching member by email: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: while fetching member by email: {str(e)}"
         log.error(error_msg)
         raise
     
@@ -1652,11 +1652,11 @@ def get_member(member_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} fetching member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: fetching member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} fetching member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: fetching member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1717,11 +1717,11 @@ def get_family(family_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} fetching family ID {family_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: fetching family ID {family_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} fetching family ID {family_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: fetching family ID {family_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1918,11 +1918,11 @@ def get_relation(relation_id: int) -> Optional[Dict[str, Any]]:
             return None
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} fetching relation with relation_id {relation_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} fetching relation with relation_id {relation_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: fetching relation with relation_id {relation_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -1998,11 +1998,11 @@ def get_relations_by_id(member_id: int,
             return relations
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: fetching relation with either member_id or partner_id is {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2222,18 +2222,18 @@ def update_member(member_id: int, update_data: Dict[str, Any]) -> bool:
                 return False
                 
     except sqlite3.IntegrityError as e:
-        error_msg = f"Database integrity error in {fu.get_function_name()} updating member"
+        error_msg = f"Database integrity error in {fu.get_function_name()}: updating member"
         if "FOREIGN KEY" in str(e):
             error_msg = f"Invalid parent ID provided in {fu.get_function_name()}. The specified father or mother does not exist."
         log.error(f"{error_msg}: {str(e)}")
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} updating member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: updating member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} updating member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: updating member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2309,11 +2309,11 @@ def delete_member(member_id: int) -> bool:
         raise ValueError(error_msg) from e
         
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} deleting member ID {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: deleting member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} deleting member ID {member_id}: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: deleting member ID {member_id}: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2592,11 +2592,11 @@ def search_members(
             return results
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} during member search: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: during member search: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} during member search: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: during member search: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -2657,11 +2657,11 @@ def get_member_relations(member_id: int) -> List[Dict[str, Any]]:
             return results
             
     except sqlite3.Error as e:
-        error_msg = f"Database error in {fu.get_function_name()} retrieving relationships for member {member_id}: {str(e)}"
+        error_msg = f"Database error in {fu.get_function_name()}: retrieving relationships for member {member_id}: {str(e)}"
         log.error(error_msg)
         raise
     except Exception as e:
-        error_msg = f"Unexpected error in {fu.get_function_name()} retrieving relationships: {str(e)}"
+        error_msg = f"Unexpected error in {fu.get_function_name()}: retrieving relationships: {str(e)}"
         log.error(error_msg)
         raise
 
@@ -4092,7 +4092,7 @@ def get_table_columns(table: str) -> List[str]:
             return columns
     except sqlite3.Error as e:
         log.error(f"Database error in {fu.get_function_name()}: fetching table columns: {str(e)}")
-        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch table columns: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()}: to fetch table columns: {str(e)}")
 
 def get_total_records(table: str) -> int:
     """
@@ -4113,7 +4113,7 @@ def get_total_records(table: str) -> int:
             return result[0] if result else 0
     except sqlite3.Error as e:
         log.error(f"Database error in {fu.get_function_name()}: fetching total records: {str(e)}")
-        raise sqlite3.Error(f"Failed in {fu.get_function_name()} to fetch total records: {str(e)}")
+        raise sqlite3.Error(f"Failed in {fu.get_function_name()}: to fetch total records: {str(e)}")
 
 def get_children(member_id: int) -> List[Dict[str, Any]]:
     """
