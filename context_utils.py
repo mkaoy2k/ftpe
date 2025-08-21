@@ -112,7 +112,16 @@ def init_session_state():
         st.session_state.user_state = dbm.User_State['f_member']
     if 'relation' not in st.session_state:
         st.session_state.relation = None
-          
+
+def clear_all_session_states():
+    """清除所有的 session states"""
+    keys = list(st.session_state.keys())
+    for key in keys:
+        del st.session_state[key]
+    
+    # 重新初始化必要的 session states
+    init_session_state()
+            
 # Example usage
 if __name__ == "__main__":
     init_session_state()

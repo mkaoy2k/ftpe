@@ -47,7 +47,7 @@ def verify_fmember(email, password):
             cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT id, password_hash, salt,
-                family_id, member_id 
+                family_id, member_id, l10n 
                 FROM {dbm.db_tables['users']} 
                 WHERE email = ? 
                 AND is_admin = {dbm.User_State['f_member']} 
@@ -57,7 +57,7 @@ def verify_fmember(email, password):
             if result is None:
                 return False
                 
-            user_id, stored_hash, salt, family_id, member_id = result
+            user_id, stored_hash, salt, family_id, member_id, l10n = result
             input_hash, _ = hash_password(password, salt)
             
             if input_hash == stored_hash:
@@ -75,7 +75,8 @@ def verify_fmember(email, password):
                 # Update context
                 cu.update_context({
                     'member_id': member_id,
-                    'family_id': family_id
+                    'family_id': family_id,
+                    'language': l10n
                 })  
                 return True
             
@@ -99,7 +100,8 @@ def verify_padmin(email, password):
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"""
-                SELECT id, password_hash, salt  
+                SELECT id, password_hash, salt, 
+                family_id, member_id, l10n  
                 FROM {dbm.db_tables['users']} 
                 WHERE email = ? 
                 AND is_admin = {dbm.User_State['p_admin']} 
@@ -109,7 +111,7 @@ def verify_padmin(email, password):
             if result is None:
                 return False
                 
-            user_id, stored_hash, salt = result
+            user_id, stored_hash, salt, family_id, member_id, l10n = result
             input_hash, _ = hash_password(password, salt)
             
             if input_hash == stored_hash:
@@ -124,6 +126,13 @@ def verify_padmin(email, password):
                 except sqlite3.Error as update_error:
                     st.warning(f"⚠️ Error updating login time: {update_error}")
                     # Continue even if update fails, as auth was successful
+                # Update context
+                cu.update_context({
+                    'member_id': member_id,
+                    'family_id': family_id,
+                    'language': l10n
+                })  
+                
                 return True
             
             return False
@@ -147,7 +156,7 @@ def verify_fadmin(email, password):
             cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT id, password_hash, salt,
-                family_id, member_id 
+                family_id, member_id, l10n
                 FROM {dbm.db_tables['users']} 
                 WHERE email = ? 
                 AND is_admin = {dbm.User_State['f_admin']} 
@@ -157,7 +166,7 @@ def verify_fadmin(email, password):
             if result is None:
                 return False
                 
-            user_id, stored_hash, salt, family_id, member_id = result
+            user_id, stored_hash, salt, family_id, member_id, l10n = result
             input_hash, _ = hash_password(password, salt)
             
             if input_hash == stored_hash:
@@ -175,7 +184,8 @@ def verify_fadmin(email, password):
                 # Update context
                 cu.update_context({
                     'member_id': member_id,
-                    'family_id': family_id
+                    'family_id': family_id,
+                    'language': l10n
                 })  
                 return True
             
@@ -366,8 +376,8 @@ def create_user (email,
                         is_active = ?,
                         l10n = ?,
                         family_id = ?,
-                        member_id = ?,
-                        WHERE id = ?
+                        member_id = ?
+                    WHERE id = ?
                 """, 
                 (password_hash, salt, 
                  role, is_active, 

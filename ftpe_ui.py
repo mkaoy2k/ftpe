@@ -486,10 +486,10 @@ def show_fadmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )  
             else:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
+                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}") 
+            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}") 
         st.divider()
 
         # Display current family subscribers
@@ -513,10 +513,10 @@ def show_fadmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )
             else:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['subscriber']} {UI_TEXTS['not_found']}")
+                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['subscriber']} {UI_TEXTS['not_found']}")
                 
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}")
+            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}")
        
 def show_padmin_sidebar():
     """Display the platform admin sidebar"""
@@ -551,13 +551,13 @@ def show_padmin_sidebar():
                 
                 if st.form_submit_button(f"{UI_TEXTS['save']} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']}"):
                     if not email or not eu.validate_email(email):
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['email']} {UI_TEXTS['not_found']}: {email}")
+                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['email']} {UI_TEXTS['not_found']}: {email}")
                     elif not new_password:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['not_found']}")
+                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['not_found']}")
                     elif new_password != confirm_password:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password_error']}")
+                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_error']}")
                     elif len(new_password) < 8:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['at_least_eight_characters']}")
+                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['at_least_eight_characters']}")
                     else:
                         user_id = au.create_user(
                             email, new_password, 
@@ -565,7 +565,7 @@ def show_padmin_sidebar():
                         if user_id:
                             st.success(f"✅ {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['created']} {UI_TEXTS['successfully']}")
                         else:
-                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
+                            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['platform']} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
     
         # Display Logout button at the bottom
         if st.sidebar.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
@@ -596,10 +596,10 @@ def show_padmin_sidebar():
                     hide_index=True  # Explicitly hide the index
                 )
             else:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
+                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['db_error']}: {e}")
+            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}")
 
 def show_fmember_content():
     """Display the family member content area"""
@@ -653,11 +653,11 @@ def reset_password_page():
         
         # Validate inputs
         if not new_password:
-            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
         if len(new_password) < 8:
-            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
         if new_password != confirm_password:
-            error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_error']}")
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_error']}")
         
         # If no validation errors, try to reset password
         if not error_messages:
@@ -671,23 +671,22 @@ def reset_password_page():
                     # Reset form state
                     st.session_state.reset_form_submitted = False
                     
-                    # Show back to login button
-                    if st.button(f"← {UI_TEXTS['back_to_login']}"):
-                        # Clear all session states
-                        del st.session_state.authenticated
-                        del st.session_state.user_email
-                        del st.session_state.user_state
-                        del st.session_state.app_context
-                        del st.session_state.ui_context
-                        del st.session_state.reset_form_submitted
+                    # Show back to login button 
+                    # Todo: not working
+                    # if st.button(f"← {UI_TEXTS['back_to_login']}"):
+                    #     # Clear all session states
+                    #     cu.clear_all_session_states()
+                    #     show_login_page()
+                    # Show refresh button as an alternative
+                    if st.button(f"{UI_TEXTS['refresh']}"):
                         st.rerun()
                     
                     # Prevent form from showing again
                     st.stop()
                 else:
-                    error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_reset_failed']}")
+                    error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}")
             except Exception as e:
-                error_messages.append(f"❌ {fu.get_function_name()} {UI_TEXTS['password_reset_failed']}: {str(e)}")
+                error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}: {str(e)}")
         
         # Display all error messages if any
         for error in error_messages:
@@ -968,9 +967,9 @@ def show_fadmin_content() -> None:
                                 else:
                                     st.error(f"❌ {message}")
                             else:
-                                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
+                                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['family']} {UI_TEXTS['admin']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
                         else:
-                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['first']}, {UI_TEXTS['To become a family admin, you must join this family as member first']}")
+                            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['first']}, {UI_TEXTS['To become a family admin, you must join this family as member first']}")
     
         # Form for Family Subscriber
         with col1:
@@ -1017,16 +1016,14 @@ def show_fadmin_content() -> None:
                                     success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                     if success:
                                         st.success(f"✅ Family member {email} subscribed successfully")
-                                        # Clear form on success
-                                        st.session_state.new_password = ""
-                                        st.session_state.confirm_password = ""
-                                        st.session_state.family_admin_email = ""
+                                        # Use form's key to reset the form
+                                        st.rerun()
                                     else:
                                         st.error(f"❌ {message}")
                                 else:
-                                    st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
+                                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['family']} {UI_TEXTS['member']} {UI_TEXTS['created']} {UI_TEXTS['failed']}")
                             else:
-                                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['first']}, {UI_TEXTS['join_family_as']} {UI_TEXTS['subscriber']}")
+                                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['first']}, {UI_TEXTS['join_family_as']} {UI_TEXTS['subscriber']}")
     
     available_tables =  [os.getenv("TBL_MEMBERS", "members"),
                  os.getenv("TBL_RELATIONS", "relations"),
@@ -1368,7 +1365,7 @@ def main():
 
     # Initialize admin features (adds necessary columns to user table)
     if not init_admin_features():
-        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['admin_init_error']}")
+        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin_init_error']}")
         st.stop()
     
     # Check authentication
@@ -1384,6 +1381,7 @@ def main():
         elif st.session_state.user_state == dbm.User_State['f_member']:
             show_fmember_sidebar()
             show_fmember_content()
+
 
 # Initialize session state
 cu.init_session_state()
