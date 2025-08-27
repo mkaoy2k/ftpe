@@ -973,7 +973,7 @@ def main_page(nav, lname_idx):
             st.graphviz_chart(dot, use_container_width=True)
 
         except:
-            st.warning(f"❌ {g_loc['MEMBER_NOT_FOUND']}")
+            st.warning(f"⚠️ {g_loc['MEMBER_NOT_FOUND']}")
             # continue to adjust sliders
 
         st.success(

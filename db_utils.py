@@ -2458,7 +2458,8 @@ def search_members(
     died: str = "",
     id: int = 0,
     email: str = "",
-    sex: str = ""
+    sex: str = "",
+    alive: bool = False
 ) -> List[Dict[str, Any]]:
     """
     Search for members based on various filter criteria.
@@ -2480,6 +2481,11 @@ def search_members(
               - Full date (YYYY-MM-DD)
               - Year and month (YYYY-MM)
               - Just year (YYYY)
+        sex: Gender filter, which can be:
+              - "M" for male
+              - "F" for female
+              - "O" for other
+        alive: Boolean flag to filter for living members only
     Returns:
         List[Dict[str, Any]]: A list of member dictionaries 
         matching the search criteria. Each dictionary contains 
@@ -2587,6 +2593,8 @@ def search_members(
             
             # Convert results to list of dictionaries
             results = [dict(row) for row in cursor.fetchall()]
+            if alive:
+                results = [member for member in results if member_is_alive(member)]
             log.debug(f"Found {len(results)} members matching search criteria")
             
             return results

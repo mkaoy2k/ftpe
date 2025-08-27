@@ -12,9 +12,24 @@ This module contains core database operations for the admin interface.
 import sqlite3
 import db_utils as dbm
 import logging
+from dotenv import load_dotenv
+import os
 
+# Load environment variables from .env file
+load_dotenv(".env")
+
+# Configure log for this module
 log = logging.getLogger(__name__)
+# Set log level from environment variable or default to WARNING
+log_level = os.getenv('LOGGING', 'WARNING').upper()
+log.setLevel(getattr(logging, log_level, logging.WARNING))
 
+# Configure console handler for debug output
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
 
 def init_db_management():
     """Initialize database management"""

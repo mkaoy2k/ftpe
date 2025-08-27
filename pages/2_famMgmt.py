@@ -922,7 +922,7 @@ def add_member_page() -> None:
                     else:
                         message = f"❌ {fu.get_function_name()} {UI_TEXTS['failed']}: {UI_TEXTS['field']} {UI_TEXTS['required']} "
                 else:
-                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {member_id}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {member_id}"
                 
             except Exception as e:
                 message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['failed']}: {member_id}"
@@ -1175,7 +1175,7 @@ def delete_member_page() -> None:
             member = dbm.get_member(member_id)
         
             if not member:
-                error_msg = f"{fu.get_function_name()} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {member_id}"
+                error_msg = f"{fu.get_function_name()} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {member_id}"
                 logger.error(error_msg)
                 st.session_state.delete_message = f"❌ {error_msg}"
                 st.session_state.delete_member_confirmation = False

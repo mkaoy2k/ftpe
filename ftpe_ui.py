@@ -288,6 +288,83 @@ def show_reset_password_page():
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error processing your request: {str(e)}")
+    
+def reset_password_page():
+    """
+    Display the reset password page on which users can reset 
+    their password.
+    """
+    global UI_TEXTS
+    
+    # Initialize form state if not exists
+    if 'reset_form_submitted' not in st.session_state:
+        st.session_state.reset_form_submitted = False
+    
+    with st.form("reset_password_form"):
+        st.subheader(f"{UI_TEXTS['reset']} {UI_TEXTS['password']} {UI_TEXTS['page']}")
+        email = st.session_state.user_email
+        st.markdown(f"{UI_TEXTS['email']}: {email}")
+        new_password = st.text_input(
+            f"{UI_TEXTS['password']}", 
+            type="password", 
+            key="reset_new_password",
+            help=f"{UI_TEXTS['enter']} {UI_TEXTS['password']}")
+        
+        confirm_password = st.text_input(
+            f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}", 
+            type="password", 
+            key="confirm_new_password",
+            help=f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}")
+        
+        submit_button = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
+        
+        if submit_button:
+            st.session_state.reset_form_submitted = True
+    
+    # Handle form submission outside the form context
+    if st.session_state.reset_form_submitted:
+        error_messages = []
+        
+        # Validate inputs
+        if not new_password:
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
+        if len(new_password) < 8:
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
+        if new_password != confirm_password:
+            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_error']}")
+        
+        # If no validation errors, try to reset password
+        if not error_messages:
+            try:
+                # Use reset_password function instead of create_user
+                success = au.reset_password(email, new_password)
+                if success:
+                    st.success(f"✅ {UI_TEXTS['password']} {UI_TEXTS['reset']} {UI_TEXTS['successfully']}")
+                    st.info(f"ℹ️ {UI_TEXTS['login_with_new_password']}")
+                    
+                    # Reset form state
+                    st.session_state.reset_form_submitted = False
+                    
+                    # Show back to login button 
+                    # Todo: not working
+                    # if st.button(f"← {UI_TEXTS['back_to_login']}"):
+                    #     # Clear all session states
+                    #     cu.clear_all_session_states()
+                    #     show_login_page()
+                    # Show refresh button as an alternative
+                    if st.button(f"{UI_TEXTS['refresh']}"):
+                        st.rerun()
+                    
+                    # Prevent form from showing again
+                    st.stop()
+                else:
+                    error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}")
+            except Exception as e:
+                error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}: {str(e)}")
+        
+        # Display all error messages if any
+        for error in error_messages:
+            st.error(error)
 
 def show_login_page():
     """Display the login page"""
@@ -605,7 +682,7 @@ def show_fmember_content():
     """Display the family member content area"""
     global UI_TEXTS
     family_id = st.session_state.app_context.get('family_id')
-    st.header(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['member']} {UI_TEXTS['home']}")
+    st.header(f"{UI_TEXTS['family']} ({UI_TEXTS['id']}: {family_id}) {UI_TEXTS['member']} {UI_TEXTS['home']}")
     
     show_front_end()
     
@@ -614,83 +691,6 @@ def show_fmember_content():
     
     # Reset Password Management
     reset_password_page()
-    
-def reset_password_page():
-    """
-    Display the reset password page on which users can reset 
-    their password.
-    """
-    global UI_TEXTS
-    
-    # Initialize form state if not exists
-    if 'reset_form_submitted' not in st.session_state:
-        st.session_state.reset_form_submitted = False
-    
-    with st.form("reset_password_form"):
-        st.subheader(f"{UI_TEXTS['reset']} {UI_TEXTS['password']} {UI_TEXTS['page']}")
-        email = st.session_state.user_email
-        st.markdown(f"{UI_TEXTS['email']}: {email}")
-        new_password = st.text_input(
-            f"{UI_TEXTS['password']}", 
-            type="password", 
-            key="reset_new_password",
-            help=f"{UI_TEXTS['enter']} {UI_TEXTS['password']}")
-        
-        confirm_password = st.text_input(
-            f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}", 
-            type="password", 
-            key="confirm_new_password",
-            help=f"{UI_TEXTS['confirm']} {UI_TEXTS['password']}")
-        
-        submit_button = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
-        
-        if submit_button:
-            st.session_state.reset_form_submitted = True
-    
-    # Handle form submission outside the form context
-    if st.session_state.reset_form_submitted:
-        error_messages = []
-        
-        # Validate inputs
-        if not new_password:
-            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['required']}")
-        if len(new_password) < 8:
-            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password']} {UI_TEXTS['field']} {UI_TEXTS['at_least_eight_characters']}")
-        if new_password != confirm_password:
-            error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_error']}")
-        
-        # If no validation errors, try to reset password
-        if not error_messages:
-            try:
-                # Use reset_password function instead of create_user
-                success = au.reset_password(email, new_password)
-                if success:
-                    st.success(f"✅ {UI_TEXTS['password']} {UI_TEXTS['reset']} {UI_TEXTS['successfully']}")
-                    st.info(f"ℹ️ {UI_TEXTS['login_with_new_password']}")
-                    
-                    # Reset form state
-                    st.session_state.reset_form_submitted = False
-                    
-                    # Show back to login button 
-                    # Todo: not working
-                    # if st.button(f"← {UI_TEXTS['back_to_login']}"):
-                    #     # Clear all session states
-                    #     cu.clear_all_session_states()
-                    #     show_login_page()
-                    # Show refresh button as an alternative
-                    if st.button(f"{UI_TEXTS['refresh']}"):
-                        st.rerun()
-                    
-                    # Prevent form from showing again
-                    st.stop()
-                else:
-                    error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}")
-            except Exception as e:
-                error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}: {str(e)}")
-        
-        # Display all error messages if any
-        for error in error_messages:
-            st.error(error)
 
 def search_members_page() -> None:
     """
@@ -721,8 +721,15 @@ def search_members_page() -> None:
     
     # Search form
     with st.form("search_form"):
-        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} ({family_id}) {UI_TEXTS['member']}")
+        st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} ({UI_TEXTS['id']}: {family_id}) {UI_TEXTS['member']}")
         
+        alive = st.radio(
+            "",
+            [UI_TEXTS['all'], UI_TEXTS['alive']],
+            index=0,
+            key="alive",
+            horizontal=True
+        )
         # Create three rows of search fields
         row1_col1, row1_col2, row1_col3 = st.columns(3)
         row2_col1, row2_col2, row2_col3 = st.columns(3)
@@ -795,7 +802,8 @@ def search_members_page() -> None:
                     died=died if died else "",
                     id=member_id if member_id > 0 else 0,
                     email=email if email else "",
-                    sex={UI_TEXTS['sex_male']: "M", UI_TEXTS['sex_female']: "F", UI_TEXTS['sex_other']: "O"}.get(sex, "") if sex else ""
+                    sex={UI_TEXTS['sex_male']: "M", UI_TEXTS['sex_female']: "F", UI_TEXTS['sex_other']: "O"}.get(sex, "") if sex else "",
+                    alive=alive == UI_TEXTS['alive']
                 )
                 if results: 
                     st.session_state.search_results = results
@@ -858,7 +866,7 @@ def show_fadmin_content() -> None:
     """Display the family admin content area"""
     global UI_TEXTS
     family_id = st.session_state.app_context.get('family_id')
-    st.header(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['admin']} {UI_TEXTS['home']}")
+    st.header(f"{UI_TEXTS['family']} ({UI_TEXTS['id']}: {family_id}) {UI_TEXTS['admin']} {UI_TEXTS['home']}")
     
     show_front_end()
     
@@ -867,7 +875,7 @@ def show_fadmin_content() -> None:
     
     # Family Subscription Management
     with st.container(border=True):
-        st.subheader(f"{UI_TEXTS['family']} ({family_id}) {UI_TEXTS['subscription']} {UI_TEXTS['management']}")
+        st.subheader(f"{UI_TEXTS['family']} ({UI_TEXTS['id']}: {family_id}) {UI_TEXTS['subscription']} {UI_TEXTS['management']}")
 
         col21, col22 = st.columns(2)
         with col22:
