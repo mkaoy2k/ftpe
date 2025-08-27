@@ -143,7 +143,7 @@ def new_birth_page():
                                 st.session_state.selected_parents['mother'] = parent['id']
                             st.session_state.search_results.append(parent)
                         else:
-                            st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                            st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.warning(f"⚠️ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -158,7 +158,7 @@ def new_birth_page():
                                 for member in members:
                                     st.session_state.search_results.append(member)
                             else:
-                                st.warning(f"❌ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                                st.warning(f"❌ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -459,7 +459,7 @@ def new_death_page():
                     if member:
                         st.session_state.search_results = [member]
                     else:
-                        st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except ValueError as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                 except Exception as e:
@@ -473,7 +473,7 @@ def new_death_page():
                         if members:
                             st.session_state.search_results = members
                         else:
-                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {name}")
+                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except ValueError as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                 except Exception as e:
@@ -633,7 +633,7 @@ def new_adopted_child_page():
                                 st.session_state.selected_parents['mother'] = parent['id']
                             st.session_state.search_results.append(parent)
                         else:
-                            st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                            st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -648,7 +648,7 @@ def new_adopted_child_page():
                                 for parent in parents:
                                     st.session_state.search_results.append(parent)
                         else:
-                            st.warning(f"⚠️ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                            st.warning(f"⚠️ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -942,7 +942,7 @@ def new_adopted_parent_page():
                     if child:
                         st.session_state.search_results = [child]
                     else:
-                        st.warning(f"⚠️ {child_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {child_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except ValueError as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                 except Exception as e:
@@ -956,7 +956,7 @@ def new_adopted_parent_page():
                         if members:
                             st.session_state.search_results = members
                         else:
-                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {name}")
+                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except ValueError as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                 except Exception as e:
@@ -1222,7 +1222,7 @@ def divorce_seperation_page():
                                 st.session_state.selected_parties['partner2'] = member
                             st.session_state.search_results.append(member)
                         else:
-                            st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                            st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -1237,7 +1237,7 @@ def divorce_seperation_page():
                                 for member in members:
                                     st.session_state.search_results.append(member)
                             else:
-                                st.warning(f"⚠️ {name}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                                st.warning(f"⚠️ {name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
                     except Exception as e:
@@ -1469,7 +1469,7 @@ def new_marriage_partnership_page():
                     if member:
                         st.session_state.search_results.append(member)
                     else:
-                        st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
@@ -1481,7 +1481,7 @@ def new_marriage_partnership_page():
                         if members:
                             st.session_state.search_results.extend(members)
                         else:
-                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['member']} {UI_TEXTS['not_found']}: {name}")
+                            st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
     
@@ -1718,7 +1718,7 @@ def new_step_child_page():
                     if member:
                         st.session_state.search_results.append(member)
                     else:
-                        st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
@@ -1728,7 +1728,7 @@ def new_step_child_page():
                     if members:
                         st.session_state.search_results.extend(members)
                     else:
-                        st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
 
@@ -1966,7 +1966,7 @@ def new_step_parent_page():
                     if member:
                         st.session_state.search_results.append(member)
                     else:
-                        st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
@@ -1976,7 +1976,7 @@ def new_step_parent_page():
                     if members:
                         st.session_state.search_results.extend(members)
                     else:
-                        st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}")
+                        st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
                     st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
 

@@ -45,7 +45,7 @@ def birthday_of_the_month_page():
             members = dbm.get_members_when_born_in(month_number)
             
             if not members:
-                message = f"⚠️ {fu.get_function_name()}: {UI_TEXTS['member']} {UI_TEXTS['not_found']}"
+                message = f"⚠️ {fu.get_function_name()}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}"
                 st.warning(message)
                 return
             
