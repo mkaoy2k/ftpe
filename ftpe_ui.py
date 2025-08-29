@@ -724,11 +724,12 @@ def search_members_page() -> None:
         st.subheader(f"{UI_TEXTS['search']} {UI_TEXTS['family']} ({UI_TEXTS['id']}: {family_id}) {UI_TEXTS['member']}")
         
         alive = st.radio(
-            "",
+            f"{UI_TEXTS['search']} {UI_TEXTS['members']}",
             [UI_TEXTS['all'], UI_TEXTS['alive']],
             index=0,
             key="alive",
-            horizontal=True
+            horizontal=True,
+            help=f"{UI_TEXTS['search']} {UI_TEXTS['members']}"
         )
         # Create three rows of search fields
         row1_col1, row1_col2, row1_col3 = st.columns(3)
