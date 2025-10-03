@@ -109,144 +109,42 @@ def birthday_of_the_month_page():
                 
                 # Define callback functions
                 def on_publish():
-                    try:
-                        # Create email publisher object
-                        publisher = eu.EmailPublisher(eu.Config.MAIL_USERNAME, eu.Config.MAIL_PASSWORD)
-                        
-                        # Filter out None or empty email addresses
-                        recipients = [m.get('email') for m in members if m.get('email')]
-                        
-                        if not recipients:
-                            st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['email']} {UI_TEXTS['not_found']}")
-                            return
-                        
-                        # Rest of the email sending code...
-                        text_content = """Wishing you a wonderful birthday celebration!
-                        May this special day bring you joy and happiness!
+                    # Create email publisher object
+                    publisher = eu.EmailPublisher(eu.Config.MAIL_USERNAME, eu.Config.MAIL_PASSWORD)
+                    
+                    # Filter out None or empty email addresses
+                    recipients = [m.get('email') for m in members if m.get('email')]
+                    
+                    if not recipients:
+                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['email']} {UI_TEXTS['not_found']}")
+                        return
+                    
+                    # Rest of the email sending code...
+                    text_content = """Wishing you a wonderful birthday celebration!
+                    May this special day bring you joy and happiness!
 
-                        Best regards,
-                        Your Family Team"""
-                        
-                        # Create HTML content with animated birthday card
-                        html_content = """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
-        .birthday-card {
-            font-family: 'Arial', sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #fff6f6 0%, #f8e8ff 100%);
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .birthday-title {
-            font-family: 'Dancing Script', cursive;
-            font-size: 36px;
-            color: #e91e63;
-            margin: 20px 0;
-            animation: bounce 2s infinite;
-        }
-        .birthday-message {
-            font-size: 16px;
-            color: #333;
-            line-height: 1.6;
-            margin: 20px 0;
-        }
-        .balloon {
-            display: inline-block;
-            width: 40px;
-            height: 50px;
-            background: #ff4081;
-            border-radius: 50%;
-            position: relative;
-            margin: 0 5px;
-            animation: float 3s ease-in-out infinite;
-        }
-        .balloon:before {
-            content: '';
-            position: absolute;
-            width: 2px;
-            height: 50px;
-            background: #999;
-            top: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .balloon:nth-child(2n) {
-            background: #3f51b5;
-            animation-delay: 0.3s;
-        }
-        .balloon:nth-child(3n) {
-            background: #4caf50;
-            animation-delay: 0.6s;
-        }
-        .balloon:nth-child(4n) {
-            background: #ff9800;
-            animation-delay: 0.9s;
-        }
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0) rotate(-2deg);
-            }
-            50% {
-                transform: translateY(-20px) rotate(2deg);
-            }
-        }
-        @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {
-                transform: translateY(0);
-            }
-            40% {
-                transform: translateY(-20px);
-            }
-            60% {
-                transform: translateY(-10px);
-            }
-        }
-        .signature {
-            margin-top: 30px;
-            font-style: italic;
-            color: #666;
-        }
-    </style>
-    <div class="birthday-card">
-        <div class="balloon"></div>
-        <div class="balloon"></div>
-        <div class="balloon"></div>
-        <div class="balloon"></div>
-                
-        <h1 class="birthday-title">Happy Birthday!</h1>
-                
-        <div class="birthday-message">
-            <p>Wishing you a wonderful birthday celebration!</p>
-            <p>May this special day bring you joy and happiness!</p>
-        </div>
-                
-        <div class="signature">
-            <p>Best regards,<br>Your Family Team</p>
-        </div>
-    </div>
-    """
-                        
-                        # Check if the attached b'day card file exists
-                        card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
-                        if not os.path.exists(card_file):
-                            st.error(f"❌ {fu.get_function_name()} {card_file} {UI_TEXTS['not_found']}")
-                            return
-                        
-                        # Send email with the animated birthday card
-                        publisher.publish_email(
-                            subject=f"🎉 Happy Birthday Celebrations - {selected_month} {datetime.now().year}",
-                            text=text_content,
-                            html=html_content,
-                            attached_file=card_file,
-                            recipients=recipients
-                        )
-                        st.success(f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['published']}  {UI_TEXTS['count']}: {len(recipients)}")
-                    except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['publish_error']}: {str(e)}")
+                    Best regards,
+                    Your Family Team"""
+                                            
+                    # Check if the attached b'day card file exists
+                    card_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bday.html")
+                    if not os.path.exists(card_file):
+                        st.error(f"❌ {fu.get_function_name()} {card_file} {UI_TEXTS['not_found']}")
+                        return
+                    # Create HTML content with animated birthday card
+                    html_content = open(card_file, 'r').read()
+                    # Display the HTML content properly
+                    st.components.v1.html(html_content, height=500)
+                    
+                    # Send email with the animated birthday card
+                    publisher.publish_email(
+                        subject=f"🎉 Happy Birthday Celebrations - {selected_month} {datetime.now().year}",
+                        text=text_content,
+                        html=html_content,
+                        attached_file=card_file,
+                        recipients=recipients
+                    )
+                    st.success(f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['published']}  {UI_TEXTS['count']}: {len(recipients)}")
                 
                 def on_download():
                     try:
