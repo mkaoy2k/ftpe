@@ -133,6 +133,7 @@
     "platform": "Platform",
     "platform_admin": "Platform Admin",
     "publish": "Publish",
+    "published": "Published",
     "publish_error": "Publish Error",
     "query": "Query",
     "refresh": "Refresh",
