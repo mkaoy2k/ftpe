@@ -964,7 +964,8 @@ def show_fadmin_content() -> None:
                         elif len(results) == 1:
                             user_id = au.create_user(
                                 email, new_password, 
-                                role=dbm.User_State['f_admin'])
+                                role=dbm.User_State['f_admin'],
+                                family_id=family_id)
                             if user_id:
                                 # Add as a subscriber by default for family admin
                                 success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
@@ -1020,7 +1021,8 @@ def show_fadmin_content() -> None:
                             elif len(results) == 1:
                                 user_id = au.create_user(
                                     email, new_password, 
-                                    role=dbm.User_State['f_member'])
+                                    role=dbm.User_State['f_member'],
+                                    family_id=family_id)
                                 if user_id and action == UI_TEXTS['subscribe']:
                                     success, message = dbm.add_subscriber(email, "By Family Admin", lang=l10n)
                                     if success:
