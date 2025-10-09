@@ -195,6 +195,7 @@
     "user_not_found": "找不到使用者",
     "visualization": "視覺化",
     "MAIN_TITLE" : "FamilyTrees 族譜入口網",
+    "MENU_TITLE" : "族譜功能選單",
     "MENU_DISP_GRAPH_BY_MALE" : "男丁二代關係圖",
     "MENU_QUERY_3G_BY_MALE" : "男丁三代關係查詢",
     "MENU_MEMBER_ADD" : "成員新增",
