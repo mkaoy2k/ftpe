@@ -2205,7 +2205,7 @@ def sidebar() -> None:
                 })
             
             st.subheader(UI_TEXTS['navigation'])
-            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("fTrees.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
@@ -2283,7 +2283,7 @@ except (KeyError, AttributeError):
 if __name__ == "__main__":
     # Check authentication
     if not st.session_state.get('authenticated', False):
-        st.switch_page("ftpe_ui.py")
+        st.switch_page("fTrees.py")
     else:
         sidebar()
         main()

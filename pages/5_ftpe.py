@@ -1677,7 +1677,7 @@ cu.init_session_state()
     
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("ftpe_ui.py")
+    st.switch_page("fTrees.py")
 else:
     st.empty()
 
@@ -1732,7 +1732,7 @@ else:
         if st.session_state.user_state != dbm.User_State['p_admin']:
             # Page Navigation Links
             st.subheader("Navigation")
-            st.page_link("ftpe_ui.py", label="Home", icon="🏠")
+            st.page_link("fTrees.py", label="Home", icon="🏠")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
