@@ -13,7 +13,7 @@ This page provides user management functionality including:
 import streamlit as st
 import pandas as pd
 import db_utils as dbm
-from ftpe_ui import show_padmin_sidebar, show_front_end
+from fTrees import show_padmin_sidebar, show_front_end
 import context_utils as cu
 import funcUtils as fu
 import auth_utils as au
@@ -30,7 +30,7 @@ def format_timestamps(df):
 def show_page():
     # Get UI texts from session state
     global UI_TEXTS
-    from ftpe_ui import UI_TEXTS  # 確保從 ftpe_ui 導入 UI_TEXTS
+    from fTrees import UI_TEXTS  # 確保從 fTrees 導入 UI_TEXTS
     
     # Initialize logging
     import logging
@@ -303,6 +303,6 @@ if 'app_context' not in st.session_state:
 
 # Check authentication
 if not st.session_state.get('authenticated', False):
-    st.switch_page("ftpe_ui.py")
+    st.switch_page("fTrees.py")
 else:
     show_page()
