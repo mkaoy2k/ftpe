@@ -296,55 +296,54 @@ def update_family_page() -> None:
         st.info(st.session_state.update_message)
         del st.session_state.update_message
     
-    if st.button(f"{UI_TEXTS['update']} {UI_TEXTS['family']}", type="primary"):
-        if family_id:
-            # Get family data
-            family = dbm.get_family(family_id)
-            
-            if not family:
-                message = f"⚠️ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}"
-                st.session_state.update_message = message
-                st.rerun()
-            
-        with st.form(f"update_family_form_{family_id}"):
-            st.subheader(
-                f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['form']}: {family_id}")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                name = st.text_input(
-                    f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['name']}",
-                    family.get('name', ''),
-                    key=f"update_name_{family_id}"
-                )
-                
-                # Display creation/update timestamps as read-only
-                created_at = family.get('created_at', 'N/A')
-                updated_at = family.get('updated_at', 'N/A')
-                
-                st.caption(f"Created: {created_at}")
-                st.caption(f"Last Updated: {updated_at}")
-                
-            with col2:
-                url = st.text_input(
-                    f"{UI_TEXTS['update']} {UI_TEXTS['url']}",
-                    family.get('url', ''),
-                    placeholder="https://example.com",
-                    key=f"update_url_{family_id}"
-                )
-            
-            background = st.text_area(
-                f"{UI_TEXTS['update']} {UI_TEXTS['background']}",
-                family.get('background', ''),
-                height=150,
-                help="Enter any relevant family history or background information",
-                key=f"update_background_{family_id}"
+    if family_id:
+        # Get family data
+        family = dbm.get_family(family_id)
+        
+        if not family:
+            message = f"⚠️ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}"
+            st.session_state.update_message = message
+            st.rerun()
+    
+    with st.form(f"update_family_form_{family_id}"):
+        st.subheader(
+            f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['form']}: {family_id}")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input(
+                f"{UI_TEXTS['update']} {UI_TEXTS['family']} {UI_TEXTS['name']}",
+                family.get('name', ''),
+                key=f"update_name_{family_id}"
             )
             
-            submitted = st.form_submit_button(f"{UI_TEXTS['submit']}", type="primary")
+            # Display creation/update timestamps as read-only
+            created_at = family.get('created_at', 'N/A')
+            updated_at = family.get('updated_at', 'N/A')
             
-            if submitted:
+            st.caption(f"Created: {created_at}")
+            st.caption(f"Last Updated: {updated_at}")
+            
+        with col2:
+            url = st.text_input(
+                f"{UI_TEXTS['update']} {UI_TEXTS['url']}",
+                family.get('url', ''),
+                placeholder="https://example.com",
+                key=f"update_url_{family_id}"
+            )
+        
+        background = st.text_area(
+            f"{UI_TEXTS['update']} {UI_TEXTS['background']}",
+            family.get('background', ''),
+            height=150,
+            help="Enter any relevant family history or background information",
+            key=f"update_background_{family_id}"
+        )
+        
+        submitted = st.form_submit_button(f"{UI_TEXTS['update']}", type="primary")
+        
+        if submitted:
                 # Validate required fields
                 if not name.strip():
                     message = f"❌ {fu.get_function_name()} {UI_TEXTS['name']} {UI_TEXTS['required']}"
