@@ -249,7 +249,7 @@ def show_reset_password_page():
                                     If you did not request this, please ignore this email.
                                     
                                     Regards,
-                                    {os.getenv('APP_NAME', 'FamilyTreePE')} Team
+                                    {os.getenv('APP_NAME', 'FamilyTrees')} Team
                                     """
                                     
                                     html = f"""
@@ -266,7 +266,7 @@ def show_reset_password_page():
                                         <p><code>{reset_link}</code></p>
                                         <p>This link will expire in {expires_hours} hours.</p>
                                         <p>If you did not request this, please ignore this email.</p>
-                                        <p>Regards,<br>{os.getenv('APP_NAME', 'FamilyTreePE')} Team</p>
+                                        <p>Regards,<br>{os.getenv('APP_NAME', 'FamilyTrees')} Team</p>
                                     </div>
                                     """
                                     
