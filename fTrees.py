@@ -17,6 +17,25 @@ Family Tree Platform - 管理介面模組
 注意：
 - 此模組使用 Streamlit 框架建置網頁介面
 - 依賴多個自訂模組處理資料庫操作、電子郵件發送等功能
+- 新增 log_activity 函數：
+    - 接收使用者 ID 和動作（'login' 或 'logout'）作為參數
+    - 自動建立 data 目錄（如果不存在）
+    - 使用當月作為日誌檔案名稱（如：01.log 到 12.log）
+    - 在寫入新日誌前，會檢查並清除超過一年的舊記錄
+    - 日誌格式：YYYY-MM-DD HH:MM:SS,user@example.com,login
+    - 登入時記錄：
+        - 在驗證成功後（無論是平台管理員、家族管理員或家族成員），記錄登入活動
+    - 登出時記錄：
+        - 在使用者點擊登出按鈕時，記錄登出活動
+    - 錯誤處理：
+        - 所有檔案操作都包含在 try-except 區塊中
+        - 如果日誌記錄失敗，會將錯誤輸出到控制台，但不會影響應用程式正常運作
+    - 這個實現確保了：
+        - 日誌檔案會按月份自動分開
+        - 自動清理超過一年的舊記錄
+        - 日誌格式一致且易於解析
+    - 錯誤處理完善，不會影響主要功能
+您可以在 data 目錄下找到按月份命名的日誌檔案（如 11.log 代表 11 月的日誌）。
 """
 from dotenv import load_dotenv
 import os
@@ -35,6 +54,8 @@ import context_utils as cu
 load_dotenv()
 
 import streamlit as st
+import os
+from datetime import datetime, timedelta
 
 # Set initial page config (will be updated after login)
 st.set_page_config(
@@ -366,6 +387,55 @@ def reset_password_page():
         for error in error_messages:
             st.error(error)
 
+def log_activity(user_id, action):
+    """Log user activity to a monthly log file
+    
+    Args:
+        user_id (str): The ID of the user
+        action (str): Either 'login' or 'logout'
+    """
+    try:
+        # Create data directory if it doesn't exist
+        os.makedirs('data', exist_ok=True)
+        
+        # Get current month and year for log file name
+        now = datetime.now()
+        month_str = now.strftime("%m")  # 01-12
+        
+        # Log file path: data/01.log, data/02.log, etc.
+        log_file = os.path.join('data', f"{month_str}.log")
+        
+        # Check if log file exists and clean up old entries if needed
+        if os.path.exists(log_file):
+            one_year_ago = now - timedelta(days=365)
+            cleaned_lines = []
+            
+            # Read existing log file and filter out old entries
+            with open(log_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        # Parse date from log entry (first part before comma)
+                        log_date_str = line.split(',')[0].strip()
+                        log_date = datetime.strptime(log_date_str, '%Y-%m-%d %H:%M:%S')
+                        if log_date >= one_year_ago:
+                            cleaned_lines.append(line)
+                    except (IndexError, ValueError):
+                        # Skip malformed lines
+                        continue
+            
+            # Write cleaned entries back to the file
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.writelines(cleaned_lines)
+        
+        # Add new log entry
+        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(f"{timestamp},{user_id},{action}\n")
+            
+    except Exception as e:
+        # Log the error but don't crash the application
+        print(f"Error logging activity: {e}")
+
 def show_login_page():
     """Display the login page"""
     global UI_TEXTS
@@ -429,18 +499,24 @@ def show_login_page():
                         st.session_state.user_email = email
                         st.session_state.user_state = dbm.User_State['p_admin']
                         st.session_state.login_error = None
+                        # Log successful login
+                        log_activity(email, 'login')
                         st.rerun()
                     elif au.verify_fadmin(email, password):
                         st.session_state.authenticated = True
                         st.session_state.user_email = email
                         st.session_state.user_state = dbm.User_State['f_admin']
                         st.session_state.login_error = None
+                        # Log successful login
+                        log_activity(email, 'login')
                         st.rerun()
                     elif au.verify_fmember(email, password):
                         st.session_state.authenticated = True
                         st.session_state.user_email = email
                         st.session_state.user_state = dbm.User_State['f_member']
                         st.session_state.login_error = None
+                        # Log successful login
+                        log_activity(email, 'login')
                         st.rerun()
                     else:
                         st.error(f"{fu.get_function_name()} {UI_TEXTS['email']} or {UI_TEXTS['password']} {UI_TEXTS['not_found']}")
@@ -484,6 +560,9 @@ def show_fmember_sidebar():
         
         # Display Logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
+            # Log logout activity
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                log_activity(st.session_state.user_email, 'logout')
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
@@ -538,6 +617,9 @@ def show_fadmin_sidebar():
  
         # Logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
+            # Log logout activity
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                log_activity(st.session_state.user_email, 'logout')
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
@@ -646,6 +728,9 @@ def show_padmin_sidebar():
     
         # Display Logout button at the bottom
         if st.sidebar.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
+            # Log logout activity
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                log_activity(st.session_state.user_email, 'logout')
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
