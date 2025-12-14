@@ -452,6 +452,9 @@ def main():
             
         # Add logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="show_3g_logout"):
+            # Log logout activity
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                fu.log_activity(st.session_state.user_email, 'logout')
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()

@@ -1515,6 +1515,10 @@ def main() -> None:
                 
                 # Add logout button at the bottom for admin
                 if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_admin_logout"):
+                    # Log logout activity
+                    if 'user_email' in st.session_state and st.session_state.user_email:
+                        fu.log_activity(st.session_state.user_email, 'logout')
+
                     st.session_state.authenticated = False
                     st.session_state.user_email = None
                     st.rerun()
@@ -1551,6 +1555,10 @@ def main() -> None:
             
             # Add logout button at the bottom for non-admin users
             if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
+                # Log logout activity
+                if 'user_email' in st.session_state and st.session_state.user_email:
+                    fu.log_activity(st.session_state.user_email, 'logout')
+                
                 st.session_state.authenticated = False
                 st.session_state.user_email = None
                 st.rerun()

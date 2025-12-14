@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import context_utils as cu
 import db_utils as dbm
+import funcUtils as fu
 
 def load_json(file_path):
     """
@@ -93,6 +94,9 @@ def main():
         
         # Add logout button at the bottom
         if st.button("Logout", type="primary", use_container_width=True, key="json_editor_logout"):
+            # Log logout activity
+            if 'user_email' in st.session_state and st.session_state.user_email:
+                fu.log_activity(st.session_state.user_email, 'logout')
             st.session_state.authenticated = False
             st.session_state.user_email = None
             st.rerun()
