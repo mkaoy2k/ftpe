@@ -395,6 +395,9 @@ def show_login_page():
         show_reset_password_page()
         return  # Important: Don't show login form if showing reset password
     
+    # Set page title and header
+    st.header(f"{os.getenv('APP_NAME', '')} {os.getenv('RELEASE', '')}")
+    
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
     
