@@ -1075,7 +1075,7 @@ def update_member_page() -> None:
                     "Father ID",
                     min_value=0,
                     step=1,
-                    value=int(member.get('dad_id', 0)),
+                    value=int(member.get('dad_id') or 0),
                     key="update_member_dad_id"
                 )
                 
@@ -1083,7 +1083,7 @@ def update_member_page() -> None:
                     "Mother ID",
                     min_value=0,
                     step=1,
-                    value=int(member.get('mom_id', 0)),
+                    value=int(member.get('mom_id') or 0),
                     key="update_member_mom_id"
                 )
             
