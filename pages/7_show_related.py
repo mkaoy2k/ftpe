@@ -5,11 +5,12 @@ It shows :
 - the center member (id and name from dbm.db_tables['members'] table), 
 - their related family members (id and name from dbm.db_tables['members'] table), 
 - and corresponding relation types (on the label of edges) 
-- draw a graph visualization using graphviz.
+- draw a graph visualization using pyvis.
 """
 
 import streamlit as st
-import graphviz as gv
+import streamlit.components.v1 as components
+import pyvis.network as net
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 import db_utils as dbm
@@ -107,39 +108,73 @@ def get_inverse_relation(relation_type: str) -> str:
     relation = relation_map.get(relation_type.lower(), relation_type)
     return relation
 
-def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
+def create_relationship_graph(relationship_data: Dict[str, Any]) -> net.Network:
     """
-    Create a Graphviz diagram of the relationship tree.
+    Create a Pyvis network diagram of the relationship tree.
     
     Args:
         relationship_data: Dictionary containing relationship data
         
     Returns:
-        graphviz.Digraph: The generated relationship graph
+        pyvis.network.Network: The generated relationship network
     """
-    # Create a new graph
-    graph = gv.Digraph(
-        'relationships',
-        node_attr={
-            'style': 'filled',
-            'shape': 'box',
-            'fontname': 'Arial',
-            'fontsize': '12',
-            'margin': '0.2,0.1',
-            'height': '0.3',
-            'width': '0.5',
-            'fillcolor': '#f0f8ff',  # Light blue background
-            'color': '#4682b4',      # Steel blue border
-            'fontcolor': '#2f4f4f'   # Dark slate gray text
-        },
-        edge_attr={
-            'fontname': 'Arial',
-            'fontsize': '10',
-            'fontcolor': '#708090',  # Slate gray
-            'color': '#a9a9a9',      # Dark gray
-            'arrowsize': '0.7'
-        }
+    # Create a new network
+    graph = net.Network(
+        height="600px",
+        width="100%",
+        bgcolor='white',
+        font_color='black',
+        directed=True,
+        notebook=False
     )
+    
+    # Configure physics and styling
+    graph.set_options("""
+    {
+      "physics": {
+        "forceAtlas2Based": {
+          "gravitationalConstant": -50,
+          "centralGravity": 0.01,
+          "springLength": 100,
+          "springConstant": 0.08
+        },
+        "maxVelocity": 50,
+        "solver": "forceAtlas2Based",
+        "timestep": 0.35,
+        "stabilization": {
+          "iterations": 150
+        }
+      },
+      "nodes": {
+        "borderWidth": 2,
+        "borderWidthSelected": 3,
+        "font": {
+          "size": 14,
+          "face": "Arial",
+          "color": "black"
+        }
+      },
+      "edges": {
+        "arrows": {
+          "to": {
+            "enabled": true,
+            "scaleFactor": 0.8
+          }
+        },
+        "color": {
+          "inherit": true
+        },
+        "smooth": {
+          "type": "continuous"
+        },
+        "font": {
+          "size": 12,
+          "align": "center",
+          "color": "#708090"
+        }
+      }
+    }
+    """)
     
     center = relationship_data.get('center', {})
     family_members = relationship_data.get('family_members', [])
@@ -149,11 +184,19 @@ def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
     center_name = center.get('name', 'Unknown')
     center_label = f"{center_id}: {center_name}"
     
-    graph.node(center_id, center_label, 
-              shape='ellipse', 
-              fillcolor='#ffffe0',  # Light yellow for center
-              style='filled,bold',
-              penwidth='1.5')
+    graph.add_node(
+        center_id,
+        label=center_label,
+        title=f"Center Member: {center_name}",
+        color={
+            'background': '#ffffe0',  # Light yellow for center
+            'border': '#ffd700'       # Gold border
+        },
+        shape='ellipse',
+        size=25,
+        border_width=3,
+        font={'size': 16, 'bold': True}
+    )
     
     # Add family member nodes and edges
     for family_member in family_members:
@@ -163,10 +206,27 @@ def create_relationship_graph(relationship_data: Dict[str, Any]) -> gv.Digraph:
         
         # Create family member node
         family_member_label = f"{family_member_id}: {family_member_name}"
-        graph.node(family_member_id, family_member_label)
+        graph.add_node(
+            family_member_id,
+            label=family_member_label,
+            title=f"Family Member: {family_member_name}\nRelation: {relation_type}",
+            color={
+                'background': '#f0f8ff',  # Light blue background
+                'border': '#4682b4'      # Steel blue border
+            },
+            shape='box',
+            size=20,
+            border_width=2
+        )
         
         # Add edge with relation type
-        graph.edge(center_id, family_member_id, label=relation_type)
+        graph.add_edge(
+            center_id,
+            family_member_id,
+            label=relation_type,
+            title=f"Relation: {relation_type}",
+            color='#a9a9a9'
+        )
     
     return graph
 
@@ -259,7 +319,8 @@ def main():
             
             # Display the graph
             graph = create_relationship_graph(relationship_data)
-            st.graphviz_chart(graph, use_container_width=True)
+            graph_html = graph.generate_html()
+            components.html(graph_html, height=600, scrolling=True)
             
             # Create a container for relationship details below the graph
             with st.container():
