@@ -6,11 +6,12 @@ up to 3 generations and down to 3 generations, given a member ID.
 
 This script displays a family tree centered around a given member ID.
 It shows the member, his/her parents, grandparents, children, 
-and grandchildren in a graph visualization.
+and grandchildren in a graph visualization using Pyvis.
 """
 
 import streamlit as st
-import graphviz as gv
+import streamlit.components.v1 as components
+import pyvis.network as net
 import pandas as pd
 import logging
 from typing import Dict, List, Optional, Tuple, Any
@@ -157,134 +158,137 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
         logger.exception("Error in get_family_members")
         return {}
 
-def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: int = 15, engine: str = 'dot') -> gv.Digraph:
+def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: int = 15, engine: str = 'dot') -> net.Network:
     """
-    Create a Graphviz diagram of the family tree.
+    Create a Pyvis network diagram of the family tree.
     
     Args:
         family_data: Dictionary containing family members data
-        height: Height of the graph in inches (default: 12)
-        width: Width of the graph in inches (default: 15)
-        engine: Graphviz layout engine ('dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo')
+        height: Height multiplier for display (default: 12)
+        width: Width multiplier for display (default: 15)
+        engine: Layout engine ('dot'=hierarchical, others=force-directed)
         
     Returns:
-        graphviz.Digraph: The generated family tree graph
+        pyvis.network.Network: The generated family tree network
     """
-    # Base graph attributes
-    graph_attrs = {
-        'size': f'{width},{height}!',
-        'center': 'true',
-        'margin': '0.2',
-        'pad': '0.5',
-        'dpi': '150',
-        'ratio': 'auto',
-        'splines': 'ortho' if engine in ['dot', 'neato'] else 'spline',
-        'overlap': 'false',
-        'splines': 'true',
-        'nodesep': '0.5',
-        'ranksep': '0.8',
-        'newrank': 'true',
-        'fontname': 'Arial'
+    # Map graphviz engines to pyvis equivalents
+    engine_mapping = {
+        'dot': 'hierarchical',
+        'neato': 'force',
+        'fdp': 'force',
+        'sfdp': 'barnes_hut',
+        'twopi': 'force',
+        'circo': 'force'
     }
     
-    # Engine-specific adjustments
-    if engine == 'dot':
-        graph_attrs.update({
-            'rankdir': 'TB',
-            'nodesep': '0.6',
-            'ranksep': '1.0',
-            'concentrate': 'true'
-        })
-    elif engine == 'neato':
-        graph_attrs.update({
-            'mode': 'major',
-            'model': 'subset',
-            'start': '1',
-            'epsilon': '0.0001',
-            'maxiter': '1000',
-            'damping': '0.99'
-        })
-    elif engine in ['fdp', 'sfdp']:
-        graph_attrs.update({
-            'K': '1.0',
-            'maxiter': '1000',
-            'start': '1',
-            'overlap_scaling': '4',
-            'repulsiveforce': '1.0'
-        })
-    elif engine == 'twopi':
-        graph_attrs.update({
-            'ranksep': '2.0',
-            'rank': 'same',
-            'root': 'center'
-        })
-    elif engine == 'circo':
-        graph_attrs.update({
-            'mindist': '1.0',
-            'nodesep': '0.75',
-            'ranksep': '1.5'
-        })
-
-    # Create the graph with the specified engine and attributes
-    graph = gv.Digraph(
-        'family_tree',
-        node_attr={
-            'shape': 'box',
-            'style': 'rounded,filled',
-            'fillcolor': 'white',
-            'fontname': 'Arial',
-            'fontsize': '14',
-            'margin': '0.15,0.2',
-            'width': '2.5',
-            'height': '0.8',
-            'penwidth': '1.0',
-            'color': 'black',
-            'fixedsize': 'true'
-        },
-        edge_attr={
-            'arrowhead': 'normal',
-            'arrowsize': '0.7',
-            'penwidth': '1.5',
-            'color': '#333333',
-            'constraint': 'true'
-        },
-        graph_attr=graph_attrs,
-        format='svg',
-        engine=engine
+    pyvis_engine = engine_mapping.get(engine, 'hierarchical')
+    
+    # Create the network
+    graph = net.Network(
+        height=f"{height * 80}px",
+        width="100%",
+        bgcolor='white',
+        font_color='black',
+        directed=True,
+        notebook=False
     )
+    
+    # Configure physics based on engine
+    if pyvis_engine == 'hierarchical':
+        graph.set_options("""
+        {
+          "physics": {
+            "hierarchicalRepulsion": {
+              "centralGravity": 0.0,
+              "springLength": 100,
+              "springConstant": 0.01,
+              "nodeDistance": 200,
+              "damping": 0.09
+            },
+            "minVelocity": 0.75,
+            "solver": "hierarchicalRepulsion"
+          }
+        }
+        """)
+    elif pyvis_engine == 'force':
+        graph.set_options("""
+        {
+          "physics": {
+            "forceAtlas2Based": {
+              "gravitationalConstant": -50,
+              "centralGravity": 0.01,
+              "springLength": 100,
+              "springConstant": 0.08
+            },
+            "maxVelocity": 50,
+            "solver": "forceAtlas2Based",
+            "timestep": 0.35,
+            "stabilization": {
+              "iterations": 150
+            }
+          }
+        }
+        """)
+    elif pyvis_engine == 'barnes_hut':
+        graph.set_options("""
+        {
+          "physics": {
+            "barnesHut": {
+              "gravitationalConstant": -8000,
+              "centralGravity": 0.3,
+              "springLength": 150,
+              "springConstant": 0.04,
+              "damping": 0.09,
+              "avoidOverlap": 0.5
+            },
+            "maxVelocity": 50,
+            "minVelocity": 0.1,
+            "solver": "barnesHut"
+          }
+        }
+        """)
+    
     # Define node attributes
-    def get_node_style(member: Dict[str, Any]) -> Dict[str, str]:
+    def get_node_style(member: Dict[str, Any]) -> Dict[str, Any]:
         """Get node style based on member attributes."""
         style = {
-            'fillcolor': 'lightblue',
-            'color': 'black',
-            'fontcolor': 'black',
-            'penwidth': '1'
+            'color': {
+                'background': '#ADD8E6',  # Light blue default
+                'border': 'black'
+            },
+            'border_width': 1,
+            'shape': 'box',
+            'font': {
+                'size': 32,
+                'align': 'center',
+                'color': 'black',
+                'face': 'Arial',
+                'bold': True
+            }
         }
         
         # Highlight center member
         if member.get('id') == family_data.get('center', {}).get('id'):
             style.update({
-                'fillcolor': '#FFD700',  # Gold
-                'color': 'black',
-                'penwidth': '2',
-                'style': 'filled,rounded',
-                'fontweight': 'bold'
+                'color': {
+                    'background': '#FFD700',  # Gold
+                    'border': 'black'
+                },
+                'border_width': 3,
+                'size': 30
             })
             
         # Style based on gender if available
         gender = member.get('sex', '').lower()
         if gender == 'f':
-            style['fillcolor'] = '#FFB6C1'  # Light pink
+            style['color']['background'] = '#FFB6C1'  # Light pink
         elif gender == 'm':
-            style['fillcolor'] = '#ADD8E6'  # Light blue
+            style['color']['background'] = '#ADD8E6'  # Light blue
             
         return style
     
     # Add nodes to the graph
-    def add_member_node(
-        member: Dict[str, Any]
-    ) -> None:
+    def add_member_node(member: Dict[str, Any]) -> None:
         """Add a member node to the graph."""
         member_id = str(member['id'])
         
@@ -319,12 +323,13 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
             except (ValueError, TypeError):
                 # If parsing fails, just use the raw value
                 label += f"\n†{died}"
-        label += f" ({generation})"
+        label += f"\n({generation})"
         
         # Add node with attributes
-        graph.node(
+        graph.add_node(
             member_id,
             label=label,
+            title=f"ID: {member.get('id', 'N/A')}<br>Name: {name}",
             **get_node_style(member)
         )
     
@@ -340,7 +345,13 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
         
         # Connect to center
         if 'center' in family_data and family_data['center']:
-            graph.edge(str(parent['id']), str(family_data['center']['id']))
+            graph.add_edge(
+                str(parent['id']), 
+                str(family_data['center']['id']),
+                color='#333333',
+                width=1.5,
+                arrows='to'
+            )
     
     # Add children
     child_nodes = []
@@ -350,7 +361,13 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
         
         # Connect to center
         if 'center' in family_data and family_data['center']:
-            graph.edge(str(family_data['center']['id']), str(child['id']))
+            graph.add_edge(
+                str(family_data['center']['id']), 
+                str(child['id']),
+                color='#333333',
+                width=1.5,
+                arrows='to'
+            )
     
     # Add grandparents
     grandparent_nodes = []
@@ -363,7 +380,13 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
             parent_relations = dbm.get_member_relations(parent['id'])
             for rel in parent_relations:
                 if rel['relation'] == 'parent' and rel['partner_id'] == grandparent['id']:
-                    graph.edge(str(grandparent['id']), str(parent['id']))
+                    graph.add_edge(
+                        str(grandparent['id']), 
+                        str(parent['id']),
+                        color='#333333',
+                        width=1.5,
+                        arrows='to'
+                    )
     
     # Add grandchildren
     grandchild_nodes = []
@@ -376,42 +399,13 @@ def create_family_graph(family_data: Dict[str, Any], height: int = 12, width: in
             child_relations = dbm.get_member_relations(child['id'])
             for rel in child_relations:
                 if rel['relation'] == 'child' and rel['partner_id'] == grandchild['id']:
-                    graph.edge(str(child['id']), str(grandchild['id']))
-    
-    # Organize nodes into ranks for proper layout
-    with graph.subgraph() as s:
-        s.attr(rank='same')
-        for node in grandparent_nodes:
-            s.node(node)
-    
-    with graph.subgraph() as s:
-        s.attr(rank='same')
-        for node in parent_nodes:
-            s.node(node)
-    
-    with graph.subgraph() as s:
-        s.attr(rank='same')
-        if 'center' in family_data and family_data['center']:
-            s.node(str(family_data['center']['id']))
-    
-    with graph.subgraph() as s:
-        s.attr(rank='same')
-        for node in child_nodes:
-            s.node(node)
-    
-    with graph.subgraph() as s:
-        s.attr(rank='same')
-        for node in grandchild_nodes:
-            s.node(node)
-    
-    # Add invisible edges to help with layout
-    if len(parent_nodes) > 1:
-        for i in range(len(parent_nodes) - 1):
-            graph.edge(parent_nodes[i], parent_nodes[i+1], style='invis')
-    
-    if len(child_nodes) > 1:
-        for i in range(len(child_nodes) - 1):
-            graph.edge(child_nodes[i], child_nodes[i+1], style='invis')
+                    graph.add_edge(
+                        str(child['id']), 
+                        str(grandchild['id']),
+                        color='#333333',
+                        width=1.5,
+                        arrows='to'
+                    )
     
     return graph
 
@@ -492,7 +486,7 @@ def main():
                 f"{UI_TEXTS['graph_width']}:",
                 min_value=1,
                 max_value=30,
-                value=5,
+                value=15,
                 step=1,
                 help=f"{UI_TEXTS['adjust']} {UI_TEXTS['family_tree']} {UI_TEXTS['graph_width']}"
             )
@@ -500,8 +494,8 @@ def main():
             graph_engine = st.selectbox(
                 f"{UI_TEXTS['layout_engine']}:",
                 options=['dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo'],
-                index=0,
-                help=f"{UI_TEXTS['select']} {UI_TEXTS['layout_engine']}"
+                index=3,    # sfdp is the best for large graphs
+                help=f"{UI_TEXTS['select']} {UI_TEXTS['layout_engine']} (dot=hierarchical, others=force-directed)"
             )
         
         submitted = st.form_submit_button(f"{UI_TEXTS['draw']} {UI_TEXTS['family_tree']}", type="primary")
@@ -536,50 +530,11 @@ def main():
                             engine=graph_engine
                         )
                         
-                        # Create a scrollable container for the graph
-                        graph_svg = graph.pipe(format='svg').decode('utf-8')
+                        # Save the graph to HTML and display it
+                        graph_html = graph.generate_html()
                         
-                        # Add CSS for the scrollable container
-                        st.markdown("""
-                        <style>
-                        .graph-container {
-                            width: 100%;
-                            max-height: 800px;
-                            overflow: auto;
-                            border: 1px solid #e0e0e0;
-                            border-radius: 0.5rem;
-                            padding: 1rem;
-                            background-color: white;
-                            margin: 1rem 0;
-                        }
-                        .graph-container svg {
-                            min-width: 100%;
-                            min-height: 100%;
-                        }
-                        /* Custom scrollbar */
-                        .graph-container::-webkit-scrollbar {
-                            width: 10px;
-                            height: 10px;
-                        }
-                        .graph-container::-webkit-scrollbar-track {
-                            background: #f1f1f1;
-                            border-radius: 5px;
-                        }
-                        .graph-container::-webkit-scrollbar-thumb {
-                            background: #888;
-                            border-radius: 5px;
-                        }
-                        .graph-container::-webkit-scrollbar-thumb:hover {
-                            background: #555;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                        
-                        # Display the graph in the scrollable container
-                        st.markdown(
-                            f'<div class="graph-container">{graph_svg}</div>',
-                            unsafe_allow_html=True
-                        )
+                        # Display the graph using components.html
+                        components.html(graph_html, height=graph_height * 80, scrolling=True)
                     except Exception as e:
                         st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}: {str(e)}")
                         logger.exception("Error in drawing family tree graph")
