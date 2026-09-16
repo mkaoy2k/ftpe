@@ -488,11 +488,12 @@ def show_fmember_sidebar():
         
         # Display navigation options
         st.sidebar.subheader(f"{UI_TEXTS['navigation']}")
-        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
+        # Obsolete - personal edition Family Tree
+        # st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="🌲")
         st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
         st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
+        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
         
         # Display logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
@@ -542,14 +543,16 @@ def show_fadmin_sidebar():
         # Page Navigation Links
         st.subheader(f"{UI_TEXTS['navigation']}")
         st.page_link("fTrees.py", label="Home", icon="🏠")
-        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-        st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-        st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
-        st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
+        
+        # Obsolete - personal edition Family Tree
+        # st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+        st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
         st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
         st.page_link("pages/9_birthday.py", label="Birthday", icon="🎂")
-        st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
+        st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")            
+        st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
+        st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+        st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
  
         # Display logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True):
