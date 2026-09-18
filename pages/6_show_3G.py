@@ -435,14 +435,14 @@ def main():
         if st.session_state.user_state != dbm.User_State['p_admin']:
             st.subheader(f"{UI_TEXTS['navigation']}")
             st.page_link("fTrees.py", label="Home", icon="🏠")
+            # st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
+                st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
+                st.page_link("pages/9_birthday.py", label="Birthday", icon="🎂")
+            st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
             st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
             st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-            st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
-            st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
-            if st.session_state.user_state == dbm.User_State['f_admin']:
-                st.page_link("pages/8_caseMgmt.py", label="Case Management", icon="📋")
-                st.page_link("pages/9_birthday.py", label="Birthday of the Month", icon="🎂")
-                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
             
         # Add logout button at the bottom
         if st.button(f"{UI_TEXTS['logout']}", type="primary", use_container_width=True, key="show_3g_logout"):

@@ -2209,14 +2209,14 @@ def sidebar() -> None:
             
             st.subheader(UI_TEXTS['navigation'])
             st.page_link("fTrees.py", label="Home", icon="🏠")
-            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
-            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
-            st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+             # st.page_link("pages/5_ftpe.py", label="FamilyTreePE", icon="📊")
+            if st.session_state.user_state == dbm.User_State['f_admin']:
+                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
+                st.page_link("pages/9_birthday.py", label="Birthday", icon="🎂")
             st.page_link("pages/6_show_3G.py", label="Show 3 Generations", icon="👥")
             st.page_link("pages/7_show_related.py", label="Show Related", icon="👨‍👩‍👧‍👦")
-            if st.session_state.user_state == dbm.User_State['f_admin']:
-                st.page_link("pages/9_birthday.py", label="Birthday", icon="🎂")
-                st.page_link("pages/2_famMgmt.py", label="Family Management", icon="🌲")
+            st.page_link("pages/3_csv_editor.py", label="CSV Editor", icon="🔧")
+            st.page_link("pages/4_json_editor.py", label="JSON Editor", icon="🪛")
              
             # Add logout button at the bottom for non-admin users
             if st.button(UI_TEXTS['logout'], type="primary", use_container_width=True, key="fam_mgmt_user_logout"):
