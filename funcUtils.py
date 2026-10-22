@@ -7,9 +7,22 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 import os
 from dotenv import load_dotenv  # pip install python-dotenv
 import json
+import logging
 import streamlit as st  # pip install streamlit
 from datetime import datetime, timedelta
 import traceback
+
+def show_user_error(message, exc=None, *, warn=False):
+    """Show a generic message in the UI and keep exception details in the server log."""
+    log = logging.getLogger("ftpe")
+    if exc is not None:
+        log.error("%s", message, exc_info=exc)
+    else:
+        log.error("%s", message)
+    if warn:
+        st.warning(message)
+    else:
+        st.error(message)
 
 def log_activity(user_id, action):
     """

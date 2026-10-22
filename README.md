@@ -160,8 +160,10 @@ There are two running environments that are supported to run `fts` App.
    - After pulling mkaoy2k/fts image from the [Docker Hub](https://hub.docker.com), execute the following command to launch `fts` container, for example:
 
    ```bash
-   docker run --name fts -d -p 8501:8501 mkaoy2k/fts:2.6
+   docker run --name fts -d -p 8501:8501 --env-file .env mkaoy2k/fts:2.6
    ```
+
+   Pass configuration and secrets with `--env-file` or `-e`. The image does not contain `.env`, database files, or `data/me.csv`.
 
    - At your default web browser, displaying the login page by entering:
 

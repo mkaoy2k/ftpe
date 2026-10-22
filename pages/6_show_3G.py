@@ -78,12 +78,12 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                 parent_relations = dbm.add_or_update_relation(
                     relation, update=True)
                 if not parent_relations:
-                    st.error(f"❌ Error adding parent relation: {str(e)}")
-                    logger.exception("Error adding parent relation: {str(e)}")
+                    fu.show_user_error("❌ Error adding parent relation", e)
+                    logger.exception("Error adding parent relation")
                     
             except Exception as e:
-                st.error(f"❌ Error adding parent relation: {str(e)}")
-                logger.exception("Error adding parent relation: {str(e)}")
+                fu.show_user_error("❌ Error adding parent relation", e)
+                logger.exception("Error adding parent relation")
 
             # Get grandparents (parents of parents)
             grandparents = dbm.get_parents(parent['id'])
@@ -99,12 +99,12 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                     grandparent_relations = dbm.add_or_update_relation(
                         relation, update=True)
                     if not grandparent_relations:
-                        st.error(f"❌ Error adding grandparent relation: {str(e)}")
-                        logger.exception("Error adding grandparent relation: {str(e)}")
+                        fu.show_user_error("❌ Error adding grandparent relation", e)
+                        logger.exception("Error adding grandparent relation")
                         
                 except Exception as e:
-                    st.error(f"❌ Error adding grandparent relation: {str(e)}")
-                    logger.exception("Error adding grandparent relation: {str(e)}")
+                    fu.show_user_error("❌ Error adding grandparent relation", e)
+                    logger.exception("Error adding grandparent relation")
                 if grandparent and grandparent not in result['grandparents']:
                     result['grandparents'].append(grandparent)
         
@@ -122,12 +122,12 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                 child_relations = dbm.add_or_update_relation(
                     relation, update=True)
                 if not child_relations:
-                    st.error(f"❌ Error adding child relation: {str(e)}")
-                    logger.exception("Error adding child relation: {str(e)}")
+                    fu.show_user_error("❌ Error adding child relation", e)
+                    logger.exception("Error adding child relation")
                     
             except Exception as e:
-                st.error(f"❌ Error adding child relation: {str(e)}")
-                logger.exception("Error adding child relation: {str(e)}")
+                fu.show_user_error("❌ Error adding child relation", e)
+                logger.exception("Error adding child relation")
             # Get grandchildren (children of children)
             grandchildren = dbm.get_children(child['id'])
             for grandchild in grandchildren:
@@ -142,19 +142,19 @@ def get_family_members(member_id: int) -> Dict[str, Any]:
                     grandchild_relations = dbm.add_or_update_relation(
                         relation, update=True)
                     if not grandchild_relations:
-                        st.error(f"❌ Error adding grandchild relation: {str(e)}")
-                        logger.exception("Error adding grandchild relation: {str(e)}")
+                        fu.show_user_error("❌ Error adding grandchild relation", e)
+                        logger.exception("Error adding grandchild relation")
                         
                 except Exception as e:
-                    st.error(f"❌ Error adding grandchild relation: {str(e)}")
-                    logger.exception("Error adding grandchild relation: {str(e)}")
+                    fu.show_user_error("❌ Error adding grandchild relation", e)
+                    logger.exception("Error adding grandchild relation")
                 if grandchild and grandchild not in result['grandchildren']:
                     result['grandchildren'].append(grandchild)
                     
         return result
         
     except Exception as e:
-        st.error(f"❌ Error fetching family members: {str(e)}")
+        fu.show_user_error("❌ Error fetching family members", e)
         logger.exception("Error in get_family_members")
         return {}
 
@@ -536,7 +536,7 @@ def main():
                         # Display the graph using components.html
                         components.html(graph_html, height=graph_height * 80, scrolling=True)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}", e)
                         logger.exception("Error in drawing family tree graph")
                     
                     # Display family information in an expandable section
@@ -584,7 +584,7 @@ def main():
                                 st.info(f"{UI_TEXTS['grandchildren']} {UI_TEXTS['not_found']}")
                 
             except Exception as e:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}: {str(e)}")
+                fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['draw']} {UI_TEXTS['family_tree']} {UI_TEXTS['visualization']} {UI_TEXTS['failed']}", e)
                 logger.exception("Error in main")
                 
 # Initialize session state and UI_TEXTS

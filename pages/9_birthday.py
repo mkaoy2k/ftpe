@@ -10,6 +10,9 @@ import pandas as pd
 from datetime import datetime
 import funcUtils as fu
 import email_utils as eu
+import logging
+
+log = logging.getLogger("ftpe")
 
 def birthday_of_the_month_page():
     """Display members born in a specific month."""
@@ -100,7 +103,8 @@ def birthday_of_the_month_page():
                 message = f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['saved']}: {csv_file}"
                 st.info(message)
             except Exception as e:
-                message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['error']}: {str(e)}"
+                message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['error']}"
+                log.error(message, exc_info=e)
                 st.error(message)
            
             # Create a row with two columns for the buttons
@@ -158,7 +162,7 @@ def birthday_of_the_month_page():
                         )
                         st.success(f"✅ {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['downloaded']}")
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}", e)
                 
                 # Create buttons with callbacks
                 col1, col2 = st.columns(2)
@@ -176,7 +180,8 @@ def birthday_of_the_month_page():
                                on_click=on_download):
                         pass  # Callback handles the action
         except Exception as e:
-            message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}: {str(e)}"
+            message = f"❌ {fu.get_function_name()} {UI_TEXTS['birthday']} {UI_TEXTS['list']} {UI_TEXTS['download_error']}"
+            log.error(message, exc_info=e)
             st.session_state.birthday_message = message
             st.error(message)
 

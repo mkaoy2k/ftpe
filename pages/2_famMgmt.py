@@ -264,9 +264,9 @@ def add_family_page() -> None:
                     st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['family']} {UI_TEXTS['not_found']}")
                 
             except ValueError as ve:
-                st.error(f"❌ {fu.get_function_name()} {str(ve)}")
+                fu.show_user_error(f"❌ {fu.get_function_name()}", ve)
             except Exception as e:
-                st.error(f"❌ {fu.get_function_name()} {str(e)}")
+                fu.show_user_error(f"❌ {fu.get_function_name()}", e)
 
 def update_family_page() -> None:
     """Display the form to update an existing family."""
@@ -383,11 +383,13 @@ def update_family_page() -> None:
                         st.rerun()
                         
                 except ValueError as ve:
-                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {str(ve)}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}"
+                    logger.error(message, exc_info=ve)
                     st.session_state.update_message = message
                     st.rerun()
                 except Exception as e:
-                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}: {str(e)}"
+                    message = f"❌ {fu.get_function_name()} {UI_TEXTS['update_error']}"
+                    logger.error(message, exc_info=e)
                     st.session_state.update_message = message
                     st.rerun()
 
@@ -471,7 +473,7 @@ def search_relations_page() -> None:
                 
                 except Exception as e:
                     st.session_state.relation_search_results = []
-                    st.error(f"❌ Error searching relations: {str(e)}")
+                    fu.show_user_error("❌ Error searching relations", e)
     
             # Display search results if available
             if st.session_state.relation_search_results:
@@ -633,9 +635,9 @@ def add_relation_page() -> None:
                     st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']} {UI_TEXTS['id']}: {relation_id}")
                 
             except ValueError as ve:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}: {str(ve)}")
+                fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}", ve)
             except Exception as e:
-                st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}: {str(e)}")
+                fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['failed']} {UI_TEXTS['add']} {UI_TEXTS['relation_error']}", e)
 
 def update_relation_page() -> None:
     """
@@ -925,6 +927,7 @@ def add_member_page() -> None:
                 
             except Exception as e:
                 message = f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['failed']}: {member_id}"
+                logger.error(message, exc_info=e)
             st.session_state.add_message = message
             st.rerun()
 
@@ -1127,7 +1130,8 @@ def update_member_page() -> None:
                             st.session_state.update_message = f"⚠️ {UI_TEXTS['update']} {UI_TEXTS['not_changed']}"
                         st.rerun()
                     except Exception as e:
-                        st.session_state.update_message = f"❌ {UI_TEXTS['update_error']} {str(e)}"
+                        st.session_state.update_message = f"❌ {UI_TEXTS['update_error']}"
+                        logging.getLogger('ftpe').error(f"❌ {UI_TEXTS['update_error']}", exc_info=e)
                         st.rerun()
                 else:
                     st.session_state.update_message = f"⚠️ {UI_TEXTS['update']} {UI_TEXTS['not_changed']}"
@@ -1248,12 +1252,12 @@ def delete_member_page() -> None:
                             st.session_state.delete_message = message
                             st.rerun()
                     except Exception as e:
-                        error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
+                        error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
                         st.rerun()
         except Exception as e:
-            error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
+            error_msg = f"❌ {fu.get_function_name()} {UI_TEXTS['delete_error']}"
             logger.error(error_msg, exc_info=True)
             st.session_state.delete_message = f"❌ {error_msg}"
             st.rerun()
@@ -1370,12 +1374,13 @@ def delete_family_page() -> None:
                             st.session_state.delete_message = message
                             st.rerun()
                     except Exception as e:
-                        error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
+                        error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
                         st.rerun()
         except Exception as e:
-            error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}: {str(e)}"
+            error_msg = f"{fu.get_function_name()} {UI_TEXTS['delete_error']}"
+            logging.getLogger('ftpe').error(f"{fu.get_function_name()} {UI_TEXTS['delete_error']}", exc_info=e)
             message = f"❌ {error_msg}"
             st.session_state.delete_message = message
             st.session_state.delete_family_confirmation = False
@@ -1481,13 +1486,13 @@ def delete_relation_page() -> None:
                             st.session_state.delete_message = message
                             st.error(message)
                     except Exception as e:
-                        error_msg = f"❌ Error deleting relation: {str(e)}"
+                        error_msg = f"❌ Error deleting relation"
                         logger.error(error_msg, exc_info=True)
                         st.session_state.delete_message = f"❌ {error_msg}"
                         st.error(error_msg)
                 
         except Exception as e:
-            error_msg = f"{fu.get_function_name()} {UI_TEXTS['relation']} {UI_TEXTS['delete_error']} {str(e)}"
+            error_msg = f"{fu.get_function_name()} {UI_TEXTS['relation']} {UI_TEXTS['delete_error']}"
             logger.error(error_msg, exc_info=True)
             st.session_state.delete_message = f"❌ {error_msg}"
             st.session_state.delete_relation_confirmation = False
