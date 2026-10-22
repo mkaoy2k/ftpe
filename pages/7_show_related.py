@@ -81,7 +81,7 @@ def get_relationship_data(member_id: int, relations: List[str]) -> Dict[str, Any
         }
         
     except Exception as e:
-        st.error(f"❌ Error retrieving relationship data: {str(e)}")
+        fu.show_user_error("❌ Error retrieving relationship data", e)
         logger.exception(f"Error in {fu.get_function_name()}")
         return {}
 

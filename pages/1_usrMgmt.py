@@ -52,7 +52,7 @@ def show_page():
         
     except Exception as e:
         logger.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin_init_error']}: {str(e)}", exc_info=True)
-        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin_init_error']}: {str(e)}")
+        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin_init_error']}", e)
         return
     
     try:
@@ -295,7 +295,7 @@ def show_page():
                 else:
                     st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['delete']} {UI_TEXTS['user']}: {user_id} {UI_TEXTS['failed']}")
     except Exception as err:
-        st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['user_error']} {str(err)}")
+        fu.show_user_error(f"❌ {fu.get_function_name()} {UI_TEXTS['user_error']}", err)
     
 # Initialize session state and UI_TEXTS
 if 'app_context' not in st.session_state:

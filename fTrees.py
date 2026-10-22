@@ -20,6 +20,7 @@ Family Tree Platform - 管理介面模組
 - 新增 logging for user login and logout
 """
 from dotenv import load_dotenv
+import logging
 import os
 import sqlite3
 import db_utils as dbm
@@ -126,11 +127,12 @@ def show_reset_password_page():
                                 st.error(error_msg)
                                 return
                     except Exception as e:
-                        error_msg = f"Error verifying token: {str(e)}"
+                        error_msg = f"Error verifying token"
+                        logging.getLogger('ftpe').error(f"Error verifying token", exc_info=e)
                         st.error(error_msg)
                         return
                 except Exception as e:
-                    st.error(f"Error verifying token: {str(e)}")
+                    fu.show_user_error("Error verifying token", e)
                     return
             
             # Show the reset password form with the email
@@ -204,7 +206,8 @@ def show_reset_password_page():
                                     st.session_state.reset_email = None
                                     st.rerun()
                         except Exception as e:
-                            st.session_state.reset_error = f"Error resetting password: {str(e)}"
+                            st.session_state.reset_error = f"Error resetting password"
+                            logging.getLogger('ftpe').error(f"Error resetting password", exc_info=e)
                             st.rerun()
         # If no token, show email input form
         else:
@@ -290,7 +293,7 @@ def show_reset_password_page():
                                 conn.commit()
                                 st.rerun()
                         except Exception as e:
-                            st.error(f"Error processing your request: {str(e)}")
+                            fu.show_user_error("Error processing your request", e)
     
 def reset_password_page():
     """
@@ -363,7 +366,8 @@ def reset_password_page():
                 else:
                     error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}")
             except Exception as e:
-                error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}: {str(e)}")
+                error_messages.append(f"❌ {fu.get_function_name()}: {UI_TEXTS['password_reset_failed']}")
+                logging.getLogger("ftpe").error("Password reset failed", exc_info=e)
         
         # Display all error messages if any
         for error in error_messages:
@@ -587,7 +591,7 @@ def show_fadmin_sidebar():
                 st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}") 
+            fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}", e)
         st.divider()
 
         # Display current family subscribers
@@ -614,7 +618,7 @@ def show_fadmin_sidebar():
                 st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['subscriber']} {UI_TEXTS['not_found']}")
                 
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}")
+            fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}", e)
        
 def show_padmin_sidebar():
     """Display the platform admin sidebar"""
@@ -700,7 +704,7 @@ def show_padmin_sidebar():
                 st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['admin']} {UI_TEXTS['user']} {UI_TEXTS['not_found']}")
             
         except sqlite3.Error as e:
-            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}: {e}")
+            fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['db_error']}", e)
 
 def show_fmember_content():
     """Display the family member content area"""
@@ -1100,7 +1104,7 @@ def handle_export(export_func, file_path, table):
             st.error(f"❌ Failed to export '{table}' table: {results.get('message')}")
                 
     except Exception as e:
-        st.error(f"❌ An error occurred: {str(e)}")
+        fu.show_user_error("❌ An error occurred", e)
     
 # Helper function to handle import operations
 def handle_import(import_func, file_path, table):
@@ -1121,7 +1125,7 @@ def handle_import(import_func, file_path, table):
             st.info(f"Imported: {result['imported']}, Skipped: {result['skipped']}")
             
     except Exception as e:
-        st.error(f"❌ An error occurred during import: {str(e)}")
+        fu.show_user_error("❌ An error occurred during import", e)
 
 def show_front_end():
     global UI_TEXTS
@@ -1367,7 +1371,7 @@ def show_padmin_content():
                                 st.success(f"Added column '{new_col_name}' to table '{selected_table}'")
                                 st.rerun()
                             except sqlite3.Error as e:
-                                st.error(f"❌ Error adding column: {e}")
+                                fu.show_user_error("❌ Error adding column", e)
                         else:
                             st.error("❌ Please enter a column name")
             

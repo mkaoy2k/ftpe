@@ -1,9 +1,11 @@
 [server]
-enableCORS = false
-enableXsrfProtection = false
+enableCORS = true
+enableXsrfProtection = true
 
 [client]
-showErrorDetails = true
+# "none" hides exception types, messages, and tracebacks in the browser.
+# False is the legacy value and still shows a stack trace.
+showErrorDetails = "none"
 
 [runner]
 fastReruns = true

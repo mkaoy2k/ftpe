@@ -1431,7 +1431,7 @@ def main_page(nav, lname_idx):
                     # force to create a new UserDB cache upon return
                     os.environ["DIRTY_USER"] = str(time.time())
                 except Exception as err:
-                    st.warning(f"⚠️ Caught '{err}'. class is {type(err)}")
+                    fu.show_user_error("Something went wrong. Check the server log for details.", err, warn=True)
                     st.error(f"❌ {g_loc['MENU_SETTINGS']} {g_username} {g_loc['FAILED']}")
 
         # --- User Import CSV --- from here

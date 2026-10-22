@@ -145,9 +145,9 @@ def new_birth_page():
                         else:
                             st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.warning(f"⚠️ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"⚠️ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e, warn=True)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}":
                     # Search by name
                     parent_name = parent_name.strip().lower()
@@ -160,9 +160,9 @@ def new_birth_page():
                             else:
                                 st.warning(f"❌ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             
     # Display search results with checkboxes for father/mother selection
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -380,7 +380,7 @@ def new_birth_page():
                             st.error(f"❌ {UI_TEXTS['member_error']}: {UI_TEXTS['member_not_created']}")
                             
                     except Exception as e:
-                        st.error(f"❌ {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {UI_TEXTS['member_error']}", e)
                 # Check optional user email and password if given for
                 # subscription, create an user in the dbm.db_table['users'] table
                 if email and password:
@@ -401,7 +401,7 @@ def new_birth_page():
                         else:
                             st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
             
 def new_death_page():
     """
@@ -461,9 +461,9 @@ def new_death_page():
                     else:
                         st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except ValueError as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
                 # Search members by name (case insensitive)
                 name = name.strip().lower()
@@ -475,9 +475,9 @@ def new_death_page():
                         else:
                             st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except ValueError as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
     
     # Display search results and marriage_form
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -539,14 +539,14 @@ def new_death_page():
                                 else:
                                     st.error(f"❌ {UI_TEXTS['member_error']} {UI_TEXTS['member_subscriber_not_found']}")
                             except Exception as e:
-                                st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                                fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                         
                         # Clear form and search results
                         st.session_state.search_results = []
                     else:
                         st.error(f"❌ {fu.get_function_name()} {UI_TEXTS['member_error']} {UI_TEXTS['member_not_updated']}: {error_msg}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
 
 def new_adopted_child_page():
     """
@@ -635,9 +635,9 @@ def new_adopted_child_page():
                         else:
                             st.warning(f"⚠️ {parent_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}":
                     # Search by name
                     parent_name = parent_name.strip().lower()
@@ -650,9 +650,9 @@ def new_adopted_child_page():
                         else:
                             st.warning(f"⚠️ {parent_name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             
     # Display search results with checkboxes for father/mother selection
     if st.session_state.search_results: 
@@ -871,7 +871,8 @@ def new_adopted_child_page():
                                 del st.session_state.search_results
                     
                 except Exception as e:
-                    message = f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}: {str(e)}"
+                    message = f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}"
+                    logger.error(message, exc_info=e)
                     st.error(message)
             # Check optional user email and password if given for
             # subscription, create an user in the dbm.db_table['users'] table
@@ -893,7 +894,7 @@ def new_adopted_child_page():
                     else:
                         st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
             
 def new_adopted_parent_page():
     """
@@ -944,9 +945,9 @@ def new_adopted_parent_page():
                     else:
                         st.warning(f"⚠️ {child_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except ValueError as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and child_name.strip():
                 # Search members by name (case insensitive)
                 name = child_name.strip().lower()
@@ -958,9 +959,9 @@ def new_adopted_parent_page():
                         else:
                             st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except ValueError as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
     
     # Display search results and adopted parent form
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -1124,7 +1125,7 @@ def new_adopted_parent_page():
                             st.error(f"❌ {UI_TEXTS['relation_error']}: {UI_TEXTS['relation_not_created']}: {relationship_data}")
                 
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     
                     # Check optional user email and password if given for
                     # subscription, create an user in the dbm.db_table['users'] table
@@ -1146,7 +1147,7 @@ def new_adopted_parent_page():
                             else:
                                 st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                         except Exception as e:
-                            st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                            fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
                     
 def divorce_seperation_page():
     """
@@ -1224,9 +1225,9 @@ def divorce_seperation_page():
                         else:
                             st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                 elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
                     # Search members by name (case insensitive)
                     name = name.strip().lower()
@@ -1239,9 +1240,9 @@ def divorce_seperation_page():
                             else:
                                 st.warning(f"⚠️ {name}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                     except ValueError as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
     
     # Display search results with checkboxes for selection
     if st.session_state.search_results:
@@ -1419,7 +1420,7 @@ def divorce_seperation_page():
                             st.error(f"❌ {UI_TEXTS['relation_error']}")
                         
                     except Exception as e:
-                        st.error(f"❌ {UI_TEXTS['relation_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {UI_TEXTS['relation_error']}", e)
 
 def new_marriage_partnership_page():
     """
@@ -1471,7 +1472,7 @@ def new_marriage_partnership_page():
                     else:
                         st.warning(f"⚠️ {member_id}: {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
                 # Search members by name (case insensitive)
                 name = name.strip().lower()
@@ -1483,7 +1484,7 @@ def new_marriage_partnership_page():
                         else:
                             st.warning(f"⚠️ {UI_TEXTS['member_error']} {UI_TEXTS['members']} {UI_TEXTS['not_found']}: {name}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
     
     # Display search results and the marriage form
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -1643,7 +1644,7 @@ def new_marriage_partnership_page():
                             st.error(f"❌ {UI_TEXTS['relation_error']}: {UI_TEXTS['relation_not_created']}: {relationship_data}")
                             
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}", e)
                 
                 # Check optional user email and password if given for
                 # subscription, create an user in the dbm.db_table['users'] table
@@ -1665,7 +1666,7 @@ def new_marriage_partnership_page():
                         else:
                             st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
                     
 def new_step_child_page():
     """ 
@@ -1720,7 +1721,7 @@ def new_step_child_page():
                     else:
                         st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
                 name = name.strip().lower()
                 try:
@@ -1730,7 +1731,7 @@ def new_step_child_page():
                     else:
                         st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
 
     # Display search results and the step child form
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -1891,7 +1892,7 @@ def new_step_child_page():
                             st.error(f"❌ {UI_TEXTS['relation_error']}: {UI_TEXTS['relation_not_created']}: {relationship_data}")
                             
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}", e)
                 
                 # Check optional user email and password if given for
                 # subscription, create an user in the dbm.db_table['users'] table
@@ -1913,7 +1914,7 @@ def new_step_child_page():
                         else:
                             st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
 
 def new_step_parent_page():
     """ 
@@ -1968,7 +1969,7 @@ def new_step_parent_page():
                     else:
                         st.warning(f"⚠️ {member_id} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
             elif search_type == f"{UI_TEXTS['member']} {UI_TEXTS['name']}" and name.strip():
                 name = name.strip().lower()
                 try:
@@ -1978,7 +1979,7 @@ def new_step_parent_page():
                     else:
                         st.warning(f"⚠️ {name} {UI_TEXTS['member_error']}: {UI_TEXTS['members']} {UI_TEXTS['not_found']}")
                 except Exception as e:
-                    st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}: {str(e)}")
+                    fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['member_error']}", e)
 
     # Display search results and the step child form
     if hasattr(st.session_state, 'search_results') and st.session_state.search_results:
@@ -2139,7 +2140,7 @@ def new_step_parent_page():
                             st.error(f"❌ {UI_TEXTS['relation_error']}: {UI_TEXTS['relation_not_created']}: {relationship_data}")
                             
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['relation_error']}", e)
                 
                 # Check optional user email and password if given for
                 # subscription, create an user in the dbm.db_table['users'] table
@@ -2161,7 +2162,7 @@ def new_step_parent_page():
                         else:
                             st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']} : {error_msg}")
                     except Exception as e:
-                        st.error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}: {str(e)}")
+                        fu.show_user_error(f"❌ {fu.get_function_name()}: {UI_TEXTS['user_error']}", e)
 
 def sidebar() -> None:
     """Sidebar application entry point."""

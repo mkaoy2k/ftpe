@@ -9,6 +9,7 @@ Authentication Utilities
 
 This module handles authentication-related functions to avoid circular imports.
 """
+import logging
 import streamlit as st
 import sqlite3
 import hashlib
@@ -16,6 +17,7 @@ import secrets
 import os
 import db_utils as dbm
 import context_utils as cu
+import funcUtils as fu
 
 def hash_password(password, salt=None):
     """Hash password with salt using PBKDF2"""
@@ -70,7 +72,7 @@ def verify_fmember(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"⚠️ Error updating login time: {update_error}")
+                    fu.show_user_error("⚠️ Error updating login time", update_error, warn=True)
                     # Continue even if update fails, as auth was successful
                 # Update context
                 cu.update_context({
@@ -83,7 +85,7 @@ def verify_fmember(email, password):
             return False
             
     except sqlite3.Error as e:
-        st.error(f"Error verifying member: {e}")
+        fu.show_user_error("Error verifying member", e)
         return False
 
 def verify_padmin(email, password):
@@ -124,7 +126,7 @@ def verify_padmin(email, password):
                     """, (user_id,))
                     conn.commit()
                 except sqlite3.Error as update_error:
-                    st.warning(f"⚠️ Error updating login time: {update_error}")
+                    fu.show_user_error("⚠️ Error updating login time", update_error, warn=True)
                     # Continue even if update fails, as auth was successful
                 # Update context
                 cu.update_context({
@@ -138,7 +140,7 @@ def verify_padmin(email, password):
             return False
             
     except sqlite3.Error as e:
-        st.error(f"Error verifying admin: {e}")
+        fu.show_user_error("Error verifying admin", e)
         return False
 
 def verify_fadmin(email, password):
@@ -180,7 +182,7 @@ def verify_fadmin(email, password):
                     conn.commit()
                 except sqlite3.Error as update_error:
                     # Continue even if update fails, as auth was successful
-                    st.warning(f"⚠️ Error updating login time: {update_error}")
+                    fu.show_user_error("⚠️ Error updating login time", update_error, warn=True)
                 # Update context
                 cu.update_context({
                     'member_id': member_id,
@@ -192,7 +194,7 @@ def verify_fadmin(email, password):
             return False
             
     except sqlite3.Error as e:
-        st.error(f"Error verifying admin: {e}")
+        fu.show_user_error("Error verifying admin", e)
         return False
 
 def create_password_reset_token(email: str, expires_hours: int = None):
@@ -230,7 +232,7 @@ def create_password_reset_token(email: str, expires_hours: int = None):
             return token
             
     except Exception as e:
-        st.error(f"Error creating password reset token: {e}")
+        fu.show_user_error("Error creating password reset token", e)
         return None
 
 def validate_password_reset_token(token: str) -> tuple:
@@ -262,7 +264,7 @@ def validate_password_reset_token(token: str) -> tuple:
             return False, None
             
     except Exception as e:
-        st.error(f"Error validating password reset token: {e}")
+        fu.show_user_error("Error validating password reset token", e)
         return False, None
 
 def reset_password(email: str, new_password: str) -> bool:
@@ -299,13 +301,12 @@ def reset_password(email: str, new_password: str) -> bool:
                     WHERE email = ?
                 """, (email,))
             except Exception as e:
-                # ignored
-                pass
+                logging.getLogger("ftpe").error("Could not mark reset tokens as used", exc_info=e)
             conn.commit()
             return result
             
     except Exception as e:
-        st.error(f"Error resetting password: {e}")
+        fu.show_user_error("Error resetting password", e)
         return False
 
 
