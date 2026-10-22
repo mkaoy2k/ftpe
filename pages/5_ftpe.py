@@ -1160,11 +1160,7 @@ def main_page(nav, lname_idx):
                     g_df.loc[idx, g_df.columns] = gbuff
 
                     try:
-                        # backup the current family tree
-                        os.rename(g_fTree, g_fTree_Backup)
-
-                        # create a new family tree
-                        g_df.to_csv(g_fTree, mode="w", header=True, index=False)
+                        write_tree_csv(g_fTree, g_fTree_Backup, g_df)
                         # force to create a new tree cache upon return
                         os.environ["DIRTY_TREE"] = str(time.time())
                         load_buff(gbuff["Name"], gbuff["Born"], g_dirtyTree)
@@ -1180,11 +1176,7 @@ def main_page(nav, lname_idx):
                     g_df.drop([idx], inplace=True)
 
                     try:
-                        # backup the current family tree
-                        os.rename(g_fTree, g_fTree_Backup)
-
-                        # create a new family tree
-                        g_df.to_csv(g_fTree, mode="w", header=True, index=False)
+                        write_tree_csv(g_fTree, g_fTree_Backup, g_df)
                         # force to create a new tree cache upon return
                         os.environ["DIRTY_TREE"] = str(time.time())
 
@@ -1419,10 +1411,14 @@ def main_page(nav, lname_idx):
         # --- User Export CSV --- from here
         # enter a CSV file name to export/download
         with c2:
-            with open(g_fTree) as f:
-                fn = f"{filename}.csv"
-                if c2.download_button(g_loc["BX_EXPORT"], f, fn):
-                    st.success(f"{g_loc['BX_EXPORT']} {fn} {g_loc['DONE']}")
+            export_path = g_fTree if os.path.isfile(g_fTree) else f"{g_path_dir}/me.sample.csv"
+            if not os.path.isfile(export_path):
+                st.info("No family-tree CSV is available to export. Add data/me.csv locally, or keep data/me.sample.csv.")
+            else:
+                with open(export_path) as f:
+                    fn = f"{filename}.csv"
+                    if c2.download_button(g_loc["BX_EXPORT"], f, fn):
+                        st.success(f"{g_loc['BX_EXPORT']} {fn} {g_loc['DONE']}")
 
         # set L10N upon click
         with c1:
@@ -1462,11 +1458,7 @@ def main_page(nav, lname_idx):
                 g_df.sort_values(by=["Order", "Born", "Name"], inplace=True)
 
                 try:
-                    # backup existing current family tree
-                    os.rename(g_fTree, g_fTree_Backup)
-
-                    # create new .csv family tree if exists
-                    g_df.to_csv(g_fTree, mode="w", header=True, index=False)
+                    write_tree_csv(g_fTree, g_fTree_Backup, g_df)
                     st.success(f"{g_loc['BX_IMPORT']} {g_loc['DONE']}")
 
                     # force to create a new tree cache upon return
@@ -1479,37 +1471,35 @@ def main_page(nav, lname_idx):
 
 # ---- READ Family Tree from CSV ----
 # Clear all caches every 5 min = 300 seconds
+def write_tree_csv(path, backup, frame):
+    """Write a family-tree CSV. Back up the personal file when it already exists."""
+    if os.path.isfile(path):
+        os.replace(path, backup)
+    frame.to_csv(path, mode="w", header=True, index=False)
+
+
 @st.cache_data(ttl=300)
 def get_data_from_csv(f, base=None):
     """
-    從CSV檔案讀取家譜資料
+    Read a family-tree CSV.
 
-    Args:
-        f (str): CSV檔案路徑
-        base (str, optional): 基準路徑. Defaults to None.
-
-    Returns:
-        tuple: 包含原始數據框和成員數據框的元組
-
-    Raises:
-        FileNotFoundError: 當找不到檔案時
+    The first data row is a placeholder and is omitted from the members frame.
+    A missing or unreadable file returns (None, None) so the caller can show
+    an empty state instead of creating data/me.csv.
     """
+    path = Path(f)
+    if not path.is_file():
+        logger.info("%s is not present.", f)
+        return None, None
     try:
-        fileCSV = open(f, "r")
-    except:
-        # create a new CSV for new family admin
-        with open(g_fTree_template, "r") as temp:
-            temp_contents = temp.read()
-        with open(f, "w") as ft:
-            print(temp_contents, file=ft)
-        logger.debug(f"{f} not existed, CREATED a NEW family tree.")
-
-    df = pd.read_csv(f)
-    members = df.drop(index=0)
-    logger.debug(f"{f} LOADED.")
-    logger.debug(f"{df.tail(3)}")
-    logger.debug(f"{members.head(3)}")
-
+        df = pd.read_csv(path)
+    except Exception:
+        logger.exception("Failed to read %s", f)
+        return None, None
+    if df.empty:
+        return df, df.iloc[0:0]
+    members = df.drop(index=df.index[0])
+    logger.debug("%s LOADED.", f)
     return df, members
 
 
@@ -1779,8 +1769,20 @@ else:
     g_fTree = f"{g_path_dir}/{g_username}.csv"
     g_fTree_template = f"{g_path_dir}/template.csv"
     g_fTree_Backup = f"{g_path_dir}/{g_username}_bak.csv"
+    g_sample = f"{g_path_dir}/me.sample.csv"
 
     g_df, all_members = get_data_from_csv(g_fTree, base=g_dirtyTree)
+    if g_df is None:
+        st.warning(
+            "data/me.csv is not on this machine. Personal family trees stay local and are not stored in git. "
+            "Showing the fictional sample at data/me.sample.csv. Copy that file to data/me.csv to keep your own tree."
+        )
+        g_df, all_members = get_data_from_csv(g_sample, base=g_dirtyTree)
+    if g_df is None or all_members is None:
+        st.error(
+            "No family-tree CSV could be loaded. Add data/me.csv, or restore the fictional data/me.sample.csv."
+        )
+        st.stop()
 
     # Define global list, 'g_lview', used for inquery
     g_lview = [g_loc["VIEW_NAME"], g_loc["VIEW_STATUS"], g_loc["VIEW_RECORD"]]

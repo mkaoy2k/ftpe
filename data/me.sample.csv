@@ -1,0 +1,6 @@
+Name,Dad,Mom,Born,Died,Relation,Sex,Order,Aka,Status,Spouse,Married,Href
+?,?,?,1900,1900,0,0,0,?,0,?,1900,n/a
+Sam Example,,,1925,2001,0,0,1,Sam,1,Jordan Example,1948,https://example.invalid/sam
+Jordan Example,,,1928,2005,0,1,1,Jo,1,Sam Example,1948,https://example.invalid/jordan
+Alex Example,Sam Example,Jordan Example,1950,2020,0,0,2,Alex,1,Riley Example,1975,https://example.invalid/alex
+Riley Example,,,1952,2021,0,1,2,Riley,1,Alex Example,1975,https://example.invalid/riley

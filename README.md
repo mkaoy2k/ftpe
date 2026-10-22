@@ -135,8 +135,9 @@ configuration script
 ├── template.env.txt      # Environment template
 │
 ├── data/                 # Data directory
-│   ├── family.db         # Family database
-│   ├── me.csv            # Personal data
+│   ├── family.db         # Local database (not in git)
+│   ├── me.csv            # Local personal tree (not in git)
+│   ├── me.sample.csv     # Fictional sample tree
 │   └── template.csv      # CSV template
 │
 └── pages/                # Application pages
