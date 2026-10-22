@@ -110,25 +110,12 @@ def show_reset_password_page():
             # If email is not in session state, try to get it from the token
             if not email:
                 try:
-                    try:
-                        with dbm.get_db_connection() as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                SELECT email FROM password_reset_tokens 
-                                WHERE token = ? AND expires_at > datetime('now')
-                            """, (token,))
-                            result = cursor.fetchone()
-                            
-                            if result:
-                                email = result[0]
-                                st.session_state.reset_email = email
-                            else:
-                                error_msg = "Invalid or expired token. Please request a new password reset."
-                                st.error(error_msg)
-                                return
-                    except Exception as e:
-                        error_msg = f"Error verifying token"
-                        logging.getLogger('ftpe').error(f"Error verifying token", exc_info=e)
+                    valid, found_email = au.validate_password_reset_token(token)
+                    if valid:
+                        email = found_email
+                        st.session_state.reset_email = email
+                    else:
+                        error_msg = "Invalid or expired token. Please request a new password reset."
                         st.error(error_msg)
                         return
                 except Exception as e:
@@ -167,44 +154,32 @@ def show_reset_password_page():
                         st.rerun()
                     else:
                         try:
-                            with dbm.get_db_connection() as conn:
-                                cursor = conn.cursor()
-                                cursor.execute("""
-                                    SELECT email FROM password_reset_tokens 
-                                    WHERE token = ? AND email = ? AND expires_at > datetime('now')
-                                """, (token, email))
-                                if cursor.fetchone():
-                                    # Update password
+                            valid, token_email = au.validate_password_reset_token(token)
+                            if valid and token_email == email:
+                                with dbm.get_db_connection() as conn:
+                                    cursor = conn.cursor()
+                                    # Update password (hash includes the current iteration count)
                                     password_hash, salt = au.hash_password(new_password)
                                     cursor.execute("""
                                         UPDATE users 
                                         SET password_hash = ?, salt = ?, updated_at = datetime('now')
                                         WHERE email = ?
                                     """, (password_hash, salt, email))
-                                    
-                                    # Delete used token
-                                    cursor.execute("""
-                                        DELETE FROM password_reset_tokens 
-                                        WHERE token = ?
-                                    """, (token,))
-                                    
                                     conn.commit()
-                                    
-                                    # Clear form state
-                                    st.session_state.pop('new_password', None)
-                                    st.session_state.pop('confirm_password', None)
-                                    
-                                    # Set success message and reset state
-                                    st.session_state.reset_success = "Password has been reset successfully. You can now login with your new password."
-                                    st.session_state.reset_error = None
-                                    st.session_state.reset_token = None
-                                    st.session_state.reset_email = None
-                                    st.rerun()
-                                else:
-                                    st.session_state.reset_error = "Invalid or expired token. Please request a new password reset."
-                                    st.session_state.reset_token = None
-                                    st.session_state.reset_email = None
-                                    st.rerun()
+                                au.delete_password_reset_token(token)
+
+                                st.session_state.pop('new_password', None)
+                                st.session_state.pop('confirm_password', None)
+                                st.session_state.reset_success = "Password has been reset successfully. You can now login with your new password."
+                                st.session_state.reset_error = None
+                                st.session_state.reset_token = None
+                                st.session_state.reset_email = None
+                                st.rerun()
+                            else:
+                                st.session_state.reset_error = "Invalid or expired token. Please request a new password reset."
+                                st.session_state.reset_token = None
+                                st.session_state.reset_email = None
+                                st.rerun()
                         except Exception as e:
                             st.session_state.reset_error = f"Error resetting password"
                             logging.getLogger('ftpe').error(f"Error resetting password", exc_info=e)
@@ -229,16 +204,16 @@ def show_reset_password_page():
                                     WHERE email = ?
                                 """, (email,))
                                 if cursor.fetchone():
-                                    token = eu.generate_verification_token()
-                                    
-                                    # Get expiration hours from environment variable
+                                    # Get expiration hours from environment variable.
+                                    # create_password_reset_token stores only a hash of the token.
                                     expires_hours = int(os.getenv('PASSWORD_RESET_TOKEN_EXPIRY_HOURS', '24'))
-                                    
-                                    cursor.execute("""
-                                        INSERT OR REPLACE INTO password_reset_tokens 
-                                        (email, token, created_at, expires_at)
-                                        VALUES (?, ?, datetime('now'), datetime('now', ? || ' hours'))
-                                    """, (email, token, str(expires_hours)))
+                                    token = au.create_password_reset_token(email, expires_hours)
+                                    if not token:
+                                        st.session_state.reset_error = "Failed to create a password reset token. Please try again later."
+                                        st.session_state.reset_success = None
+                                        conn.commit()
+                                        st.rerun()
+                                        return
                                     
                                     reset_link = f"{os.getenv('FT_SVR', 'http://localhost:8501')}/?token={token}"
                                     

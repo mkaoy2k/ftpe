@@ -10,6 +10,8 @@ Authentication Utilities
 This module handles authentication-related functions to avoid circular imports.
 """
 import logging
+import hmac
+import re
 import streamlit as st
 import sqlite3
 import hashlib
@@ -19,20 +21,90 @@ import db_utils as dbm
 import context_utils as cu
 import funcUtils as fu
 
-def hash_password(password, salt=None):
-    """Hash password with salt using PBKDF2"""
-    if salt is None:
-        salt = secrets.token_hex(16)  # Generate random salt
-    
-    # Use SHA-256 for password hashing
-    password_hash = hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode('utf-8'),  # Convert password to bytes
-        salt.encode('utf-8'),      # Use salt
-        100000                     # Number of iterations
+# PBKDF2-HMAC-SHA256. New hashes use the current iteration count and record it
+# in the stored string. Older rows are a bare hex digest from LEGACY_PBKDF2_ITERATIONS.
+PBKDF2_ITERATIONS = 600_000
+LEGACY_PBKDF2_ITERATIONS = 100_000
+_HASH_PREFIX = "pbkdf2_sha256$"
+# SHA-256 hex digest. New password hashes and stored reset tokens use this shape.
+# Legacy password hashes are a bare digest; legacy reset tokens are url-safe strings.
+_SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+
+def _pbkdf2_hex(password, salt, iterations):
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        int(iterations),
     ).hex()
-    
-    return password_hash, salt
+
+def hash_password(password, salt=None, iterations=None):
+    """Hash password with salt using PBKDF2-HMAC-SHA256.
+
+    Returns (stored_hash, salt). stored_hash includes the iteration count:
+    ``pbkdf2_sha256$<iterations>$<hex digest>``.
+    """
+    if salt is None:
+        salt = secrets.token_hex(16)
+    if iterations is None:
+        iterations = PBKDF2_ITERATIONS
+    digest = _pbkdf2_hex(password, salt, iterations)
+    return f"{_HASH_PREFIX}{int(iterations)}${digest}", salt
+
+def _split_stored_hash(stored_hash):
+    """Return (iterations, digest) or None if the value is not a known hash."""
+    if not isinstance(stored_hash, str) or not stored_hash:
+        return None
+    if stored_hash.startswith(_HASH_PREFIX):
+        rest = stored_hash[len(_HASH_PREFIX):]
+        iter_text, sep, digest = rest.partition("$")
+        if sep and iter_text.isdigit() and _SHA256_HEX.fullmatch(digest):
+            return int(iter_text), digest
+        return None
+    # Legacy rows: hex digest only, produced with 100k iterations.
+    if _SHA256_HEX.fullmatch(stored_hash):
+        return LEGACY_PBKDF2_ITERATIONS, stored_hash
+    return None
+
+def _password_ok(password, salt, stored_hash):
+    """Constant-time check of password against a stored hash."""
+    parsed = _split_stored_hash(stored_hash)
+    if parsed is None or not isinstance(salt, str):
+        return False
+    iterations, digest = parsed
+    try:
+        candidate = _pbkdf2_hex(password, salt, iterations)
+    except (TypeError, ValueError):
+        return False
+    if len(candidate) != len(digest):
+        return False
+    return hmac.compare_digest(candidate, digest)
+
+def _needs_rehash(stored_hash):
+    parsed = _split_stored_hash(stored_hash)
+    if parsed is None:
+        return False
+    iterations, _digest = parsed
+    return iterations != PBKDF2_ITERATIONS or not stored_hash.startswith(_HASH_PREFIX)
+
+def _rehash_password_if_needed(cursor, user_id, password, stored_hash):
+    """Replace a legacy or outdated hash after a successful login."""
+    if not _needs_rehash(stored_hash):
+        return
+    new_hash, new_salt = hash_password(password)
+    cursor.execute(f"""
+        UPDATE {dbm.db_tables['users']}
+        SET password_hash = ?, salt = ?
+        WHERE id = ?
+    """, (new_hash, new_salt, user_id))
+
+def hash_reset_token(token):
+    """SHA-256 hex digest of a password-reset token. The raw token is not stored."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def is_stored_reset_token(value):
+    """True when value is already a SHA-256 hex digest rather than a raw token."""
+    return isinstance(value, str) and _SHA256_HEX.fullmatch(value) is not None
 
 def verify_fmember(email, password):
     """Verify family member credentials and membership status
@@ -60,9 +132,8 @@ def verify_fmember(email, password):
                 return False
                 
             user_id, stored_hash, salt, family_id, member_id, l10n = result
-            input_hash, _ = hash_password(password, salt)
-            
-            if input_hash == stored_hash:
+            if _password_ok(password, salt, stored_hash):
+                _rehash_password_if_needed(cursor, user_id, password, stored_hash)
                 # Update last login time with current timestamp
                 try:
                     cursor.execute(f"""
@@ -114,9 +185,8 @@ def verify_padmin(email, password):
                 return False
                 
             user_id, stored_hash, salt, family_id, member_id, l10n = result
-            input_hash, _ = hash_password(password, salt)
-            
-            if input_hash == stored_hash:
+            if _password_ok(password, salt, stored_hash):
+                _rehash_password_if_needed(cursor, user_id, password, stored_hash)
                 # Update last login time with current timestamp
                 try:
                     cursor.execute(f"""
@@ -169,9 +239,8 @@ def verify_fadmin(email, password):
                 return False
                 
             user_id, stored_hash, salt, family_id, member_id, l10n = result
-            input_hash, _ = hash_password(password, salt)
-            
-            if input_hash == stored_hash:
+            if _password_ok(password, salt, stored_hash):
+                _rehash_password_if_needed(cursor, user_id, password, stored_hash)
                 # Update last login time with current timestamp
                 try:
                     cursor.execute(f"""
@@ -213,20 +282,19 @@ def create_password_reset_token(email: str, expires_hours: int = None):
         if expires_hours is None:
             expires_hours = int(os.getenv('PASSWORD_RESET_TOKEN_EXPIRY_HOURS', '24'))
         
-        # Generate a secure random token
+        # Generate a secure random token. Only its hash is stored.
         token = secrets.token_urlsafe(32)
         
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
             
-            # Insert the token into the database
             cursor.execute("""
                 INSERT INTO password_reset_tokens (
                     email, 
                     token, 
                     expires_at
                 ) VALUES (?, ?, datetime('now', ? || ' hours'))
-            """, (email, token, str(expires_hours)))
+            """, (email, hash_reset_token(token), str(expires_hours)))
             
             conn.commit()
             return token
@@ -246,26 +314,65 @@ def validate_password_reset_token(token: str) -> tuple:
                and email is the associated email address if valid, None otherwise
     """
     try:
+        if not token:
+            return False, None
+        token_hash = hash_reset_token(token)
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            # Check if token exists and is not expired or used
             cursor.execute("""
-                SELECT email 
-                FROM password_reset_tokens 
-                WHERE token = ? 
-                AND used = 0 
+                SELECT email
+                FROM password_reset_tokens
+                WHERE token = ?
+                AND used = 0
                 AND expires_at > datetime('now')
-            """, (token,))
-            
+            """, (token_hash,))
             result = cursor.fetchone()
             if result:
                 return True, result[0]
-            return False, None
+
+            # Rows created before hashing still hold the raw token.
+            # Do not accept a stored digest presented as the token.
+            if is_stored_reset_token(token):
+                return False, None
+            cursor.execute("""
+                SELECT id, email
+                FROM password_reset_tokens
+                WHERE token = ?
+                AND used = 0
+                AND expires_at > datetime('now')
+            """, (token,))
+            legacy = cursor.fetchone()
+            if not legacy:
+                return False, None
+            cursor.execute("""
+                UPDATE password_reset_tokens
+                SET token = ?
+                WHERE id = ?
+            """, (token_hash, legacy[0]))
+            conn.commit()
+            return True, legacy[1]
             
     except Exception as e:
         fu.show_user_error("Error validating password reset token", e)
         return False, None
+
+def delete_password_reset_token(token: str) -> None:
+    """Delete the reset-token row for a raw token (hashed or leftover plaintext)."""
+    if not token:
+        return
+    token_hash = hash_reset_token(token)
+    with dbm.get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM password_reset_tokens WHERE token = ?",
+            (token_hash,),
+        )
+        if not is_stored_reset_token(token):
+            cursor.execute(
+                "DELETE FROM password_reset_tokens WHERE token = ?",
+                (token,),
+            )
+        conn.commit()
 
 def reset_password(email: str, new_password: str) -> bool:
     """Reset a user's password

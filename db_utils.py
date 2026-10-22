@@ -322,7 +322,28 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_mirrors_order ON {db_tables["mirrors"]}('Order')
         """)
 
+        migrate_plaintext_reset_tokens(conn)
         conn.commit()
+
+def migrate_plaintext_reset_tokens(conn) -> int:
+    """Hash leftover plaintext password-reset tokens in place.
+
+    Existing email links still work: validation hashes the presented token
+    and compares it to the stored digest. Expiry and the used flag are kept.
+    Rows that already store a SHA-256 hex digest are skipped.
+    """
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, token FROM password_reset_tokens")
+    updated = 0
+    for row in cursor.fetchall():
+        token = row["token"]
+        if token and not au.is_stored_reset_token(token):
+            cursor.execute(
+                "UPDATE password_reset_tokens SET token = ? WHERE id = ?",
+                (au.hash_reset_token(token), row["id"]),
+            )
+            updated += 1
+    return updated
 
 def add_subscriber(email: str, token: str, lang: str = None) -> Tuple[bool, str]:
     """
